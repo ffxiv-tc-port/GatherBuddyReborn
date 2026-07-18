@@ -65,7 +65,6 @@ public partial class Interface
                 GatherBuddy.Config.AutoGatherConfig.GoHomeWhenIdle, b => GatherBuddy.Config.AutoGatherConfig.GoHomeWhenIdle = b);
             ImGui.SameLine();
             ImGuiEx.PluginAvailabilityIndicator([new("Lifestream")]);
-            Svc.Framework.Run
         }
 
         public static void DrawUseSkillsForFallabckBox()
