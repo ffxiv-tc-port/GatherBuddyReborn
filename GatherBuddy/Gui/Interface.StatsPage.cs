@@ -50,7 +50,7 @@ public partial class Interface
             var spots = Locations.Values.ToList();
             _fishingSpotCombo = new ClippedSelectableCombo<FishingSpot>(
                 "FishingSpotSelector",
-                "Fishing Spot",
+                "釣點",
                 500,
                 spots,
                 CosmicHandler
@@ -69,7 +69,7 @@ public partial class Interface
     private void DrawCopier()
     {
         var copyStatsString = GenerateSpotReport();
-        if (ImUtf8.Button($"Copy Fish Stats for {CosmicHandler(_selectedSpot)}"))
+        if (ImUtf8.Button($"複製 {CosmicHandler(_selectedSpot)} 的釣魚統計資料"))
             ImUtf8.SetClipboardText(copyStatsString);
 
         ImUtf8.HoverTooltip(copyStatsString);
@@ -95,10 +95,10 @@ public partial class Interface
                 name    = name[..^8];
             }
 
-        sb.AppendLine($"Location: {name}");
+        sb.AppendLine($"地點：{name}");
         if (numbers > 0)
-            sb.AppendLine($"Mission: {Missions[numbers].Name}");
-        sb.AppendLine("Collection Method: GatherBuddy Report Generator");
+            sb.AppendLine($"任務：{Missions[numbers].Name}");
+        sb.AppendLine("收集方式：GatherBuddy 報告產生器");
         sb.AppendLine("");
 
         foreach (var baitGroup in recordsAtSpot)
@@ -106,10 +106,10 @@ public partial class Interface
             var baitRecords = baitGroup.ToList();
             var bait        = baitRecords[0].BaitId;
             var baitName = GatherBuddy.GameData.Bait.TryGetValue(bait, out var b) ? b.Name :
-                GatherBuddy.GameData.Fishes.TryGetValue(bait, out var f)          ? $"Mooch - {new Bait(f.ItemData).Name}" : Bait.Unknown.Name;
+                GatherBuddy.GameData.Fishes.TryGetValue(bait, out var f)          ? $"魚吞 - {new Bait(f.ItemData).Name}" : Bait.Unknown.Name;
 
             // Bait Name
-            sb.AppendLine($"Bait: {baitName}");
+            sb.AppendLine($"魚餌：{baitName}");
 
             var fishIdToIndex = _selectedSpot.Items
                 .Select((fish, index) => new { fish.FishId, index })
@@ -132,7 +132,7 @@ public partial class Interface
 
                 if (count == 0)
                 {
-                    sb.AppendLine($"{fish.Name}:\n- (0 Caught)");
+                    sb.AppendLine($"{fish.Name}:\n- （捕獲 0 次）");
                     continue;
                 }
 
@@ -146,7 +146,7 @@ public partial class Interface
 
                     if (timeRecords.Count == 0)
                     {
-                        sb.AppendLine("- No valid time data.");
+                        sb.AppendLine("- 無有效時間資料。");
                     }
                     else
                     {
@@ -156,9 +156,9 @@ public partial class Interface
                         var lureRecords = timeRecords.Where(r => r.Flags.HasFlag(Effects.ValidLure)).ToList();
                         var isMinLure   = lureRecords.Count != 0 && lureRecords.Min(r => r.Bite) / 1000f == minTime;
 
-                        var timeLine = $"- Times: {minTime} - {maxTime} ({timeRecords.Count} caught)";
+                        var timeLine = $"- 時間：{minTime} - {maxTime}（捕獲 {timeRecords.Count} 次）";
                         if (isMinLure)
-                            timeLine += " (Lure Min!)";
+                            timeLine += "（擬餌鉤最短！）";
 
                         sb.AppendLine(timeLine);
                     }
@@ -188,21 +188,21 @@ public partial class Interface
 
                     var normal = Classify(
                         fishRecords.Where(r => !r.Flags.HasFlag(Effects.Large) && !r.Flags.HasFlag(Effects.BigGameFishing)),
-                        "Average");
+                        "一般");
 
                     var large = Classify(
                         fishRecords.Where(r => r.Flags.HasFlag(Effects.Large) && !r.Flags.HasFlag(Effects.BigGameFishing)),
-                        "Large");
+                        "大型");
 
                     var bgf = Classify(
                         fishRecords.Where(r => r.Flags.HasFlag(Effects.BigGameFishing)),
-                        "BGF");
+                        "大物垂釣");
 
 
                     string Format((string label, List<ushort> sizes, Dictionary<Effects, int> effects, int count) group)
                     {
                         if (group.sizes.Count == 0)
-                            return $"No {group.label} Fish";
+                            return $"無{group.label}魚";
 
                         var min = group.sizes.Min() / 10f;
                         var max = group.sizes.Max() / 10f;
@@ -222,7 +222,7 @@ public partial class Interface
                         Format(bgf),
                     };
 
-                    sb.AppendLine("- Sizes: " + string.Join(" | ", sizeParts));
+                    sb.AppendLine("- 尺寸：" + string.Join(" | ", sizeParts));
                 }
 
                 if (GatherBuddy.Config.EnableReportMulti)
@@ -235,9 +235,9 @@ public partial class Interface
 
                     var hookLine = new List<string>();
                     if (doubleHook > 0)
-                        hookLine.Add($"Double Hook Yield: {doubleHook}");
+                        hookLine.Add($"雙鉤產量：{doubleHook}");
                     if (tripleHook > 0)
-                        hookLine.Add($"Triple Hook Yield: {tripleHook}");
+                        hookLine.Add($"三鉤產量：{tripleHook}");
 
                     if (hookLine.Count != 0)
                         sb.AppendLine($"- {string.Join(" | ", hookLine)}");
@@ -252,25 +252,25 @@ public partial class Interface
 
     private void DrawFishingSpotInfo()
     {
-        ImUtf8.Text($"Coordinates: ({_selectedSpot.IntegralXCoord}, {_selectedSpot.IntegralYCoord})");
-        ImUtf8.Text($"Territory: {_selectedSpot.Territory.Name}");
+        ImUtf8.Text($"座標：({_selectedSpot.IntegralXCoord}, {_selectedSpot.IntegralYCoord})");
+        ImUtf8.Text($"區域：{_selectedSpot.Territory.Name}");
         ImGui.Separator();
 
         if (_selectedSpot.ClosestAetheryte != null)
-            ImUtf8.Text($"Closest Aetheryte: {_selectedSpot.ClosestAetheryte.Name}");
+            ImUtf8.Text($"最近以太之光：{_selectedSpot.ClosestAetheryte.Name}");
         else
-            ImUtf8.Text("No Aetheryte found nearby.");
+            ImUtf8.Text("附近沒有以太之光。");
         ImGui.Separator();
 
         if (_selectedSpot.Items.Any())
         {
-            ImUtf8.Text("Available Fish:");
+            ImUtf8.Text("可捕獲的魚：");
             foreach (var fish in _selectedSpot.Items)
                 ImUtf8.Text("- " + fish.Name[GatherBuddy.Language]);
         }
         else
         {
-            ImUtf8.Text("No fish available.");
+            ImUtf8.Text("沒有可捕獲的魚。");
         }
     }
 
@@ -308,7 +308,7 @@ public partial class Interface
             foreach (var (baitId, entries) in baitGroups)
             {
                 var bait = GatherBuddy.GameData.Bait.GetValueOrDefault(baitId);
-                ImUtf8.BulletText($"Bait: {bait?.Name ?? "Unknown"}");
+                ImUtf8.BulletText($"魚餌：{bait?.Name ?? "未知"}");
 
                 DrawAmountCaught(entries.Count);
                 DrawCatchPercentage(entries, recordsAtSpot.Count(r => r.BaitId == baitId));
@@ -430,8 +430,8 @@ public partial class Interface
 
         // Titles
         drawList.AddText(new Vector2(cursor.X + leftMargin + chartWidth * 0.5f - 20f, origin.Y + 20f), ImGui.GetColorU32(ImGuiCol.Text),
-            "Size");
-        drawList.AddText(ImGui.GetFont(), ImGui.GetFontSize(), new Vector2(cursor.X + 5f, cursor.Y), ImGui.GetColorU32(ImGuiCol.Text), "Count");
+            "尺寸");
+        drawList.AddText(ImGui.GetFont(), ImGui.GetFontSize(), new Vector2(cursor.X + 5f, cursor.Y), ImGui.GetColorU32(ImGuiCol.Text), "數量");
 
         // Legend
         var legendX = origin.X + chartWidth + 10f;
@@ -441,9 +441,9 @@ public partial class Interface
             var sizeName =
                 new List<string>
                 {
-                    "Average",
-                    "Large",
-                    "Big Game Fishing",
+                    "一般",
+                    "大型",
+                    "大物垂釣",
                 }[i];
             var label = $"{sizeName}";
             drawList.AddRectFilled(new Vector2(legendX, legendY), new Vector2(legendX + textHeight, legendY + textHeight),
@@ -458,13 +458,13 @@ public partial class Interface
 
     private static void DrawAmountCaught(int count)
     {
-        ImUtf8.Text($"Caught: {count} times");
+        ImUtf8.Text($"捕獲次數：{count}");
     }
 
     private static void DrawCatchPercentage(List<FishRecord> entries, int baitTotal)
     {
         var percentage = entries.Count / (float)baitTotal * 100f;
-        ImUtf8.Text($"Percent of baited catches: {percentage:F2}");
+        ImUtf8.Text($"佔該魚餌捕獲比例：{percentage:F2}");
     }
 
     private static void DrawBiteTimeHistogram(List<FishRecord> entries)
@@ -714,8 +714,8 @@ public partial class Interface
 
         // Titles
         drawList.AddText(new Vector2(cursor.X + leftMargin + chartWidth * 0.5f - 20f, origin.Y + 20f), ImGui.GetColorU32(ImGuiCol.Text),
-            "Bite Time");
-        drawList.AddText(ImGui.GetFont(), ImGui.GetFontSize(), new Vector2(cursor.X + 5f, cursor.Y), ImGui.GetColorU32(ImGuiCol.Text), "Count");
+            "咬鉤時間");
+        drawList.AddText(ImGui.GetFont(), ImGui.GetFontSize(), new Vector2(cursor.X + 5f, cursor.Y), ImGui.GetColorU32(ImGuiCol.Text), "數量");
 
         // Legend
         var legendX = origin.X + chartWidth + 10f;
@@ -736,13 +736,13 @@ public partial class Interface
             var baitName =
                 new List<string>
                 {
-                    "Chum",
-                    "AmbitiousLure1",
-                    "AmbitiousLure2",
-                    "AmbitiousLure3",
-                    "ModestLure1",
-                    "ModestLure2",
-                    "ModestLure3",
+                    "撒餌",
+                    "進取型擬餌鉤 1",
+                    "進取型擬餌鉤 2",
+                    "進取型擬餌鉤 3",
+                    "保守型擬餌鉤 1",
+                    "保守型擬餌鉤 2",
+                    "保守型擬餌鉤 3",
                 }[k];
             var label = $"{baitName}";
             if (k == 0)
@@ -767,8 +767,8 @@ public partial class Interface
 
         _records = _plugin.FishRecorder.Records;
         using var id  = ImUtf8.PushId("Fishing Spots Stats"u8);
-        using var tab = ImUtf8.TabItem("Fishing Spots Stats"u8);
-        ImUtf8.HoverTooltip("Aggregator of Fish Record data in a presentable format"u8);
+        using var tab = ImUtf8.TabItem("釣點統計"u8);
+        ImUtf8.HoverTooltip("以易讀格式彙整釣魚紀錄資料"u8);
 
         if (!tab)
             return;
