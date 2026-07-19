@@ -38,12 +38,17 @@ jobs:
           $json = Get-Content -Raw $path | ConvertFrom-Json
           $json.AssemblyVersion = "${{ env.VER }}"
           $json | ConvertTo-Json | Set-Content -Path $path
+      - name: Rename artifact to GatherbuddyReborn.zip
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem -Path . -Recurse -Filter latest.zip | Select-Object -First 1
+          Copy-Item $zip.FullName -Destination "GatherbuddyReborn.zip"
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
           files: |
-            GatherBuddy/bin/Release/GatherBuddyReborn/latest.zip
+            GatherbuddyReborn.zip
             GatherBuddy/bin/Release/GatherBuddyReborn/GatherBuddyReborn.json
           generate_release_notes: true
