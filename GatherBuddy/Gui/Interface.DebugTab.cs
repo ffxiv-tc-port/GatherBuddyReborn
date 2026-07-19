@@ -147,19 +147,19 @@ public partial class Interface
 
     private void DrawDebugButtons()
     {
-        if (ImGui.CollapsingHeader("Debug"))
+        if (ImGui.CollapsingHeader("除錯"))
         {
-            if (ImGui.Button("Set Weather Dirty"))
+            if (ImGui.Button("將天氣標記為待更新"))
                 _weatherTable.SetDirty();
-            if (ImGui.Button("Set Locations Dirty"))
+            if (ImGui.Button("將位置標記為待更新"))
                 GatherBuddy.UptimeManager.ResetLocations();
-            if (ImGui.Button("Populate Diadem List"))
+            if (ImGui.Button("填入戴亞德姆清單"))
             {
                 var diademItems = GatherBuddy.GameData.Gatherables.Values.Where(g => g.Name[ClientLanguage.English].Contains("Grade 4 Skybuilder", StringComparison.InvariantCultureIgnoreCase));
                 var list = new AutoGatherList()
                 {
-                    Name        = "Diadem Debug",
-                    Description = "Debug list for diadem gatherables",
+                    Name        = "戴亞德姆除錯",
+                    Description = "戴亞德姆採集物除錯清單",
                 };
                 foreach (var item in diademItems)
                 {
@@ -188,7 +188,7 @@ public partial class Interface
 
     private static unsafe void DrawDebugTime()
     {
-        if (!ImGui.CollapsingHeader("Time"))
+        if (!ImGui.CollapsingHeader("時間"))
             return;
 
         using var table = ImRaii.Table("##Times", 2);
@@ -221,11 +221,11 @@ public partial class Interface
 
     private static unsafe void DrawDebugFishingState()
     {
-        if (!ImGui.CollapsingHeader("Fishing State"))
+        if (!ImGui.CollapsingHeader("釣魚狀態"))
             return;
 
         ImGui.Text($"Remote Task State (Upload): {_plugin.FishRecorder.RemoteRecordsUploadTask.Status}");
-        if (ImGui.Button("Force Cancellation"))
+        if (ImGui.Button("強制取消"))
         {
             _plugin.FishRecorder.StopRemoteRecordsRequests();
         }
@@ -312,7 +312,7 @@ public partial class Interface
 
     private unsafe void DrawDebugFishingTimes()
     {
-        if (!ImGui.CollapsingHeader("Fishing Times"))
+        if (!ImGui.CollapsingHeader("咬鉤時間"))
             return;
 
         using var table = ImRaii.Table("##Fishing Times", 6);
@@ -344,7 +344,7 @@ public partial class Interface
 
     private static void DrawUptimeManagerTable()
     {
-        if (!ImGui.CollapsingHeader($"Uptimes ({GatherBuddy.GameData.TimedGatherables})"))
+        if (!ImGui.CollapsingHeader($"上線時間 ({GatherBuddy.GameData.TimedGatherables})"))
             return;
 
         using var table = ImRaii.Table("##Uptimes", 6, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit);
@@ -424,7 +424,7 @@ public partial class Interface
 
     private void DrawAlarmDebug()
     {
-        if (!ImGui.CollapsingHeader("Alarms##AlarmDebug"))
+        if (!ImGui.CollapsingHeader("提醒##AlarmDebug"))
             return;
 
         using var table = ImRaii.Table("##Alarms", 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit);
@@ -468,7 +468,7 @@ public partial class Interface
 
     private void DrawWaymarkTab()
     {
-        if (!ImGui.CollapsingHeader("Waymarks##WaymarkDebug"))
+        if (!ImGui.CollapsingHeader("場地標記##WaymarkDebug"))
             return;
 
         ImGui.TextUnformatted($"Waymark Manager: 0x{GatherBuddy.WaymarkManager.Address:X}");
@@ -483,10 +483,10 @@ public partial class Interface
             using var id = ImRaii.PushId(i);
             var waymark = GatherBuddy.WaymarkManager[i];
             ImGui.TableNextColumn();
-            if (ImGui.Button("Clear"))
+            if (ImGui.Button("清除"))
                 GatherBuddy.WaymarkManager.ClearWaymark(i);
             ImGui.TableNextColumn();
-            if (ImGui.Button("Set"))
+            if (ImGui.Button("設定"))
                 GatherBuddy.WaymarkManager.SetWaymark(i);
             ImGuiUtil.DrawTableColumn(waymark.Active.ToString());
             ImGuiUtil.DrawTableColumn(waymark.Position.X.ToString());
@@ -500,7 +500,7 @@ public partial class Interface
 
     private static void DrawOceanTab()
     {
-        if (!ImGui.CollapsingHeader("Ocean Routes##OceanDebug"))
+        if (!ImGui.CollapsingHeader("海釣路線##OceanDebug"))
             return;
 
         using (var table = ImRaii.Table("##Ocean", 8, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
@@ -541,7 +541,7 @@ public partial class Interface
 
     private static void DrawCosmicTab()
     {
-        if (!ImUtf8.CollapsingHeader("Cosmic Exploration Fishing Missions##CosmicDebug"u8))
+        if (!ImUtf8.CollapsingHeader("宇宙探索釣魚任務##CosmicDebug"u8))
             return;
 
         using (var table = ImUtf8.Table("##Cosmic", 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
@@ -558,8 +558,8 @@ public partial class Interface
     private void DrawDebugTab()
     {
         using var id = ImRaii.PushId("Debug");
-        using var tab = ImRaii.TabItem("Debug");
-        ImGuiUtil.HoverTooltip("I really hope there is a good reason for you seeing this.");
+        using var tab = ImRaii.TabItem("除錯");
+        ImGuiUtil.HoverTooltip("真心希望你看到這個頁籤是有充分理由的。");
 
         if (!tab)
             return;
@@ -577,34 +577,34 @@ public partial class Interface
         DrawAlarmDebug();
         DrawAutoGatherDebug();
         DrawReflectionDebug();
-        ImGuiTable.DrawTabbedTable($"Aetherytes ({GatherBuddy.GameData.Aetherytes.Count})", GatherBuddy.GameData.Aetherytes.Values,
+        ImGuiTable.DrawTabbedTable($"以太之光 ({GatherBuddy.GameData.Aetherytes.Count})", GatherBuddy.GameData.Aetherytes.Values,
             DrawDebugAetheryte, flags, "Id", "Name", "Territory", "Coords", "Aetherstream");
-        ImGuiTable.DrawTabbedTable($"Territories ({GatherBuddy.GameData.WeatherTerritories.Length})", GatherBuddy.GameData.WeatherTerritories,
+        ImGuiTable.DrawTabbedTable($"區域 ({GatherBuddy.GameData.WeatherTerritories.Length})", GatherBuddy.GameData.WeatherTerritories,
             DrawDebugTerritory, flags, "Id", "Name", "SizeFactor", "#Weathers", "Weathers");
-        ImGuiTable.DrawTabbedTable($"Bait ({GatherBuddy.GameData.Bait.Count})", GatherBuddy.GameData.Bait.Values,
+        ImGuiTable.DrawTabbedTable($"魚餌 ({GatherBuddy.GameData.Bait.Count})", GatherBuddy.GameData.Bait.Values,
             DrawDebugBait, flags, "Id", "Name");
-        ImGuiTable.DrawTabbedTable($"Gatherables ({GatherBuddy.GameData.Gatherables.Count})",
+        ImGuiTable.DrawTabbedTable($"採集物 ({GatherBuddy.GameData.Gatherables.Count})",
             GatherBuddy.GameData.Gatherables.Values.OrderBy(g => g.ItemId),
             DrawGatherableDebug, flags, "ItemId", "GatheringId", "Name", "Level", "#Nodes");
-        ImGuiTable.DrawTabbedTable($"Gathering Nodes ({GatherBuddy.GameData.GatheringNodes.Count})", GatherBuddy.GameData.GatheringNodes.Values,
+        ImGuiTable.DrawTabbedTable($"採集點 ({GatherBuddy.GameData.GatheringNodes.Count})", GatherBuddy.GameData.GatheringNodes.Values,
             DrawGatheringNodeDebug, flags, "Id", "Name", "Job", "Level", "Type", "Territory", "Coords", "Aetheryte", "Folklore", "Times",
             "Items", "World Coords");
-        ImGuiTable.DrawTabbedTable($"Fish ({GatherBuddy.GameData.Fishes.Count})", GatherBuddy.GameData.Fishes.Values,
+        ImGuiTable.DrawTabbedTable($"魚 ({GatherBuddy.GameData.Fishes.Count})", GatherBuddy.GameData.Fishes.Values,
             DrawFishDebug, flags, "ItemId", "FishId", "Name", "Restrictions", "Folklore", "InLog", "Big", "Fishing Spots");
-        ImGuiTable.DrawTabbedTable($"Fishing Spots ({GatherBuddy.GameData.FishingSpots.Count})", GatherBuddy.GameData.FishingSpots.Values,
+        ImGuiTable.DrawTabbedTable($"釣點 ({GatherBuddy.GameData.FishingSpots.Count})", GatherBuddy.GameData.FishingSpots.Values,
             DrawFishingSpotDebug, flags, "Id", "Name", "Territory", "Aetheryte", "Coords", "Shadow", "Fishes");
         DrawUptimeManagerTable();
         DrawOceanTab();
         DrawCosmicTab();
         DrawWaymarkTab();
-        if (ImGui.CollapsingHeader("GatheringTree"))
+        if (ImGui.CollapsingHeader("採集物字典樹"))
         {
             id.Push("GatheringTree");
             PrintNode(GatherBuddy.GameData.GatherablesTrie.Root);
             id.Pop();
         }
 
-        if (ImGui.CollapsingHeader("FishingTree"))
+        if (ImGui.CollapsingHeader("魚類字典樹"))
         {
             id.Push("FishingTree");
             PrintNode(GatherBuddy.GameData.FishTrie.Root);
@@ -668,7 +668,7 @@ public partial class Interface
                 ImGui.TableNextColumn();
                 ImGui.Text($"void {GatherBuddy.InternalName}.SetAutoGatherEnabled(bool)");
                 ImGui.TableNextColumn();
-                if (ImGui.Button("Toggle"))
+                if (ImGui.Button("切換"))
                 {
                     Dalamud.PluginInterface.GetIpcSubscriber<bool, object>($"{GatherBuddy.InternalName}.SetAutoGatherEnabled")
                         .InvokeAction(!autoGatherEnabled);
@@ -730,18 +730,18 @@ public partial class Interface
             }
         }
 
-        if (ImGui.CollapsingHeader("World Objects"))
+        if (ImGui.CollapsingHeader("世界物件"))
         {
             using var group = ImRaii.Group();
-            ImGui.Text("Gatherables within 200 yalms");
+            ImGui.Text("200 亞姆內的採集物");
             var gatherables = Svc.Objects.Where(o => o.ObjectKind == ObjectKind.GatheringPoint);
             foreach (var obj in gatherables)
             {
                 ImGui.PushID(obj.GameObjectId.ToString());
                 var node = GatherBuddy.GameData.GatheringNodes.TryGetValue((uint)obj.GameObjectId, out var n) ? n : null;
-                ImGui.Text($"{obj.GameObjectId}: {obj.Name ?? "Unknown"} - DataId: {obj.DataId}");
+                ImGui.Text($"{obj.GameObjectId}: {obj.Name ?? "未知"} - DataId: {obj.DataId}");
                 ImGui.SameLine();
-                if (ImGui.SmallButton("NavTo"))
+                if (ImGui.SmallButton("導航前往"))
                 {
                     VNavmesh.SimpleMove.PathfindAndMoveTo(obj.Position, true);
                 }
@@ -750,10 +750,10 @@ public partial class Interface
             }
         }
 
-        if (ImGui.CollapsingHeader("Saved World Objects"))
+        if (ImGui.CollapsingHeader("已儲存的世界物件"))
         {
             using var group = ImRaii.Group();
-            ImGui.Text("Saved Gatherables");
+            ImGui.Text("已儲存的採集物");
             foreach (var kvp in WorldData.WorldLocationsByNodeId)
             {
                 ImGui.PushID(kvp.Key.ToString());
@@ -771,10 +771,10 @@ public partial class Interface
 
     private void DrawAutoGatherDebug()
     {
-        if (!ImGui.CollapsingHeader("AutoGather"))
+        if (!ImGui.CollapsingHeader("自動採集"))
             return;
 
-        if (ImGui.Button("Clear Timed Node Memory"))
+        if (ImGui.Button("清除限時採集點記憶"))
         {
             GatherBuddy.Log.Information("Timed node memory cleared manually!");
             GatherBuddy.AutoGather.DebugClearVisited();
@@ -814,7 +814,7 @@ public partial class Interface
             }
         }
 
-        if (ImGui.CollapsingHeader("Timed Node Memory"))
+        if (ImGui.CollapsingHeader("限時採集點記憶"))
         {
             foreach (var (location, time) in GatherBuddy.AutoGather.DebugVisitedTimedLocations)
             {
@@ -822,7 +822,7 @@ public partial class Interface
             }
         }
 
-        if (ImGui.CollapsingHeader("Visited Nodes"))
+        if (ImGui.CollapsingHeader("已造訪採集點"))
         {
             foreach (var pos in GatherBuddy.AutoGather.VisitedNodes)
             {
@@ -830,7 +830,7 @@ public partial class Interface
             }
         }
 
-        if (ImGui.CollapsingHeader("Far Nodes Seen So Far"))
+        if (ImGui.CollapsingHeader("目前已見過的遠距採集點"))
         {
             foreach (var pos in GatherBuddy.AutoGather.FarNodesSeenSoFar)
             {
@@ -838,7 +838,7 @@ public partial class Interface
             }
         }
 
-        if (ImGui.CollapsingHeader("Items to Gather"))
+        if (ImGui.CollapsingHeader("待採集物品"))
         {
             foreach (var x in GatherBuddy.AutoGather.ItemsToGather)
             {
@@ -846,13 +846,13 @@ public partial class Interface
                 if (x.Time == TimeInterval.Always || x.Node.NodeType is not Enums.NodeType.Unspoiled and not Enums.NodeType.Legendary)
                     continue;
                 ImGui.SameLine();
-                if (ImGui.Button("Mark Visited"))
+                if (ImGui.Button("標記為已造訪"))
                     GatherBuddy.AutoGather.DebugMarkVisited(x);
             }
         }
 
         var tr = GatherBuddy.AutoGather.GatheringWindowReader;
-        if (ImGui.CollapsingHeader("Gather Window Reader"))
+        if (ImGui.CollapsingHeader("採集視窗讀取器"))
         {
             var text = new StringBuilder();
             if (tr != null)
@@ -897,7 +897,7 @@ public partial class Interface
     private void DrawReflectionDebug()
     {
 
-        if (!ImGui.CollapsingHeader("Reflection"))
+        if (!ImGui.CollapsingHeader("反射"))
             return;
 
         var exporter = GatherBuddy.AutoGather.ArtisanExporter;
@@ -917,7 +917,7 @@ public partial class Interface
         ImUtf8.InputScalar($"End ID: {GatherBuddy.GameData.FishingSpots.GetValueOrDefault(_endId)?.Name}",     ref _endId);
         ImGui.PopItemWidth();
 
-        if (!ImUtf8.Button("Copy Most Recent Unknown Fish Data"u8))
+        if (!ImUtf8.Button("複製最新的未知魚類資料"u8))
             return;
 
         var patch = $"{nameof(Patch)}.{Enum.GetValues<Patch>().Last()}";
