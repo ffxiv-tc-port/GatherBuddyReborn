@@ -75,20 +75,20 @@ public partial class Interface
             GatherBuddy.FishLog.Change             += OnLogChange;
         }
 
-        private static readonly NameColumn        _nameColumn        = new() { Label = "Item Name..." };
-        private static readonly CaughtColumn      _caughtColumn      = new() { Label = "Log" };
-        private static readonly NextUptimeColumn  _nextUptimeColumn  = new() { Label = "Next Uptime" };
-        private static readonly UptimesColumn     _uptimeColumn      = new() { Label = "Up%" };
-        private static readonly BaitColumn        _baitColumn        = new() { Label = "Bait..." };
-        private static readonly AetheryteColumn   _aetheryteColumn   = new() { Label = "Aetheryte..." };
-        private static readonly TypeColumn        _typeColumn        = new() { Label = "Fish Type" };
-        private static readonly CollectibleColumn _collectibleColumn = new() { Label = "Coll." };
-        private static readonly PatchColumn       _patchColumn       = new() { Label = "Patch" };
-        private static readonly FolkloreColumn    _folkloreColumn    = new() { Label = "Folklore..." };
-        private static readonly BestSpotColumn    _bestSpotColumn    = new() { Label = "Best Spot..." };
-        private static readonly BestZoneColumn    _bestZoneColumn    = new() { Label = "Best Zone..." };
-        private static readonly ItemIdColumn      _itemIdColumn      = new() { Label = "Item Id" };
-        private static readonly FishIdColumn      _fishIdColumn      = new() { Label = "G. Id" };
+        private static readonly NameColumn        _nameColumn        = new() { Label = "物品名稱..." };
+        private static readonly CaughtColumn      _caughtColumn      = new() { Label = "紀錄" };
+        private static readonly NextUptimeColumn  _nextUptimeColumn  = new() { Label = "下次上線時間" };
+        private static readonly UptimesColumn     _uptimeColumn      = new() { Label = "上線%" };
+        private static readonly BaitColumn        _baitColumn        = new() { Label = "魚餌..." };
+        private static readonly AetheryteColumn   _aetheryteColumn   = new() { Label = "以太之光..." };
+        private static readonly TypeColumn        _typeColumn        = new() { Label = "魚種" };
+        private static readonly CollectibleColumn _collectibleColumn = new() { Label = "收藏品" };
+        private static readonly PatchColumn       _patchColumn       = new() { Label = "版本" };
+        private static readonly FolkloreColumn    _folkloreColumn    = new() { Label = "傳承錄..." };
+        private static readonly BestSpotColumn    _bestSpotColumn    = new() { Label = "最佳釣點..." };
+        private static readonly BestZoneColumn    _bestZoneColumn    = new() { Label = "最佳區域..." };
+        private static readonly ItemIdColumn      _itemIdColumn      = new() { Label = "物品 ID" };
+        private static readonly FishIdColumn      _fishIdColumn      = new() { Label = "採集 ID" };
 
         private class FishFilterColumn : ColumnFlags<FishFilter, ExtendedFish>
         {
@@ -168,7 +168,7 @@ public partial class Interface
             {
                 Flags |= ImGuiTableColumnFlags.NoReorder;
                 SetFlags(FishFilter.AlreadyCaught, FishFilter.Uncaught, FishFilter.NotInLog);
-                SetNames("Already Caught", "Uncaught", "Not In Log");
+                SetNames("已捕獲", "未捕獲", "不在紀錄中");
             }
 
             public override float Width
@@ -223,7 +223,7 @@ public partial class Interface
             {
                 Flags |= ImGuiTableColumnFlags.DefaultSort;
                 SetFlags(FishFilter.Available, FishFilter.Unavailable, FishFilter.FishDependency);
-                SetNames("Currently Available", "Currently Unavailable", "Dependent On Other Restrictions");
+                SetNames("目前可捕獲", "目前不可捕獲", "取決於其他限制");
             }
 
             public override float Width
@@ -280,7 +280,7 @@ public partial class Interface
         private sealed class AetheryteColumn : ColumnString<ExtendedFish>
         {
             public override string ToName(ExtendedFish item)
-                => item.Uptime.Item1.ClosestAetheryte?.Name ?? "None";
+                => item.Uptime.Item1.ClosestAetheryte?.Name ?? "無";
 
             public override float Width
                 => _closestAetheryteColumnWidth * ImGuiHelpers.GlobalScale;
@@ -290,7 +290,7 @@ public partial class Interface
                 var aetheryte = item.Uptime.Item1.ClosestAetheryte;
                 if (aetheryte == null)
                 {
-                    ImGui.Text("None");
+                    ImGui.Text("無");
                     return;
                 }
 
@@ -361,7 +361,7 @@ public partial class Interface
             public TypeColumn()
             {
                 SetFlags(FishFilter.SmallFish, FishFilter.BigFish, FishFilter.Spearfishing, FishFilter.OceanFish);
-                SetNames("Regular Fish", "Big Fish", "Spearfishing", "Oceanfishing");
+                SetNames("一般魚", "大型魚", "刺魚", "海釣");
             }
 
             public override void DrawColumn(ExtendedFish item, int _)
@@ -390,7 +390,7 @@ public partial class Interface
             public CollectibleColumn()
             {
                 SetFlags(FishFilter.Collectible, FishFilter.NotCollectible);
-                SetNames("Collectible", "Not Collectible");
+                SetNames("收藏品", "非收藏品");
             }
 
             public override float Width
@@ -435,7 +435,7 @@ public partial class Interface
             public UptimesColumn()
             {
                 SetFlags(FishFilter.TimeDependency, FishFilter.WeatherDependency, FishFilter.NoDependency);
-                SetNames("Dependent on Time of Day", "Dependent on Weather", "No Dependencies");
+                SetNames("取決於時段", "取決於天氣", "無限制");
             }
 
             public override float Width
@@ -540,7 +540,7 @@ public partial class Interface
                 => lhs.Data.FishId.CompareTo(rhs.Data.FishId);
 
             public override void DrawColumn(ExtendedFish item, int _)
-                => ImGuiUtil.RightAlign($"{item.Data.FishId}{(item.Data.IsSpearFish ? " (sf)" : string.Empty)}");
+                => ImGuiUtil.RightAlign($"{item.Data.FishId}{(item.Data.IsSpearFish ? " (刺)" : string.Empty)}");
         }
 
 
@@ -574,16 +574,16 @@ public partial class Interface
     private void DrawFishTab()
     {
         using var id  = ImRaii.PushId("Fish");
-        using var tab = ImRaii.TabItem("Fish");
-        ImGuiUtil.HoverTooltip("There are plenty of fish in the sea. And the air. And the sand. And the lava. And space, for some reason.\n"
-          + " Gotta catch'em all!\n"
-          + "Enough information about fish to get you started, and for everything else there's TeamCraft!");
+        using var tab = ImRaii.TabItem("釣魚");
+        ImGuiUtil.HoverTooltip("海裡有很多魚。空氣裡也有。沙子裡也有。熔岩裡也有。不知為何連太空裡也有。\n"
+          + " 全部抓給你看！\n"
+          + "這裡有足夠讓你入門的釣魚資訊，其餘的交給 TeamCraft 就好！");
         if (!tab)
             return;
 
         _fishTable.ExtraHeight = GatherBuddy.Config.ShowStatusLine ? ImGui.GetTextLineHeight() : 0;
         _fishTable.Draw(ImGui.GetTextLineHeightWithSpacing());
-        DrawStatusLine(_fishTable, "Fish");
+        DrawStatusLine(_fishTable, "魚");
         DrawClippy();
     }
 }
