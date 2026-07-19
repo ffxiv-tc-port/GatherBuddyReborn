@@ -20,7 +20,7 @@ namespace GatherBuddy.Gui
     public partial class Interface
     {
         private static readonly (string name, uint id)[] CrystalTypes =
-            [("Elemental Shards", 2), ("Elemental Crystals", 8), ("Elemental Clusters", 14)];
+            [("元素碎晶", 2), ("元素水晶", 8), ("元素晶簇", 14)];
 
         private readonly ConfigPresetsSelector                _configPresetsSelector = new();
         private          (bool EditingName, bool ChangingMin) _configPresetsUIState;
@@ -76,7 +76,7 @@ namespace GatherBuddy.Gui
                 var preset = ConfigPreset.FromBase64String(data);
                 if (preset == null)
                 {
-                    Notify.Error("Failed to load config preset from clipboard. Are you sure it's valid?");
+                    Notify.Error("無法從剪貼簿載入設定預設。請確認內容是否有效。");
                     return false;
                 }
 
@@ -84,7 +84,7 @@ namespace GatherBuddy.Gui
 
                 Items.Insert(Items.Count - 1, preset);
                 Save();
-                Notify.Success($"Imported config preset {preset.Name} from clipboard successfully.");
+                Notify.Success($"已成功從剪貼簿匯入設定預設 {preset.Name}。");
                 return true;
             }
 
@@ -223,9 +223,9 @@ namespace GatherBuddy.Gui
 
         public void DrawConfigPresetsTab()
         {
-            using var tab = ImRaii.TabItem("Config Presets");
+            using var tab = ImRaii.TabItem("設定預設");
 
-            ImGuiUtil.HoverTooltip("Configure what actions to use with Auto-Gather.");
+            ImGuiUtil.HoverTooltip("設定自動採集要使用的動作。");
 
             if (!tab)
                 return;
@@ -233,32 +233,32 @@ namespace GatherBuddy.Gui
             var selector = _configPresetsSelector;
             selector.Draw(SelectorWidth);
             ImGui.SameLine();
-            ItemDetailsWindow.Draw("Preset Details", DrawConfigPresetHeader,
+            ItemDetailsWindow.Draw("預設詳情", DrawConfigPresetHeader,
                 () => { DrawConfigPreset(selector.EnsureCurrent()!, selector.CurrentIdx == selector.Presets.Count - 1); });
         }
 
         private void DrawConfigPresetHeader()
         {
-            if (ImGui.Button("Export"))
+            if (ImGui.Button("匯出"))
             {
                 var current = _configPresetsSelector.Current;
                 if (current == null)
                 {
-                    Notify.Error("No config preset selected.");
+                    Notify.Error("未選擇設定預設。");
                     return;
                 }
 
                 var text = current.ToBase64String();
                 ImGui.SetClipboardText(text);
-                Notify.Success($"Successfully copied {current.Name} to clipboard.");
+                Notify.Success($"已成功複製 {current.Name} 到剪貼簿。");
             }
 
-            if (ImGui.Button("Check"))
+            if (ImGui.Button("檢查"))
             {
                 ImGui.OpenPopup("Config Presets Checker");
             }
 
-            ImGuiUtil.HoverTooltip("Check what presets are used for items from the auto-gather list");
+            ImGuiUtil.HoverTooltip("檢查採集清單中各物品所使用的設定預設");
 
             var open = true;
             using (var popup = ImRaii.PopupModal("Config Presets Checker", ref open,
@@ -268,9 +268,9 @@ namespace GatherBuddy.Gui
                 {
                     using (var table = ImRaii.Table("Items", 3, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
                     {
-                        ImGui.TableSetupColumn("Gather List");
-                        ImGui.TableSetupColumn("Item");
-                        ImGui.TableSetupColumn("Config Preset");
+                        ImGui.TableSetupColumn("採集清單");
+                        ImGui.TableSetupColumn("物品");
+                        ImGui.TableSetupColumn("設定預設");
                         ImGui.TableHeadersRow();
 
                         var crystals = CrystalTypes
@@ -313,19 +313,19 @@ namespace GatherBuddy.Gui
                         }
                     }
 
-                    var size   = ImGui.CalcTextSize("Close").X + ImGui.GetStyle().FramePadding.X * 2.0f;
+                    var size   = ImGui.CalcTextSize("關閉").X + ImGui.GetStyle().FramePadding.X * 2.0f;
                     var offset = (ImGui.GetContentRegionAvail().X - size) * 0.5f;
                     if (offset > 0.0f)
                         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + offset);
-                    if (ImGui.Button("Close"))
+                    if (ImGui.Button("關閉"))
                         ImGui.CloseCurrentPopup();
                 }
             }
 
             ImGuiComponents.HelpMarker(
-                "Presets are checked against the current target item in order from top to bottom.\n"
-              + "Only the first matched preset is used, the rest are ignored.\n"
-              + "The Default preset is always last and is used if no other preset matches the item.");
+                "預設會依照由上到下的順序，與目前目標物品進行比對。\n"
+              + "只會使用第一個符合的預設，其餘的會被忽略。\n"
+              + "預設清單的最後一項永遠是「預設」，當沒有其他預設符合時會使用它。");
         }
 
         private void DrawConfigPreset(ConfigPreset preset, bool isDefault)
@@ -344,7 +344,7 @@ namespace GatherBuddy.Gui
                 }
 
                 var enabled = preset.Enabled;
-                if (ImGui.Checkbox("Enabled", ref enabled) && enabled != preset.Enabled)
+                if (ImGui.Checkbox("啟用", ref enabled) && enabled != preset.Enabled)
                 {
                     preset.Enabled = enabled;
                     selector.Save();
@@ -359,7 +359,7 @@ namespace GatherBuddy.Gui
                     new Vector2(-1.5f * ImGui.GetStyle().ItemSpacing.X, ImGui.GetFrameHeightWithSpacing() * 3 + ItemSpacing.Y));
                 Span<int> ilvl = [preset.ItemLevel.Min, preset.ItemLevel.Max];
                 ImGui.SetNextItemWidth(SetInputWidth);
-                if (ImGui.DragInt2("Minimum and maximum item", ref ilvl[0], 0.2f, 1, useGlv ? ConfigPreset.MaxGvl : ConfigPreset.MaxLevel))
+                if (ImGui.DragInt2("最低與最高等級", ref ilvl[0], 0.2f, 1, useGlv ? ConfigPreset.MaxGvl : ConfigPreset.MaxLevel))
                 {
                     state.ChangingMin    = preset.ItemLevel.Min != ilvl[0];
                     preset.ItemLevel.Min = ilvl[0];
@@ -380,13 +380,13 @@ namespace GatherBuddy.Gui
                 }
 
                 ImGui.SameLine();
-                if (ImGui.RadioButton("level", !useGlv))
+                if (ImGui.RadioButton("等級", !useGlv))
                     useGlv = false;
-                ImGuiUtil.HoverTooltip("Level as shown in the gathering log and the gathering window.");
+                ImGuiUtil.HoverTooltip("採集紀錄與採集視窗中顯示的等級。");
                 ImGui.SameLine();
-                if (ImGui.RadioButton("glv", useGlv))
+                if (ImGui.RadioButton("採集等級", useGlv))
                     useGlv = true;
-                ImGuiUtil.HoverTooltip("Gathering level (hidden stat). Use it to distinguish between different tiers of legendary nodes.");
+                ImGuiUtil.HoverTooltip("採集等級（隱藏數值）。可用於區分不同等級的傳說採集點。");
                 if (useGlv != preset.ItemLevel.UseGlv)
                 {
                     int min, max;
@@ -423,32 +423,32 @@ namespace GatherBuddy.Gui
                     selector.Save();
                 }
 
-                ImGui.Text("Node types:");
+                ImGui.Text("採集點類型：");
                 ImGui.SameLine();
-                if (ImGuiUtil.Checkbox("Regular", "", preset.NodeType.Regular, x => preset.NodeType.Regular = x))
+                if (ImGuiUtil.Checkbox("一般", "", preset.NodeType.Regular, x => preset.NodeType.Regular = x))
                     selector.Save();
-                ImGui.SameLine(0, ImGui.CalcTextSize("Crystals").X - ImGui.CalcTextSize("Regular").X + ItemSpacing.X);
-                if (ImGuiUtil.Checkbox("Unspoiled", "", preset.NodeType.Unspoiled, x => preset.NodeType.Unspoiled = x))
+                ImGui.SameLine(0, ImGui.CalcTextSize("水晶").X - ImGui.CalcTextSize("一般").X + ItemSpacing.X);
+                if (ImGuiUtil.Checkbox("未鑑別", "", preset.NodeType.Unspoiled, x => preset.NodeType.Unspoiled = x))
                     selector.Save();
-                ImGui.SameLine(0, ImGui.CalcTextSize("Collectables").X - ImGui.CalcTextSize("Unspoiled").X + ItemSpacing.X);
-                if (ImGuiUtil.Checkbox("Legendary", "", preset.NodeType.Legendary, x => preset.NodeType.Legendary = x))
+                ImGui.SameLine(0, ImGui.CalcTextSize("收藏品").X - ImGui.CalcTextSize("未鑑別").X + ItemSpacing.X);
+                if (ImGuiUtil.Checkbox("傳說", "", preset.NodeType.Legendary, x => preset.NodeType.Legendary = x))
                     selector.Save();
                 ImGui.SameLine();
-                if (ImGuiUtil.Checkbox("Ephemeral", "", preset.NodeType.Ephemeral, x => preset.NodeType.Ephemeral = x))
+                if (ImGuiUtil.Checkbox("限時", "", preset.NodeType.Ephemeral, x => preset.NodeType.Ephemeral = x))
                     selector.Save();
 
-                ImGui.Text("Item types:");
-                ImGui.SameLine(0, ImGui.CalcTextSize("Node types:").X - ImGui.CalcTextSize("Item types:").X + ItemSpacing.X);
-                if (ImGuiUtil.Checkbox("Crystals", "", preset.ItemType.Crystals, x => preset.ItemType.Crystals = x))
+                ImGui.Text("物品類型：");
+                ImGui.SameLine(0, ImGui.CalcTextSize("採集點類型：").X - ImGui.CalcTextSize("物品類型：").X + ItemSpacing.X);
+                if (ImGuiUtil.Checkbox("水晶", "", preset.ItemType.Crystals, x => preset.ItemType.Crystals = x))
                     selector.Save();
                 ImGui.SameLine();
-                if (ImGuiUtil.Checkbox("Collectables", "", preset.ItemType.Collectables, x => preset.ItemType.Collectables = x))
+                if (ImGuiUtil.Checkbox("收藏品", "", preset.ItemType.Collectables, x => preset.ItemType.Collectables = x))
                     selector.Save();
                 ImGui.SameLine();
-                if (ImGuiUtil.Checkbox("Other", "", preset.ItemType.Other, x => preset.ItemType.Other = x))
+                if (ImGuiUtil.Checkbox("其他", "", preset.ItemType.Other, x => preset.ItemType.Other = x))
                     selector.Save();
                 ImGui.SameLine();
-                if (ImGuiUtil.Checkbox("Fish", "", preset.ItemType.Fish, x => preset.ItemType.Fish = x))
+                if (ImGuiUtil.Checkbox("魚類", "", preset.ItemType.Fish, x => preset.ItemType.Fish = x))
                     selector.Save();
             }
 
@@ -456,14 +456,14 @@ namespace GatherBuddy.Gui
 
             using var width = ImRaii.ItemWidth(SetInputWidth);
 
-            using (var node = ImRaii.TreeNode("General Settings", ImGuiTreeNodeFlags.Framed))
+            using (var node = ImRaii.TreeNode("一般設定", ImGuiTreeNodeFlags.Framed))
             {
                 if (node)
                 {
                     if (preset.ItemType.Crystals || preset.ItemType.Other)
                     {
                         var tmp = preset.GatherableMinGP;
-                        if (ImGui.DragInt("Minimum GP for gathering regular items or crystals", ref tmp, 1f, 0, ConfigPreset.MaxGP))
+                        if (ImGui.DragInt("採集一般物品或水晶所需的最低 GP", ref tmp, 1f, 0, ConfigPreset.MaxGP))
                             preset.GatherableMinGP = tmp;
                         if (ImGui.IsItemDeactivatedAfterEdit())
                             selector.Save();
@@ -472,27 +472,27 @@ namespace GatherBuddy.Gui
                     if (preset.ItemType.Collectables)
                     {
                         var tmp = preset.CollectableMinGP;
-                        if (ImGui.DragInt("Minimum GP for collecting collectables", ref tmp, 1f, 0, ConfigPreset.MaxGP))
+                        if (ImGui.DragInt("採集收藏品所需的最低 GP", ref tmp, 1f, 0, ConfigPreset.MaxGP))
                             preset.CollectableMinGP = tmp;
                         if (ImGui.IsItemDeactivatedAfterEdit())
                             selector.Save();
 
                         tmp = preset.CollectableActionsMinGP;
-                        if (ImGui.DragInt("Minimum GP for using actions on collectables", ref tmp, 1f, 0, ConfigPreset.MaxGP))
+                        if (ImGui.DragInt("對收藏品使用動作所需的最低 GP", ref tmp, 1f, 0, ConfigPreset.MaxGP))
                             preset.CollectableActionsMinGP = tmp;
                         if (ImGui.IsItemDeactivatedAfterEdit())
                             selector.Save();
 
                         ImGui.SameLine();
-                        if (ImGuiUtil.Checkbox($"Always use {ConcatNames(Actions.SolidAge)}",
-                                $"Use {ConcatNames(Actions.SolidAge)} regardless of starting GP if the target collectability score is reached",
+                        if (ImGuiUtil.Checkbox($"永遠使用 {ConcatNames(Actions.SolidAge)}",
+                                $"當達到目標收藏品評分時，無論起始 GP 為何都使用 {ConcatNames(Actions.SolidAge)}",
                                 preset.CollectableAlwaysUseSolidAge,
                                 x => preset.CollectableAlwaysUseSolidAge = x))
                             selector.Save();
 
-                        if (ImGuiUtil.Checkbox("Manually set collectability scores",
-                                "When disabled, collectability scores will be automatically detected from the game UI.\n"
-                              + "When enabled, you can manually specify the target and minimum scores below.",
+                        if (ImGuiUtil.Checkbox("手動設定收藏品評分",
+                                "停用時，收藏品評分會自動從遊戲介面偵測。\n"
+                              + "啟用時，可以在下方手動指定目標與最低評分。",
                                 preset.CollectableManualScores,
                                 x => preset.CollectableManualScores = x))
                             selector.Save();
@@ -500,7 +500,7 @@ namespace GatherBuddy.Gui
                         if (preset.CollectableManualScores)
                         {
                             tmp = preset.CollectableTagetScore;
-                            if (ImGui.DragInt("Target collectability score to reach before collecting", ref tmp, 1f, 0,
+                            if (ImGui.DragInt("採集前要達到的目標收藏品評分", ref tmp, 1f, 0,
                                     ConfigPreset.MaxCollectability))
                                 preset.CollectableTagetScore = tmp;
                             if (ImGui.IsItemDeactivatedAfterEdit())
@@ -508,7 +508,7 @@ namespace GatherBuddy.Gui
 
                             tmp = preset.CollectableMinScore;
                             if (ImGui.DragInt(
-                                    $"Minimum collectability score to collect at the last integrity point (set to {ConfigPreset.MaxCollectability} to disable)",
+                                    $"在最後一次耐久時採集所需的最低收藏品評分（設為 {ConfigPreset.MaxCollectability} 可停用）",
                                     ref tmp, 1f, 0, ConfigPreset.MaxCollectability))
                                 preset.CollectableMinScore = tmp;
                             if (ImGui.IsItemDeactivatedAfterEdit())
@@ -516,23 +516,22 @@ namespace GatherBuddy.Gui
                         }
                     }
 
-                    if (ImGuiUtil.Checkbox("Automatically decide what actions to use",
-                            "This setting works differently depending on item or node type.\n"
-                          + "For collectables: the usual collectable rotation is used with all actions enabled.\n"
-                          + "For unspoiled and legendary nodes: actions are chosen to maximise the yield.\n"
-                          + "For regular nodes: actions are chosen to maximise the yield per GP spent.\n",
+                    if (ImGuiUtil.Checkbox("自動決定使用哪些動作",
+                            "此設定依物品或採集點類型而有不同效果。\n"
+                          + "收藏品：使用常見的收藏品循環，啟用所有動作。\n"
+                          + "未鑑別與傳說採集點：選擇能將產量最大化的動作。\n"
+                          + "一般採集點：選擇能將每 GP 產量最大化的動作。\n",
                             preset.ChooseBestActionsAutomatically,
                             x => preset.ChooseBestActionsAutomatically = x))
                         selector.Save();
 
                     if (preset.ChooseBestActionsAutomatically && preset.NodeType.Regular)
                     {
-                        if (ImGuiUtil.Checkbox("Hold off spending GP until a node with the best bonuses",
-                                "This setting is for regular nodes only. When enabled, GP would be kept for nodes with bonuses\n"
-                              + "that would give the best possible yield per GP spent. Make sure that nodes with +2 integrity,\n"
-                              + "+3 yield, and +100% boon chance hidden bonuses do exist, and you can meet their requirements.\n"
-                              + $"It is ignored if {ConcatNames(Actions.Bountiful)} gives +3 bonus, because nothing can beat that.\n"
-                              + "Not recommended if you have the Revisit trait (level 91+).",
+                        if (ImGuiUtil.Checkbox("保留 GP，直到出現擁有最佳加成的採集點",
+                                "此設定僅適用於一般採集點。啟用時，會保留 GP 以等待能帶來最佳每 GP 產量加成的採集點。\n"
+                              + "請確認擁有 +2 耐久、+3 產量、+100% 額外獎勵機率隱藏加成的採集點確實存在，且你能滿足其條件。\n"
+                              + $"若 {ConcatNames(Actions.Bountiful)} 給予 +3 加成則會忽略此設定，因為沒有更好的選擇了。\n"
+                              + "若你擁有再訪特性（91 級以上），不建議啟用此設定。",
                                 preset.SpendGPOnBestNodesOnly,
                                 x => preset.SpendGPOnBestNodesOnly = x))
                             selector.Save();
@@ -543,7 +542,7 @@ namespace GatherBuddy.Gui
             using var width2 = ImRaii.ItemWidth(SetInputWidth - ImGui.GetStyle().IndentSpacing);
             if ((preset.ItemType.Crystals || preset.ItemType.Other) && !preset.ChooseBestActionsAutomatically)
             {
-                using var node = ImRaii.TreeNode("Gathering Actions", ImGuiTreeNodeFlags.Framed);
+                using var node = ImRaii.TreeNode("採集動作", ImGuiTreeNodeFlags.Framed);
                 if (node)
                 {
                     DrawActionConfig(ConcatNames(Actions.Bountiful), preset.GatherableActions.Bountiful, selector.Save);
@@ -563,7 +562,7 @@ namespace GatherBuddy.Gui
 
             if (preset.ItemType.Collectables && !preset.ChooseBestActionsAutomatically)
             {
-                using var node = ImRaii.TreeNode("Collectable Actions", ImGuiTreeNodeFlags.Framed);
+                using var node = ImRaii.TreeNode("收藏品動作", ImGuiTreeNodeFlags.Framed);
                 if (node)
                 {
                     DrawActionConfig(Actions.Scour.Names.Botanist,      preset.CollectableActions.Scour,      selector.Save);
@@ -575,15 +574,15 @@ namespace GatherBuddy.Gui
             }
 
             {
-                using var node = ImRaii.TreeNode("Consumables", ImGuiTreeNodeFlags.Framed);
+                using var node = ImRaii.TreeNode("消耗品", ImGuiTreeNodeFlags.Framed);
                 if (node)
                 {
-                    DrawActionConfig("Cordial",         preset.Consumables.Cordial,        selector.Save, PossibleCordials);
-                    DrawActionConfig("Food",            preset.Consumables.Food,           selector.Save, PossibleFoods,           true);
-                    DrawActionConfig("Potion",          preset.Consumables.Potion,         selector.Save, PossiblePotions,         true);
-                    DrawActionConfig("Manual",          preset.Consumables.Manual,         selector.Save, PossibleManuals,         true);
-                    DrawActionConfig("Squadron Manual", preset.Consumables.SquadronManual, selector.Save, PossibleSquadronManuals, true);
-                    DrawActionConfig("Squadron Pass",   preset.Consumables.SquadronPass,   selector.Save, PossibleSquadronPasses,  true);
+                    DrawActionConfig("酒",           preset.Consumables.Cordial,        selector.Save, PossibleCordials);
+                    DrawActionConfig("食物",          preset.Consumables.Food,           selector.Save, PossibleFoods,           true);
+                    DrawActionConfig("藥水",          preset.Consumables.Potion,         selector.Save, PossiblePotions,         true);
+                    DrawActionConfig("指南",          preset.Consumables.Manual,         selector.Save, PossibleManuals,         true);
+                    DrawActionConfig("小隊指南",       preset.Consumables.SquadronManual, selector.Save, PossibleSquadronManuals, true);
+                    DrawActionConfig("小隊通行證",     preset.Consumables.SquadronPass,   selector.Save, PossibleSquadronPasses,  true);
                 }
             }
 
@@ -600,14 +599,14 @@ namespace GatherBuddy.Gui
 
             ref var state = ref _configPresetsUIState;
 
-            if (ImGuiUtil.Checkbox("Enabled", "", action.Enabled, x => action.Enabled = x))
+            if (ImGuiUtil.Checkbox("啟用", "", action.Enabled, x => action.Enabled = x))
                 save();
             if (!action.Enabled)
                 return;
 
             if (action is ConfigPreset.ActionConfigIntegrity action2)
             {
-                if (ImGuiUtil.Checkbox("Use only on first step", "Use only if no items have been gathered from the node yet",
+                if (ImGuiUtil.Checkbox("僅在第一階段使用", "僅在尚未從該採集點採集任何物品時使用",
                         action2.FirstStepOnly, x => action2.FirstStepOnly = x))
                     save();
             }
@@ -615,7 +614,7 @@ namespace GatherBuddy.Gui
             if (!hideGP)
             {
                 Span<int> gp = [action.MinGP, action.MaxGP];
-                if (ImGui.DragInt2("Minimum and maximum GP", ref gp[0], 1, 0, ConfigPreset.MaxGP))
+                if (ImGui.DragInt2("最低與最高 GP", ref gp[0], 1, 0, ConfigPreset.MaxGP))
                 {
                     state.ChangingMin = action.MinGP != gp[0];
                     action.MinGP      = gp[0];
@@ -639,7 +638,7 @@ namespace GatherBuddy.Gui
             if (action is ConfigPreset.ActionConfigBoon action3)
             {
                 Span<int> chance = [action3.MinBoonChance, action3.MaxBoonChance];
-                if (ImGui.DragInt2("Minimum and maximum boon chance", ref chance[0], 0.2f, 0, 100))
+                if (ImGui.DragInt2("最低與最高額外獎勵機率", ref chance[0], 0.2f, 0, 100))
                 {
                     state.ChangingMin     = action3.MinBoonChance != chance[0];
                     action3.MinBoonChance = chance[0];
@@ -663,7 +662,7 @@ namespace GatherBuddy.Gui
             if (action is ConfigPreset.ActionConfigIntegrity action4)
             {
                 var tmp = action4.MinIntegrity;
-                if (ImGui.DragInt("Minimum initial node integrity", ref tmp, 0.1f, 1, ConfigPreset.MaxIntegrity))
+                if (ImGui.DragInt("最低初始採集點耐久", ref tmp, 0.1f, 1, ConfigPreset.MaxIntegrity))
                     action4.MinIntegrity = tmp;
                 if (ImGui.IsItemDeactivatedAfterEdit())
                     save();
@@ -672,7 +671,7 @@ namespace GatherBuddy.Gui
             if (action is ConfigPreset.ActionConfigYieldBonus action5)
             {
                 var tmp = action5.MinYieldBonus;
-                if (ImGui.DragInt("Minimum yield bonus", ref tmp, 0.1f, 1, 3))
+                if (ImGui.DragInt("最低產量加成", ref tmp, 0.1f, 1, 3))
                     action5.MinYieldBonus = tmp;
                 if (ImGui.IsItemDeactivatedAfterEdit())
                     save();
@@ -681,7 +680,7 @@ namespace GatherBuddy.Gui
             if (action is ConfigPreset.ActionConfigYieldTotal action6)
             {
                 var tmp = action6.MinYieldTotal;
-                if (ImGui.DragInt("Minimum total yield", ref tmp, 0.1f, 1, 30))
+                if (ImGui.DragInt("最低總產量", ref tmp, 0.1f, 1, 30))
                     action6.MinYieldTotal = tmp;
                 if (ImGui.IsItemDeactivatedAfterEdit())
                     save();
@@ -703,7 +702,7 @@ namespace GatherBuddy.Gui
                     .ToList();
 
                 var       selected = (action7.ItemId > 0 ? list.FirstOrDefault(x => x.rowid == action7.ItemId).name : null) ?? string.Empty;
-                using var combo    = ImRaii.Combo($"Select {name.ToLower()}", selected);
+                using var combo    = ImRaii.Combo($"選擇{name.ToLower()}", selected);
                 if (combo)
                 {
                     if (ImGui.Selectable(string.Empty, action7.ItemId <= 0))
