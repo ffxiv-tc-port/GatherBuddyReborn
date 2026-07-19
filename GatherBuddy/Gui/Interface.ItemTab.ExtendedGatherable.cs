@@ -38,8 +38,8 @@ public partial class Interface
                 : data.NodeList.First().Folklore;
             Uptimes = data.NodeType switch
             {
-                NodeType.Regular => "Always",
-                NodeType.Unknown => "Unknown",
+                NodeType.Regular => "隨時",
+                NodeType.Unknown => "未知",
                 _                => data.NodeList.Select(n => n.Times).Aggregate(BitfieldUptime.Combine).PrintHours(true),
             };
             Level     = Data.LevelString();
