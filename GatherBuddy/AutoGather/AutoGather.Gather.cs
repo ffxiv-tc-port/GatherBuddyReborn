@@ -116,6 +116,20 @@ namespace GatherBuddy.AutoGather
                 return (fallbackSkills && !slot.IsCollectable, slot);
             }
 
+            // TC note: a slot can hold a real item that GameData.Gatherables doesn't
+            // recognize (older TC patch data), which makes it null-Item. That null Item
+            // means it can never match the user's gather/fallback lists above (the Join
+            // there matches by resolved Gatherable object identity), even when the item
+            // genuinely is one the user wants - so without this, a wanted-but-unresolved
+            // item looked indistinguishable from "nothing to gather here" and the
+            // AbandonNodes check right below would immediately abandon the node without
+            // ever attempting to gather anything. Try it before honoring AbandonNodes.
+            var unresolvedSlot = GatheringWindowReader!.ItemSlots.FirstOrDefault(s => !s.IsEmpty && s.Item == null && !s.IsCollectable);
+            if (unresolvedSlot != null)
+            {
+                return (false, unresolvedSlot);
+            }
+
             //Check if we should and can abandon the node
             if (GatherBuddy.Config.AutoGatherConfig.AbandonNodes)
                 throw new NoGatherableItemsInNodeException();
@@ -134,17 +148,6 @@ namespace GatherBuddy.AutoGather
             }
             //If there are no crystals, gather anything which is not treasure map nor collectable
             slot = available.FirstOrDefault(s => (!s.Item?.IsTreasureMap ?? false) && !s.IsCollectable);
-            if (slot != null)
-            {
-                return (false, slot);
-            }
-
-            // TC note: a slot can hold a real item that GameData.Gatherables doesn't
-            // recognize (older TC patch data), which makes it null-Item and therefore
-            // excluded by CheckItemOvercap from `available` above. Rather than treating
-            // the node as having nothing to gather and closing the window, try any such
-            // occupied-but-unresolved slot as a last resort before giving up.
-            slot = GatheringWindowReader!.ItemSlots.FirstOrDefault(s => !s.IsEmpty && s.Item == null && !s.IsCollectable);
             if (slot != null)
             {
                 return (false, slot);
