@@ -8,60 +8,61 @@ namespace GatherBuddy.AutoGather.AtkReaders;
 
 public class ItemSlotReader(IntPtr addon, int beginOffset = 0) : AtkReader(addon, beginOffset)
 {
-    // TC note: this field is a native Bool on the global client but a UInt (0/1) on TC's
-    // older client build, for at least the first slot (absolute index 6). ReadBool()
-    // throws InvalidCastException on the type mismatch; fall back to reading it as a
-    // UInt (nonzero = enabled) instead of crashing the whole auto-gather tick.
-    public  bool        Enabled
+    // TC note: TC runs an older client patch than the AtkValue layouts these indices
+    // were measured against. Several fields here come back as a different AtkValue.Type
+    // on TC than expected (Bool-vs-UInt confirmed for Enabled/HasGivingLandBuff).
+    // ReadUInt()/ReadBool() throw InvalidCastException by design on any such mismatch,
+    // which used to abort the whole auto-gather tick. Every raw read here is wrapped so
+    // one mismatched field degrades to 0/false instead of taking down the whole loop.
+    private uint SafeReadUInt(int n)
     {
-        get
+        try
         {
-            try
-            {
-                return ReadBool(0).GetValueOrDefault();
-            }
-            catch (InvalidCastException)
-            {
-                return ReadUInt(0).GetValueOrDefault() != 0;
-            }
+            return ReadUInt(n).GetValueOrDefault();
+        }
+        catch (InvalidCastException)
+        {
+            return 0u;
         }
     }
-    public  uint        ItemId                 => ReadUInt(1).GetValueOrDefault();
+
+    private bool SafeReadBool(int n)
+    {
+        try
+        {
+            return ReadBool(n).GetValueOrDefault();
+        }
+        catch (InvalidCastException)
+        {
+            return ReadUInt(n).GetValueOrDefault() != 0;
+        }
+    }
+
+    public  bool        Enabled                => SafeReadBool(0);
+    public  uint        ItemId                 => SafeReadUInt(1);
+
     // TC note: GameData.Gatherables is keyed off item IDs from the current global
     // patch's data sheets. TC runs an older patch, so an item ID read live from the
     // addon (e.g. a newer-patch gatherable) can be absent from that dictionary. The
-    // indexer throws KeyNotFoundException in that case, which - like the ItemSlotFlags
-    // issue above - aborts the whole auto-gather tick before anything gets selected.
+    // indexer throws KeyNotFoundException in that case, which - like the type
+    // mismatches above - aborts the whole auto-gather tick before anything gets
+    // selected. Use GetValueOrDefault instead of the throwing indexer.
     public  Gatherable? Item                   => ItemId > 0 ? GatherBuddy.GameData.Gatherables.GetValueOrDefault(ItemId) : null;
-    private uint        FlagsRaw               => ReadUInt(5).GetValueOrDefault();
+    private uint        FlagsRaw               => SafeReadUInt(5);
     public  bool        HasBonus               => (FlagsRaw & 4) != 0;
     public  bool        RequiresPerception     => (FlagsRaw & 1) != 0;
     private SeString    RequiresPerceptionText => ReadSeString(6);
-    private uint        BuffsValuesRaw         => ReadUInt(7).GetValueOrDefault();
+    private uint        BuffsValuesRaw         => SafeReadUInt(7);
 
     public sbyte Yield
         => (sbyte)(BuffsValuesRaw & 0xff);
 
     public sbyte BoonChance => (sbyte)((BuffsValuesRaw >> 8) & 0xff);
 
-    // Same TC Bool-vs-UInt mismatch as Enabled above - defend the same way.
-    public bool HasGivingLandBuff
-    {
-        get
-        {
-            try
-            {
-                return ReadBool(9).GetValueOrDefault();
-            }
-            catch (InvalidCastException)
-            {
-                return ReadUInt(9).GetValueOrDefault() != 0;
-            }
-        }
-    }
+    public bool HasGivingLandBuff => SafeReadBool(9);
 
     private uint CollectableRaw
-        => ReadUInt(10).GetValueOrDefault();
+        => SafeReadUInt(10);
 
     public bool IsCollectable => CollectableRaw == 2;
 }

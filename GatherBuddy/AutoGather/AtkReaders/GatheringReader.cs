@@ -11,20 +11,51 @@ namespace GatherBuddy.AutoGather.AtkReaders;
 
 public unsafe class GatheringReader(AtkUnitBase* addon) : AtkReader(addon)
 {
+    // TC note: TC runs an older client patch than the AtkValue layouts these indices
+    // were measured against. Several fields in this addon come back as a different
+    // AtkValue.Type on TC than expected (UInt-vs-String at index 99, UInt-vs-Bool
+    // elsewhere) - ReadUInt()/ReadBool() throw InvalidCastException by design on any
+    // such mismatch, which used to abort the whole auto-gather tick before any item
+    // selection happened. Every raw read here is wrapped so one mismatched field
+    // degrades to 0/false instead of taking down the whole loop.
+    private uint SafeReadUInt(int n)
+    {
+        try
+        {
+            return ReadUInt(n).GetValueOrDefault();
+        }
+        catch (InvalidCastException)
+        {
+            return 0u;
+        }
+    }
+
+    private bool SafeReadBool(int n)
+    {
+        try
+        {
+            return ReadBool(n).GetValueOrDefault();
+        }
+        catch (InvalidCastException)
+        {
+            return ReadUInt(n).GetValueOrDefault() != 0;
+        }
+    }
+
     private uint GatherChancesRaw1
-        => ReadUInt(1).GetValueOrDefault();
+        => SafeReadUInt(1);
 
     private uint GatherChancesRaw2
-        => ReadUInt(2).GetValueOrDefault();
+        => SafeReadUInt(2);
 
     private uint GatherChances
         => (GatherChancesRaw1 != 0 && GatherChancesRaw1 != 0xFFFFFFFF ? BinaryPrimitives.ReverseEndianness(GatherChancesRaw1) : BinaryPrimitives.ReverseEndianness(GatherChancesRaw2));
 
     private uint ItemLevelRaw1
-        => ReadUInt(3).GetValueOrDefault();
+        => SafeReadUInt(3);
 
     private uint ItemLevelRaw2
-        => ReadUInt(4).GetValueOrDefault();
+        => SafeReadUInt(4);
 
     private uint ItemLevel
         => (ItemLevelRaw1 != 0 && ItemLevelRaw1 != 0xFFFFFFFF ? BinaryPrimitives.ReverseEndianness(ItemLevelRaw1) : BinaryPrimitives.ReverseEndianness(ItemLevelRaw2));
@@ -47,60 +78,27 @@ public unsafe class GatheringReader(AtkUnitBase* addon) : AtkReader(addon)
         }
     }
 
-    // TC note: index 99 in the "Gathering" addon's AtkValues array is a UInt
-    // (rare/hidden flags) on the global client, but on TC's older client build
-    // this slot holds a String value instead - the addon's field layout has
-    // shifted. ReadUInt() throws InvalidCastException on a type mismatch by
-    // design, and this getter is read every auto-gather tick (via
-    // HiddenRevealed -> ItemSlots), so the exception was aborting the entire
-    // auto-gather action loop before any item selection happened. Fall back to
-    // "no flags" instead of crashing when the type doesn't match.
+    // index 99: rare/hidden flags array - String on TC instead of UInt.
     private uint ItemSlotFlags
-    {
-        get
-        {
-            try
-            {
-                return ReadUInt(99).GetValueOrDefault();
-            }
-            catch (InvalidCastException)
-            {
-                return 0u;
-            }
-        }
-    }
-
-    // Same TC Bool-vs-UInt AtkValue mismatch as ItemSlotFlags/ItemSlotReader.Enabled -
-    // guard every ReadBool() here the same way rather than waiting for another crash report.
-    private static bool SafeReadBool(Func<bool?> readBool, Func<uint?> readUInt)
-    {
-        try
-        {
-            return readBool().GetValueOrDefault();
-        }
-        catch (InvalidCastException)
-        {
-            return readUInt().GetValueOrDefault() != 0;
-        }
-    }
+        => SafeReadUInt(99);
 
     public bool QuickGatheringAllowed
-        => SafeReadBool(() => ReadBool(106), () => ReadUInt(106));
+        => SafeReadBool(106);
 
     public bool QuickGatheringEnabled
-        => SafeReadBool(() => ReadBool(107), () => ReadUInt(107));
+        => SafeReadBool(107);
 
     public bool QuickGatheringInProgress
-        => SafeReadBool(() => ReadBool(108), () => ReadUInt(108));
+        => SafeReadBool(108);
 
     private uint LastSelectedSlot
-        => ReadUInt(109).GetValueOrDefault();
+        => SafeReadUInt(109);
 
     public int IntegrityRemaining
-        => (int)ReadUInt(110).GetValueOrDefault();
+        => (int)SafeReadUInt(110);
 
     public int IntegrityMax
-        => (int)ReadUInt(111).GetValueOrDefault();
+        => (int)SafeReadUInt(111);
 
     public bool Touched
         => IntegrityRemaining != IntegrityMax;
