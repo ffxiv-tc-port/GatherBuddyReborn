@@ -9,7 +9,7 @@ namespace GatherBuddy.AutoGather.AtkReaders;
 public class ItemSlotReader(IntPtr addon, int beginOffset = 0) : AtkReader(addon, beginOffset)
 {
     public  bool        Enabled                => ReadBool(0).GetValueOrDefault();
-    private uint        ItemId                 => ReadUInt(1).GetValueOrDefault();
+    public  uint        ItemId                 => ReadUInt(1).GetValueOrDefault();
     // TC note: GameData.Gatherables is keyed off item IDs from the current global
     // patch's data sheets. TC runs an older patch, so an item ID read live from the
     // addon (e.g. a newer-patch gatherable) can be absent from that dictionary. The

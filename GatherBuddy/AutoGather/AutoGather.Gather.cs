@@ -28,7 +28,11 @@ namespace GatherBuddy.AutoGather
 
         private unsafe void EnqueueGatherItem(ItemSlot slot)
         {
-            if (slot.Item.ItemData.IsCollectable)
+            // TC note: slot.Item can be null here for the raw-fallback case in
+            // GetItemSlotToGather (an item ID unresolved in GameData.Gatherables on
+            // TC's older patch data) - slot.IsCollectable is read straight from the
+            // addon's own flags, so it doesn't need Item to be resolved.
+            if (slot.Item != null && slot.IsCollectable)
             {
                 // Since it's possible that we are not gathering the top item in the list,
                 // we need to remember what we are going to gather inside MasterpieceAddon
@@ -37,7 +41,7 @@ namespace GatherBuddy.AutoGather
 
             EnqueueActionWithDelay(slot.Gather);
 
-            if (slot.Item.IsTreasureMap)
+            if (slot.Item?.IsTreasureMap ?? false)
             {
                 TaskManager.Enqueue(() => Dalamud.Conditions[ConditionFlag.Gathering42], 1000);
                 TaskManager.Enqueue(() => !Dalamud.Conditions[ConditionFlag.Gathering42]);
@@ -134,6 +138,18 @@ namespace GatherBuddy.AutoGather
             {
                 return (false, slot);
             }
+
+            // TC note: a slot can hold a real item that GameData.Gatherables doesn't
+            // recognize (older TC patch data), which makes it null-Item and therefore
+            // excluded by CheckItemOvercap from `available` above. Rather than treating
+            // the node as having nothing to gather and closing the window, try any such
+            // occupied-but-unresolved slot as a last resort before giving up.
+            slot = GatheringWindowReader!.ItemSlots.FirstOrDefault(s => !s.IsEmpty && s.Item == null && !s.IsCollectable);
+            if (slot != null)
+            {
+                return (false, slot);
+            }
+
             //Abort if there are no items we can gather
             throw new NoGatherableItemsInNodeException();
         }
