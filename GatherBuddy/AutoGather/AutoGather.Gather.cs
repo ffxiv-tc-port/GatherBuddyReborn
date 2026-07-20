@@ -124,7 +124,12 @@ namespace GatherBuddy.AutoGather
             // item looked indistinguishable from "nothing to gather here" and the
             // AbandonNodes check right below would immediately abandon the node without
             // ever attempting to gather anything. Try it before honoring AbandonNodes.
-            var unresolvedSlot = GatheringWindowReader!.ItemSlots.FirstOrDefault(s => !s.IsEmpty && s.Item == null && !s.IsCollectable);
+            // Must also require Enabled and a non-zero GatherChance - without this, a
+            // slot with a 0% gather chance (game refuses the attempt every time) got
+            // retried forever, spamming "Firing callback: Gathering" every tick with
+            // the game rejecting it and never actually gathering anything.
+            var unresolvedSlot = GatheringWindowReader!.ItemSlots
+                .FirstOrDefault(s => !s.IsEmpty && s.Item == null && !s.IsCollectable && s.Enabled && s.GatherChance > 0);
             if (unresolvedSlot != null)
             {
                 return (false, unresolvedSlot);
