@@ -47,8 +47,28 @@ public unsafe class GatheringReader(AtkUnitBase* addon) : AtkReader(addon)
         }
     }
 
+    // TC note: index 99 in the "Gathering" addon's AtkValues array is a UInt
+    // (rare/hidden flags) on the global client, but on TC's older client build
+    // this slot holds a String value instead - the addon's field layout has
+    // shifted. ReadUInt() throws InvalidCastException on a type mismatch by
+    // design, and this getter is read every auto-gather tick (via
+    // HiddenRevealed -> ItemSlots), so the exception was aborting the entire
+    // auto-gather action loop before any item selection happened. Fall back to
+    // "no flags" instead of crashing when the type doesn't match.
     private uint ItemSlotFlags
-        => ReadUInt(99).GetValueOrDefault();
+    {
+        get
+        {
+            try
+            {
+                return ReadUInt(99).GetValueOrDefault();
+            }
+            catch (InvalidCastException)
+            {
+                return 0u;
+            }
+        }
+    }
 
     public bool QuickGatheringAllowed
         => ReadBool(106).GetValueOrDefault();
