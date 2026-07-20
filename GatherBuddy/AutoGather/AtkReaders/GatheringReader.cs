@@ -70,14 +70,28 @@ public unsafe class GatheringReader(AtkUnitBase* addon) : AtkReader(addon)
         }
     }
 
+    // Same TC Bool-vs-UInt AtkValue mismatch as ItemSlotFlags/ItemSlotReader.Enabled -
+    // guard every ReadBool() here the same way rather than waiting for another crash report.
+    private static bool SafeReadBool(Func<bool?> readBool, Func<uint?> readUInt)
+    {
+        try
+        {
+            return readBool().GetValueOrDefault();
+        }
+        catch (InvalidCastException)
+        {
+            return readUInt().GetValueOrDefault() != 0;
+        }
+    }
+
     public bool QuickGatheringAllowed
-        => ReadBool(106).GetValueOrDefault();
+        => SafeReadBool(() => ReadBool(106), () => ReadUInt(106));
 
     public bool QuickGatheringEnabled
-        => ReadBool(107).GetValueOrDefault();
+        => SafeReadBool(() => ReadBool(107), () => ReadUInt(107));
 
     public bool QuickGatheringInProgress
-        => ReadBool(108).GetValueOrDefault();
+        => SafeReadBool(() => ReadBool(108), () => ReadUInt(108));
 
     private uint LastSelectedSlot
         => ReadUInt(109).GetValueOrDefault();

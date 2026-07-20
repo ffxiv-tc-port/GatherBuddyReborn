@@ -8,7 +8,24 @@ namespace GatherBuddy.AutoGather.AtkReaders;
 
 public class ItemSlotReader(IntPtr addon, int beginOffset = 0) : AtkReader(addon, beginOffset)
 {
-    public  bool        Enabled                => ReadBool(0).GetValueOrDefault();
+    // TC note: this field is a native Bool on the global client but a UInt (0/1) on TC's
+    // older client build, for at least the first slot (absolute index 6). ReadBool()
+    // throws InvalidCastException on the type mismatch; fall back to reading it as a
+    // UInt (nonzero = enabled) instead of crashing the whole auto-gather tick.
+    public  bool        Enabled
+    {
+        get
+        {
+            try
+            {
+                return ReadBool(0).GetValueOrDefault();
+            }
+            catch (InvalidCastException)
+            {
+                return ReadUInt(0).GetValueOrDefault() != 0;
+            }
+        }
+    }
     public  uint        ItemId                 => ReadUInt(1).GetValueOrDefault();
     // TC note: GameData.Gatherables is keyed off item IDs from the current global
     // patch's data sheets. TC runs an older patch, so an item ID read live from the
@@ -27,7 +44,21 @@ public class ItemSlotReader(IntPtr addon, int beginOffset = 0) : AtkReader(addon
 
     public sbyte BoonChance => (sbyte)((BuffsValuesRaw >> 8) & 0xff);
 
-    public bool HasGivingLandBuff => ReadBool(9).GetValueOrDefault();
+    // Same TC Bool-vs-UInt mismatch as Enabled above - defend the same way.
+    public bool HasGivingLandBuff
+    {
+        get
+        {
+            try
+            {
+                return ReadBool(9).GetValueOrDefault();
+            }
+            catch (InvalidCastException)
+            {
+                return ReadUInt(9).GetValueOrDefault() != 0;
+            }
+        }
+    }
 
     private uint CollectableRaw
         => ReadUInt(10).GetValueOrDefault();
