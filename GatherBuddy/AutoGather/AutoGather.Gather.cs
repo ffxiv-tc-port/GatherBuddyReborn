@@ -36,7 +36,18 @@ namespace GatherBuddy.AutoGather
             {
                 // Since it's possible that we are not gathering the top item in the list,
                 // we need to remember what we are going to gather inside MasterpieceAddon
-                CurrentCollectableRotation = new CollectableRotation(MatchConfigPreset(slot.Item), slot.Item, _activeItemList.FirstOrDefault(x => x.Item == slot.Item).Quantity);
+                //
+                // Matching by ItemId rather than `x.Item == slot.Item`: if `Gatherable`
+                // doesn't override equality, that compared object references, which can
+                // differ between the instance backing `_activeItemList` and the instance
+                // resolved fresh from GameData.Gatherables for this slot even for the
+                // exact same item. A reference mismatch silently fell through to the
+                // struct default (Quantity = 0), which made GetNextAction() see
+                // itemsLeft <= 0 on the very first call and immediately abandon the node
+                // (via AbandonNodes) without ever using a single collectable action -
+                // matching "opens the Masterpiece window, does nothing, goes back."
+                var quantity = _activeItemList.FirstOrDefault(x => x.Item?.ItemId == slot.Item.ItemId).Quantity;
+                CurrentCollectableRotation = new CollectableRotation(MatchConfigPreset(slot.Item), slot.Item, quantity);
             }
 
             EnqueueActionWithDelay(slot.Gather);
