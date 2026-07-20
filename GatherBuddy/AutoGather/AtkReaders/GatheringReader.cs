@@ -11,13 +11,17 @@ namespace GatherBuddy.AutoGather.AtkReaders;
 
 public unsafe class GatheringReader(AtkUnitBase* addon) : AtkReader(addon)
 {
-    // TC note: TC runs an older client patch than the AtkValue layouts these indices
-    // were measured against. Several fields in this addon come back as a different
-    // AtkValue.Type on TC than expected (UInt-vs-String at index 99, UInt-vs-Bool
-    // elsewhere) - ReadUInt()/ReadBool() throw InvalidCastException by design on any
-    // such mismatch, which used to abort the whole auto-gather tick before any item
-    // selection happened. Every raw read here is wrapped so one mismatched field
-    // degrades to 0/false instead of taking down the whole loop.
+    // TC/CN note: the "Gathering" addon's AtkValues array has 113 entries on
+    // TC/CN-style clients versus 114 on global - one field fewer, starting right
+    // after the per-item-slot block begins. Every index from the per-slot base
+    // onward is shifted down by exactly 1 as a result (confirmed against
+    // aliceric27/GatherBuddyReborn@dev-tc's "Fix AtkValue Offset" commit, which
+    // hit the identical 113-vs-114 count on the CN client). This is a real field
+    // offset difference, not just a type mismatch - reading the global-client
+    // indices doesn't throw (SafeReadUInt/SafeReadBool below still guard against
+    // that separately), it just silently reads the *wrong* neighboring field.
+    private int Shift => addon->AtkValuesCount == 113 ? -1 : 0;
+
     private uint SafeReadUInt(int n)
     {
         try
@@ -61,7 +65,7 @@ public unsafe class GatheringReader(AtkUnitBase* addon) : AtkReader(addon)
         => (ItemLevelRaw1 != 0 && ItemLevelRaw1 != 0xFFFFFFFF ? BinaryPrimitives.ReverseEndianness(ItemLevelRaw1) : BinaryPrimitives.ReverseEndianness(ItemLevelRaw2));
 
     private List<ItemSlotReader> ItemSlotReaders
-        => Loop<ItemSlotReader>(6, 11, 8);
+        => Loop<ItemSlotReader>(6 + Shift, 11, 8);
 
     public List<ItemSlot> ItemSlots
     {
@@ -78,27 +82,27 @@ public unsafe class GatheringReader(AtkUnitBase* addon) : AtkReader(addon)
         }
     }
 
-    // index 99: rare/hidden flags array - String on TC instead of UInt.
+    // global index 99 / TC-CN index 98: rare/hidden flags array.
     private uint ItemSlotFlags
-        => SafeReadUInt(99);
+        => SafeReadUInt(99 + Shift);
 
     public bool QuickGatheringAllowed
-        => SafeReadBool(106);
+        => SafeReadBool(106 + Shift);
 
     public bool QuickGatheringEnabled
-        => SafeReadBool(107);
+        => SafeReadBool(107 + Shift);
 
     public bool QuickGatheringInProgress
-        => SafeReadBool(108);
+        => SafeReadBool(108 + Shift);
 
     private uint LastSelectedSlot
-        => SafeReadUInt(109);
+        => SafeReadUInt(109 + Shift);
 
     public int IntegrityRemaining
-        => (int)SafeReadUInt(110);
+        => (int)SafeReadUInt(110 + Shift);
 
     public int IntegrityMax
-        => (int)SafeReadUInt(111);
+        => (int)SafeReadUInt(111 + Shift);
 
     public bool Touched
         => IntegrityRemaining != IntegrityMax;
