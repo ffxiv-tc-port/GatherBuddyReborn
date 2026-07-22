@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using Dalamud.Game.ClientState.Objects.Enums;
 using ECommons;
 using ECommons.DalamudServices;
+using ECommons.LanguageHelpers;
 using ECommons.Throttlers;
 using GatherBuddy.AutoGather.AtkReaders;
 using GatherBuddy.AutoGather.Helpers;
@@ -371,7 +372,7 @@ namespace GatherBuddy.AutoGather
                                         ActionSequence = task.Result.GetEnumerator();
                                     return task.IsCompleted;
                                 });
-                                AutoStatus = "Calculating best action sequence...";
+                                AutoStatus = "Calculating best action sequence...".Loc();
                                 return;
                             }
                         }

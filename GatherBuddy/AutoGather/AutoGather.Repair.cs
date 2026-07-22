@@ -9,6 +9,7 @@ using ECommons.UIHelpers.AddonMasterImplementations;
 using ECommons.Automation;
 using ECommons.ExcelServices;
 using ECommons.GameHelpers;
+using ECommons.LanguageHelpers;
 
 namespace GatherBuddy.AutoGather;
 
@@ -76,7 +77,7 @@ public unsafe partial class AutoGather
 
         if (!GatherBuddy.Config.AutoGatherConfig.DoRepair)
         {
-            Communicator.PrintError("Your gear is almost broken. Repair it before enabling Auto-Gather.");
+            Communicator.PrintError("Your gear is almost broken. Repair it before enabling Auto-Gather.".Loc());
             AbortAutoGather("Repairs needed.");
             return true;
         }
@@ -92,7 +93,7 @@ public unsafe partial class AutoGather
             return true;
         }
 
-        AutoStatus = "Repairing...";
+        AutoStatus = "Repairing...".Loc();
         StopNavigation();
         YesAlready.Lock();
 
