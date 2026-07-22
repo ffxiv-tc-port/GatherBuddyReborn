@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Numerics;
 using Dalamud.Interface.Textures;
+using ECommons.LanguageHelpers;
 using GatherBuddy.Classes;
 using GatherBuddy.Config;
 using GatherBuddy.Plugin;
@@ -82,7 +83,7 @@ public partial class Interface
         var alarmData = which ? _plugin.AlarmManager.LastItemAlarm : _plugin.AlarmManager.LastFishAlarm;
         if (alarmData == null)
         {
-            ImGuiUtil.DrawDisabledButton(failureText, _headerCache.AlarmButtonSize, "點擊以 /gather 前往此提醒項目。", true);
+            ImGuiUtil.DrawDisabledButton(failureText, _headerCache.AlarmButtonSize, "Click to /gather this alarm.".Loc(), true);
             return;
         }
 
@@ -90,7 +91,7 @@ public partial class Interface
 
         var text = $"{(alarm.Name.Any() ? alarm.Name : alarm.Item.Name[GatherBuddy.Language])}###{(which ? "itemAlarm" : "fishAlarm")}";
         var desc =
-            $"點擊以 /gather 前往此提醒項目。\n{loc.Name} - {loc.ClosestAetheryte?.Name ?? "無"}\n{time.Start.LocalTime}\n{time.End.LocalTime}";
+            $"{"Click to /gather this alarm.".Loc()}\n{loc.Name} - {loc.ClosestAetheryte?.Name ?? "None".Loc()}\n{time.Start.LocalTime}\n{time.End.LocalTime}";
 
         if (!ImGuiUtil.DrawDisabledButton(text, _headerCache.AlarmButtonSize, desc, false))
             return;
@@ -102,10 +103,10 @@ public partial class Interface
     }
 
     private void DrawLastItemAlarm()
-        => DrawLastAlarm(true, "無已觸發的道具提醒");
+        => DrawLastAlarm(true, "No Item Alarm Triggered".Loc());
 
     private void DrawLastFishAlarm()
-        => DrawLastAlarm(false, "無已觸發的釣魚提醒");
+        => DrawLastAlarm(false, "No Fish Alarm Triggered".Loc());
 
 
     private void DrawAlarmRow()
@@ -126,9 +127,9 @@ public partial class Interface
         if (ImGui.IsItemHovered())
         {
             using var tt = ImRaii.Tooltip();
-            ImGui.TextUnformatted("若此時間與遊戲內艾歐傑亞時間不符，請確認你的 Windows 系統時間是否正確。");
-            ImGui.TextUnformatted($"下一班阿爾德那海域航線: {OceanUptime.NextOceanRoute(OceanArea.Aldenard, TimeStamp.UtcNow)}");
-            ImGui.TextUnformatted($"下一班奧薩德海域航線: {OceanUptime.NextOceanRoute(OceanArea.Othard,     TimeStamp.UtcNow)}");
+            ImGui.TextUnformatted("If this does not correspond to your in-game Eorzea Time, verify that your windows system time is accurate.".Loc());
+            ImGui.TextUnformatted("Next Aldenard Ocean Route: ??".Loc(OceanUptime.NextOceanRoute(OceanArea.Aldenard, TimeStamp.UtcNow)));
+            ImGui.TextUnformatted("Next Othard Ocean Route: ??".Loc(OceanUptime.NextOceanRoute(OceanArea.Othard,     TimeStamp.UtcNow)));
         }
     }
 
@@ -176,7 +177,7 @@ public partial class Interface
         nextHourS    -= nextHourM * RealTime.SecondsPerMinute;
         nextWeatherS -= nextWeatherM * RealTime.SecondsPerMinute;
 
-        var nextWeatherString = $"  {nextWeatherM:D2}:{nextWeatherS:D2} 分  ";
+        var nextWeatherString = $"  {nextWeatherM:D2}:{nextWeatherS:D2} {"Min.".Loc()}  ";
         var width = -(ImGui.CalcTextSize(nextWeatherString).X
           + (WeatherIconSize.X + ItemSpacing.X + FramePadding.X) * 3);
 
@@ -184,7 +185,7 @@ public partial class Interface
         using var _ = ImRaii.Group();
         DrawEorzeaTime($"ET {GatherBuddy.Time.EorzeaHourOfDay:D2}:{GatherBuddy.Time.EorzeaMinuteOfHour:D2}");
         ImGui.SameLine();
-        DrawNextEorzeaHour($"距下一小時尚有 {nextHourM:D2}:{nextHourS:D2}", new Vector2(width, WeatherIconSize.Y));
+        DrawNextEorzeaHour("??:?? Min to next hour.".Loc($"{nextHourM:D2}", $"{nextHourS:D2}"), new Vector2(width, WeatherIconSize.Y));
         ImGui.SameLine();
         DrawNextWeather(nextWeatherString);
     }

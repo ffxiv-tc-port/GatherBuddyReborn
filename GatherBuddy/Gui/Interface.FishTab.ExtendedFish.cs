@@ -1,5 +1,6 @@
 ﻿using Dalamud.Interface.Textures;
 using Dalamud.Interface.Utility;
+using ECommons.LanguageHelpers;
 using GatherBuddy.Classes;
 using GatherBuddy.Config;
 using GatherBuddy.Enums;
@@ -148,7 +149,7 @@ public partial class Interface
                 [
                     new BaitOrder
                     {
-                        Name    = string.Intern($"{fish.Size.ToName()}、{fish.Speed.ToName()}"),
+                        Name    = string.Intern("?? and ??".Loc(fish.Size.ToName(), fish.Speed.ToName())),
                         Fish    = null,
                         Icon    = Icons.FromSize(fish.Size),
                         Bite    = Bites.Unknown,
@@ -254,9 +255,9 @@ public partial class Interface
             var minutes = intuition / RealTime.SecondsPerMinute;
             var seconds = intuition % RealTime.SecondsPerMinute;
             if (seconds == 0)
-                return minutes == 1 ? "直覺持續 1 分鐘" : string.Intern($"直覺持續 {minutes} 分鐘");
+                return minutes == 1 ? "Intuition for 1 Minute".Loc() : string.Intern("Intuition for ?? Minutes".Loc(minutes));
 
-            return string.Intern($"直覺持續 {minutes}:{seconds:D2} 分鐘");
+            return string.Intern("Intuition for ??:?? Minutes".Loc(minutes, $"{seconds:D2}"));
         }
 
         public ExtendedFish(Fish data)
@@ -278,17 +279,17 @@ public partial class Interface
                 Data.FishingSpots.Where(f => f.ClosestAetheryte != null).Select(f => f.ClosestAetheryte!.Name).Distinct());
             if (!Aetherytes.Contains('\n'))
                 Aetherytes = '\0' + Aetherytes;
-            Patch = string.Intern($"版本 {Data.Patch.ToVersionString()}");
-            FishType = Data.OceanFish ? "海釣" :
-                Data.IsSpearFish      ? "刺魚" :
-                Data.IsBigFish        ? "大型魚" : "一般魚";
+            Patch = string.Intern("Patch ??".Loc(Data.Patch.ToVersionString()));
+            FishType = Data.OceanFish ? "Ocean Fish".Loc() :
+                Data.IsSpearFish      ? "Spearfishing".Loc() :
+                Data.IsBigFish        ? "Big Fish".Loc() : "Regular Fish".Loc();
 
             Time = !Data.FishRestrictions.HasFlag(FishRestrictions.Time)
-                ? "一直上線"
+                ? "Always Up".Loc()
                 : Data.OceanFish
                     ? PrintOceanTime(Data.OceanTime)
                     : Data.Interval.AlwaysUp()
-                        ? "未知上線時段"
+                        ? "Unknown Uptime".Loc()
                         : string.Intern(Data.Interval.PrintHours());
 
             UptimePercent = SetUptime(Data);
@@ -310,13 +311,13 @@ public partial class Interface
         {
             return time switch
             {
-                OceanTime.Sunset                   => "日落",
-                OceanTime.Sunset | OceanTime.Night => "日落或夜晚",
-                OceanTime.Sunset | OceanTime.Day   => "日落或白天",
-                OceanTime.Night                    => "夜晚",
-                OceanTime.Night | OceanTime.Day    => "白天或夜晚",
-                OceanTime.Day                      => "白天",
-                _                                  => "未知上線時段",
+                OceanTime.Sunset                   => "Sunset".Loc(),
+                OceanTime.Sunset | OceanTime.Night => "Sunset or Night".Loc(),
+                OceanTime.Sunset | OceanTime.Day   => "Sunset or Day".Loc(),
+                OceanTime.Night                    => "Night".Loc(),
+                OceanTime.Night | OceanTime.Day    => "Day or Night".Loc(),
+                OceanTime.Day                      => "Day".Loc(),
+                _                                  => "Unknown Uptime".Loc(),
             };
         }
 
@@ -330,20 +331,20 @@ public partial class Interface
         {
             if (!fish.Data.FishRestrictions.HasFlag(FishRestrictions.Weather))
             {
-                ImUtf8.TextFramed("無天氣限制"u8, ColorId.HeaderWeather.Value());
+                ImUtf8.TextFramed("No Weather Restrictions".Loc(), ColorId.HeaderWeather.Value());
                 return;
             }
 
             if (fish.WeatherIcons.Length == 0 && fish.TransitionIcons.Length == 0)
             {
-                ImUtf8.TextFramed("未知天氣限制"u8, ColorId.HeaderWeather.Value());
+                ImUtf8.TextFramed("Unknown Weather Restrictions".Loc(), ColorId.HeaderWeather.Value());
                 return;
             }
 
             using var style = ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, ImGui.GetStyle().ItemSpacing / 2);
             if (fish.TransitionIcons.Length > 0)
             {
-                AlignTextToSize(fish.TransitionIcons.Length > 1 ? "需要以下其一" : "需要", weatherIconSize);
+                AlignTextToSize(fish.TransitionIcons.Length > 1 ? "Requires one of".Loc() : "Requires".Loc(), weatherIconSize);
                 style.Push(ImGuiStyleVar.ItemSpacing, Vector2.One * ImGuiHelpers.GlobalScale);
                 foreach (var w in fish.TransitionIcons)
                 {
@@ -357,11 +358,11 @@ public partial class Interface
                 style.Pop();
 
                 ImGui.SameLine();
-                AlignTextToSize(fish.WeatherIcons.Length > 1 ? "接著出現以下其一" : "接著出現", weatherIconSize);
+                AlignTextToSize(fish.WeatherIcons.Length > 1 ? "followed by one of".Loc() : "followed by".Loc(), weatherIconSize);
                 if (fish.WeatherIcons.Length == 0)
                 {
                     ImGui.SameLine();
-                    AlignTextToSize(" 任何天氣", weatherIconSize);
+                    AlignTextToSize(" Anything".Loc(), weatherIconSize);
                 }
                 else
                 {
@@ -378,7 +379,7 @@ public partial class Interface
             }
             else if (fish.WeatherIcons.Length > 0)
             {
-                AlignTextToSize(fish.WeatherIcons.Length > 1 ? "需要以下其一" : "需要", weatherIconSize);
+                AlignTextToSize(fish.WeatherIcons.Length > 1 ? "Requires one of".Loc() : "Requires".Loc(), weatherIconSize);
                 style.Push(ImGuiStyleVar.ItemSpacing, Vector2.One * ImGuiHelpers.GlobalScale);
                 foreach (var w in fish.WeatherIcons)
                 {
@@ -395,7 +396,7 @@ public partial class Interface
         {
             if (fish.Bait.Length == 0)
             {
-                ImUtf8.TextFramed("未知釣法"u8, 0xFF0000A0);
+                ImUtf8.TextFramed("Unknown Catch Method".Loc(), 0xFF0000A0);
                 return;
             }
 
@@ -535,7 +536,7 @@ public partial class Interface
         private static void PrintPoints(ExtendedFish fish)
         {
             if (fish.Data.Points > 0)
-                ImUtf8.TextFramed($"價值 {fish.Data.Points} 點", 0xFF006400);
+                ImUtf8.TextFramed("Worth ?? Points".Loc(fish.Data.Points), 0xFF006400);
         }
 
         public void SetTooltip(Territory territory, Vector2 iconSize, Vector2 smallIconSize, Vector2 weatherIconSize, bool printName,

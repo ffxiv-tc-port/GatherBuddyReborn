@@ -2,6 +2,7 @@
 using System.Numerics;
 using Dalamud.Interface;
 using Dalamud.Interface.Components;
+using ECommons.LanguageHelpers;
 using GatherBuddy.Alarms;
 using GatherBuddy.Config;
 using GatherBuddy.GatherHelper;
@@ -115,7 +116,7 @@ public partial class Interface
 
     private void DrawGatherWindowPresetHeaderLine()
     {
-        if (ImGuiUtil.DrawDisabledButton(FontAwesomeIcon.Copy.ToIconString(), IconButtonSize, "將目前的採集視窗預設複製到剪貼簿。",
+        if (ImGuiUtil.DrawDisabledButton(FontAwesomeIcon.Copy.ToIconString(), IconButtonSize, "Copy current gather window preset to clipboard.".Loc(),
                 _gatherWindowCache.Selector.Current == null, true))
         {
             var preset = _gatherWindowCache.Selector.Current!;
@@ -123,26 +124,26 @@ public partial class Interface
             {
                 var s = new GatherWindowPreset.Config(preset).ToBase64();
                 ImGui.SetClipboardText(s);
-                Communicator.PrintClipboardMessage("採集視窗預設 ", preset.Name);
+                Communicator.PrintClipboardMessage("Gather window preset ".Loc(), preset.Name);
             }
             catch (Exception e)
             {
-                Communicator.PrintClipboardMessage("採集視窗預設 ", preset.Name, e);
+                Communicator.PrintClipboardMessage("Gather window preset ".Loc(), preset.Name, e);
             }
         }
 
-        if (ImGuiUtil.DrawDisabledButton("建立提醒", Vector2.Zero, "根據此採集視窗預設建立新的提醒群組。", _gatherWindowCache.Selector.Current == null))
+        if (ImGuiUtil.DrawDisabledButton("Create Alarms".Loc(), Vector2.Zero, "Create a new Alarm Group from this gather window preset.".Loc(), _gatherWindowCache.Selector.Current == null))
         {
             var preset = new AlarmGroup(_gatherWindowCache.Selector.Current!);
             _plugin.AlarmManager.AddGroup(preset);
         }
 
         ImGuiComponents.HelpMarker(
-            "若不依上線時間排序採集視窗，項目會依「已啟用的預設順序」再依「預設內項目順序」不重複加入。\n"
-          + "你可以在清單中拖曳預設來調整順序。\n"
-          + "你可以在特定預設內拖曳項目來調整順序。\n"
-          + "你可以將項目拖曳到選擇器中另一個預設上，把它加入該預設並從目前預設移除。\n"
-          + "在採集視窗本身，按住 Ctrl 並右鍵點擊項目，可將其從所屬預設中刪除。若這麼做移除了預設中的最後一個項目，該預設也會一併被移除。");
+            ("If not sorting the Gather Window by uptimes, items are uniquely added in order of enabled preset, then order of item in preset.\n"
+          + "You can drag and draw presets in the list to move them.\n"
+          + "You can drag and draw items in a specific preset to move them.\n"
+          + "You can drag and draw an item onto a different preset from the selector to add it to that preset and remove it from the current.\n"
+          + "In the Gather Window itself, you can hold Control and Right-Click an item to delete it from the preset it comes from. If this removes the last item in a preset, the preset will also be removed.").Loc());
     }
 
     private void DrawGatherWindowPreset(GatherWindowPreset preset)
@@ -155,7 +156,7 @@ public partial class Interface
             _plugin.GatherWindowManager.ChangeDescription(preset, newDesc);
 
         var tmp = preset.Enabled;
-        if (ImGui.Checkbox("啟用##preset", ref tmp) && tmp != preset.Enabled)
+        if (ImGui.Checkbox("Enabled".Loc() + "##preset", ref tmp) && tmp != preset.Enabled)
             _plugin.GatherWindowManager.TogglePreset(preset);
 
         ImGui.NewLine();
@@ -169,7 +170,7 @@ public partial class Interface
             using var id    = ImRaii.PushId(i);
             using var group = ImRaii.Group();
             var       item  = preset.Items[i];
-            if (ImGuiUtil.DrawDisabledButton(FontAwesomeIcon.Trash.ToIconString(), IconButtonSize, "從預設中刪除此項目...", false,
+            if (ImGuiUtil.DrawDisabledButton(FontAwesomeIcon.Trash.ToIconString(), IconButtonSize, "Delete this item from the preset...".Loc(), false,
                     true))
                 _plugin.GatherWindowManager.RemoveItem(preset, i--);
 
@@ -186,7 +187,7 @@ public partial class Interface
         }
 
         if (ImGuiUtil.DrawDisabledButton(FontAwesomeIcon.Plus.ToIconString(), IconButtonSize,
-                "將此項目加到預設的最後面（若尚未包含在內）...",
+                "Add this item at the end of the preset, if it is not already included...".Loc(),
                 preset.Items.Contains(GatherGroupCache.AllGatherables[_gatherWindowCache.NewGatherableIdx]), true))
             _plugin.GatherWindowManager.AddItem(preset, GatherGroupCache.AllGatherables[_gatherWindowCache.NewGatherableIdx]);
 
@@ -198,11 +199,11 @@ public partial class Interface
     private void DrawGatherWindowTab()
     {
         using var id  = ImRaii.PushId("GatherWindow");
-        using var tab = ImRaii.TabItem("採集視窗");
+        using var tab = ImRaii.TabItem("Gather Window".Loc());
 
         ImGuiUtil.HoverTooltip(
-            "設定視窗太大裝不下嗎？\n"
-          + "準備一個只顯示你真正在意的項目的小視窗吧！");
+            ("Config window too big? Why can't you hold all this information?\n"
+          + "Prepare a small window with only those items that actually interest you!").Loc());
 
         if (!tab)
             return;
@@ -210,7 +211,7 @@ public partial class Interface
         _gatherWindowCache.Selector.Draw(SelectorWidth);
         ImGui.SameLine();
 
-        ItemDetailsWindow.Draw("預設詳情", DrawGatherWindowPresetHeaderLine, () =>
+        ItemDetailsWindow.Draw("Preset Details".Loc(), DrawGatherWindowPresetHeaderLine, () =>
         {
             if (_gatherWindowCache.Selector.Current != null)
                 DrawGatherWindowPreset(_gatherWindowCache.Selector.Current);

@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Numerics;
 using Dalamud.Interface.Utility;
+using ECommons.LanguageHelpers;
 using GatherBuddy.Config;
 using GatherBuddy.Time;
 using ImGuiNET;
@@ -45,7 +46,7 @@ public partial class Interface
         private sealed class ZoneHeader : ColumnString<CachedWeather>
         {
             public ZoneHeader()
-                => Label = "篩選區域...";
+                => Label = "Filter Zone...".Loc();
 
             public override float Width
                 => _zoneSize * ImGuiHelpers.GlobalScale;
@@ -167,9 +168,9 @@ public partial class Interface
     private void DrawWeatherTab()
     {
         using var id  = ImRaii.PushId("Weather");
-        using var tab = ImRaii.TabItem("天氣");
-        ImGuiUtil.HoverTooltip("沒錯，「陰霾」也算天氣。\n"
-          + "查看所有區域接下來幾個時段的天氣預報，以及上一個時段的天氣。");
+        using var tab = ImRaii.TabItem("Weather".Loc());
+        ImGuiUtil.HoverTooltip(("Yes, 'Gloom' is weather.\n"
+          + "See the weather forecast in all zones for the following days, as well as the last one.").Loc());
 
         if (!tab)
             return;

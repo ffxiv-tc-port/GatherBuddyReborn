@@ -1,5 +1,6 @@
 ﻿using System.Linq;
 using Dalamud.Interface.Textures;
+using ECommons.LanguageHelpers;
 using GatherBuddy.Classes;
 using GatherBuddy.Enums;
 using GatherBuddy.Interfaces;
@@ -38,8 +39,8 @@ public partial class Interface
                 : data.NodeList.First().Folklore;
             Uptimes = data.NodeType switch
             {
-                NodeType.Regular => "隨時",
-                NodeType.Unknown => "未知",
+                NodeType.Regular => "Always".Loc(),
+                NodeType.Unknown => "Unknown".Loc(),
                 _                => data.NodeList.Select(n => n.Times).Aggregate(BitfieldUptime.Combine).PrintHours(true),
             };
             Level     = Data.LevelString();
