@@ -9,6 +9,7 @@ public delegate void UpdateCatchDelegate(IntPtr module, uint fishId, bool large,
 public sealed class UpdateFishCatch : SeFunctionBase<UpdateCatchDelegate>
 {
     public UpdateFishCatch(ISigScanner sigScanner)
-        : base(sigScanner, "40 55 56 41 54 41 56 41 57 48 8D 6C 24 ?? 48 81 EC ?? ?? ?? ?? 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 45 ?? 48 8B 01")
+        // TC 7.20: 舊簽名失效,採用上游 FFXIV-CombatReborn 的新簽名(已離線比對 TC 7.20 執行檔,唯一命中)。
+        : base(sigScanner, "48 89 6C 24 ?? 56 41 56 41 57 48 81 EC ?? ?? ?? ?? 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 84 24 ?? ?? ?? ?? 48 8B 01")
     {}
 }
