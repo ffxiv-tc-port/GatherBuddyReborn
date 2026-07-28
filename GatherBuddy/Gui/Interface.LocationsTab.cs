@@ -201,7 +201,9 @@ public partial class Interface
                 var       x           = location.IntegralXCoord / 100f;
                 ImGui.SetNextItemWidth(-1);
                 if (ImGui.DragFloat("##x", ref x, 0.05f, 1f, 42f, "%.2f", ImGuiSliderFlags.AlwaysClamp))
-                    _plugin.LocationManager.SetXCoord(location, (int)(x * 100f + 0.5f));
+                    _plugin.LocationManager.SetXCoord(location, (int)(x * 100f + 0.5f), false);
+                if (ImGui.IsItemDeactivatedAfterEdit())
+                    _plugin.LocationManager.Save();
                 if (overwritten)
                 {
                     ImGuiUtil.HoverTooltip("Right-click to restore default. (??)".Loc($"{location.DefaultXCoord / 100f:0.00}"));
@@ -229,7 +231,9 @@ public partial class Interface
                 var       y           = location.IntegralYCoord / 100f;
                 ImGui.SetNextItemWidth(-1);
                 if (ImGui.DragFloat("##y", ref y, 0.05f, 1f, 42f, "%.2f", ImGuiSliderFlags.AlwaysClamp))
-                    _plugin.LocationManager.SetYCoord(location, (int)(y * 100f + 0.5f));
+                    _plugin.LocationManager.SetYCoord(location, (int)(y * 100f + 0.5f), false);
+                if (ImGui.IsItemDeactivatedAfterEdit())
+                    _plugin.LocationManager.Save();
                 if (overwritten)
                 {
                     ImGuiUtil.HoverTooltip("Right-click to restore default. (??)".Loc($"{location.DefaultYCoord / 100f:0.00}"));
@@ -257,7 +261,9 @@ public partial class Interface
                 ImGui.SetNextItemWidth(-1);
                 int radius = location.Radius;
                 if (ImGui.DragInt("##radius", ref radius, 0.1f, 0, IMarkable.RadiusMax))
-                    _plugin.LocationManager.SetRadius(location, Math.Clamp((ushort)radius, (ushort)0, IMarkable.RadiusMax));
+                    _plugin.LocationManager.SetRadius(location, Math.Clamp((ushort)radius, (ushort)0, IMarkable.RadiusMax), false);
+                if (ImGui.IsItemDeactivatedAfterEdit())
+                    _plugin.LocationManager.Save();
                 if (overwritten)
                 {
                     ImGuiUtil.HoverTooltip("Right-click to restore default. (??)".Loc(location.DefaultRadius));

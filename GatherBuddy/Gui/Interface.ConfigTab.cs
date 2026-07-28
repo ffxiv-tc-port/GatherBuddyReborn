@@ -98,8 +98,10 @@ public partial class Interface
                 else if (volume > 100)
                     volume = 100;
                 GatherBuddy.Config.AutoGatherConfig.SoundPlaybackVolume = volume;
-                GatherBuddy.Config.Save();
             }
+
+            if (ImGui.IsItemDeactivatedAfterEdit())
+                GatherBuddy.Config.Save();
 
             ImGuiUtil.HoverTooltip(
                 "The volume of the sound played when auto-gathering shuts down because your list is complete.\nHold CTRL and click to enter custom value".Loc());
@@ -117,10 +119,10 @@ public partial class Interface
         {
             var tmp = GatherBuddy.Config.AutoGatherConfig.RepairThreshold;
             if (ImGui.DragInt("Repair Threshold".Loc(), ref tmp, 1, 1, 100))
-            {
                 GatherBuddy.Config.AutoGatherConfig.RepairThreshold = tmp;
+
+            if (ImGui.IsItemDeactivatedAfterEdit())
                 GatherBuddy.Config.Save();
-            }
 
             ImGuiUtil.HoverTooltip("The percentage of durability at which you will repair your gear.".Loc());
         }
@@ -129,10 +131,10 @@ public partial class Interface
         {
             var tmp = GatherBuddy.Config.AutoGatherConfig.MaxFishingSpotMinutes;
             if (ImGui.DragInt("Max Fishing Spot Minutes".Loc(), ref tmp, 1, 1, 40))
-            {
                 GatherBuddy.Config.AutoGatherConfig.MaxFishingSpotMinutes = tmp;
+
+            if (ImGui.IsItemDeactivatedAfterEdit())
                 GatherBuddy.Config.Save();
-            }
 
             ImGuiUtil.HoverTooltip("The maximum number of minutes you will fish at a fishing spot.".Loc());
         }
@@ -153,8 +155,10 @@ public partial class Interface
                 if (string.IsNullOrEmpty(tmp))
                     tmp = "auto";
                 GatherBuddy.Config.AutoGatherConfig.LifestreamCommand = tmp;
-                GatherBuddy.Config.Save();
             }
+
+            if (ImGui.IsItemDeactivatedAfterEdit())
+                GatherBuddy.Config.Save();
 
             ImGuiUtil.HoverTooltip(
                 "The command used when idling or done gathering. DO NOT include '/li'\nBe careful when changing this, GBR does not validate this command!".Loc());
@@ -188,10 +192,10 @@ public partial class Interface
         {
             var tmp = GatherBuddy.Config.AutoGatherConfig.FarNodeFilterDistance;
             if (ImGui.DragFloat("Far Node Filter Distance".Loc(), ref tmp, 0.1f, 0.1f, 100f))
-            {
                 GatherBuddy.Config.AutoGatherConfig.FarNodeFilterDistance = tmp;
+
+            if (ImGui.IsItemDeactivatedAfterEdit())
                 GatherBuddy.Config.Save();
-            }
 
             ImGuiUtil.HoverTooltip(
                 "When looking for non-empty nodes GBR will filter out any nodes that are closer to you than this. Prevents checking nodes you can already see are empty.".Loc());
@@ -201,10 +205,10 @@ public partial class Interface
         {
             var tmp = GatherBuddy.Config.AutoGatherConfig.TimedNodePrecog;
             if (ImGui.DragInt("Timed Node Precognition (Seconds)".Loc(), ref tmp, 1, 0, 600))
-            {
                 GatherBuddy.Config.AutoGatherConfig.TimedNodePrecog = tmp;
+
+            if (ImGui.IsItemDeactivatedAfterEdit())
                 GatherBuddy.Config.Save();
-            }
 
             ImGuiUtil.HoverTooltip("How far in advance of the node actually being up GBR should consider the node to be up".Loc());
         }
@@ -213,10 +217,10 @@ public partial class Interface
         {
             var tmp = (int)GatherBuddy.Config.AutoGatherConfig.ExecutionDelay;
             if (ImGui.DragInt("Execution delay (Milliseconds)".Loc(), ref tmp, 1, 0, 1500))
-            {
                 GatherBuddy.Config.AutoGatherConfig.ExecutionDelay = (uint)Math.Min(Math.Max(0, tmp), 10000);
+
+            if (ImGui.IsItemDeactivatedAfterEdit())
                 GatherBuddy.Config.Save();
-            }
 
             ImGuiUtil.HoverTooltip("Delay executing each action by the specified amount.".Loc());
         }
@@ -231,10 +235,10 @@ public partial class Interface
         {
             var tmp = GatherBuddy.Config.AutoGatherConfig.MountUpDistance;
             if (ImGui.DragFloat("Mount Up Distance".Loc(), ref tmp, 0.1f, 0.1f, 100f))
-            {
                 GatherBuddy.Config.AutoGatherConfig.MountUpDistance = tmp;
+
+            if (ImGui.IsItemDeactivatedAfterEdit())
                 GatherBuddy.Config.Save();
-            }
 
             ImGuiUtil.HoverTooltip("The distance at which you will mount up to move to a node.".Loc());
         }
@@ -249,10 +253,10 @@ public partial class Interface
         {
             var tmp = GatherBuddy.Config.AutoGatherConfig.NavResetCooldown;
             if (ImGui.DragFloat("Anti-Stuck Cooldown".Loc(), ref tmp, 0.1f, 0.1f, 10f))
-            {
                 GatherBuddy.Config.AutoGatherConfig.NavResetCooldown = tmp;
+
+            if (ImGui.IsItemDeactivatedAfterEdit())
                 GatherBuddy.Config.Save();
-            }
 
             ImGuiUtil.HoverTooltip("The time in seconds before the navigation system will reset if you are stuck.".Loc());
         }
@@ -269,10 +273,10 @@ public partial class Interface
         {
             var tmp = GatherBuddy.Config.AutoGatherConfig.NavResetThreshold;
             if (ImGui.DragFloat("Stuck Threshold".Loc(), ref tmp, 0.1f, 0.1f, 10f))
-            {
                 GatherBuddy.Config.AutoGatherConfig.NavResetThreshold = tmp;
+
+            if (ImGui.IsItemDeactivatedAfterEdit())
                 GatherBuddy.Config.Save();
-            }
 
             ImGuiUtil.HoverTooltip("The time in seconds before the navigation system will consider you stuck.".Loc());
         }
@@ -540,56 +544,59 @@ public partial class Interface
             var ret = ImGui.DragFloat("Fish Timer Bite Time Scale".Loc(), ref value, 0.1f, FishRecord.MinBiteTime / 500f,
                 FishRecord.MaxBiteTime / 1000f,
                 "%2.3f Seconds".Loc());
+            var deactivated = ImGui.IsItemDeactivatedAfterEdit();
 
             ImGuiUtil.HoverTooltip(("The fishing timer window bite times are scaled to this value.\n"
               + "If your bite time exceeds the value, the progress bar and bite windows will not be displayed.\n"
               + "You should probably keep this as high as your highest bite window and as low as possible. About 40 seconds is usually enough.").Loc());
 
-            if (!ret)
-                return;
+            if (ret)
+            {
+                var newValue = (ushort)Math.Clamp((int)(value * 1000f + 0.9), FishRecord.MinBiteTime * 2, FishRecord.MaxBiteTime);
+                if (newValue != GatherBuddy.Config.FishTimerScale)
+                    GatherBuddy.Config.FishTimerScale = newValue;
+            }
 
-            var newValue = (ushort)Math.Clamp((int)(value * 1000f + 0.9), FishRecord.MinBiteTime * 2, FishRecord.MaxBiteTime);
-            if (newValue == GatherBuddy.Config.FishTimerScale)
-                return;
-
-            GatherBuddy.Config.FishTimerScale = newValue;
-            GatherBuddy.Config.Save();
+            if (deactivated)
+                GatherBuddy.Config.Save();
         }
 
         public static void DrawFishTimerIntervals()
         {
             int value = GatherBuddy.Config.ShowSecondIntervals;
             ImGui.SetNextItemWidth(SetInputWidth);
-            var ret = ImGui.DragInt("Fish Timer Interval Separators".Loc(), ref value, 0.01f, 0, 16);
+            var ret         = ImGui.DragInt("Fish Timer Interval Separators".Loc(), ref value, 0.01f, 0, 16);
+            var deactivated = ImGui.IsItemDeactivatedAfterEdit();
             ImGuiUtil.HoverTooltip(("The fishing timer window can show a number of interval lines and corresponding seconds between 0 and 16.\n"
               + "Set to 0 to turn this feature off.").Loc());
-            if (!ret)
-                return;
+            if (ret)
+            {
+                var newValue = (byte)Math.Clamp(value, 0, 16);
+                if (newValue != GatherBuddy.Config.ShowSecondIntervals)
+                    GatherBuddy.Config.ShowSecondIntervals = newValue;
+            }
 
-            var newValue = (byte)Math.Clamp(value, 0, 16);
-            if (newValue == GatherBuddy.Config.ShowSecondIntervals)
-                return;
-
-            GatherBuddy.Config.ShowSecondIntervals = newValue;
-            GatherBuddy.Config.Save();
+            if (deactivated)
+                GatherBuddy.Config.Save();
         }
 
         public static void DrawFishTimerIntervalsRounding()
         {
             var value = GatherBuddy.Config.SecondIntervalsRounding;
             ImGui.SetNextItemWidth(SetInputWidth);
-            var ret = ImGui.DragInt("Fish Timer Interval Rounding".Loc(), ref value, 0.01f, 0, 3);
+            var ret         = ImGui.DragInt("Fish Timer Interval Rounding".Loc(), ref value, 0.01f, 0, 3);
+            var deactivated = ImGui.IsItemDeactivatedAfterEdit();
             ImGuiUtil.HoverTooltip(("Round the displayed second value to this number of digits past the decimal. \n"
                 + "Set to 0 to display only whole numbers.").Loc());
-            if (!ret)
-                return;
+            if (ret)
+            {
+                var newValue = (byte)Math.Clamp(value, 0, 3);
+                if (newValue != GatherBuddy.Config.SecondIntervalsRounding)
+                    GatherBuddy.Config.SecondIntervalsRounding = newValue;
+            }
 
-            var newValue = (byte)Math.Clamp(value, 0, 3);
-            if (newValue == GatherBuddy.Config.SecondIntervalsRounding)
-                return;
-
-            GatherBuddy.Config.SecondIntervalsRounding = newValue;
-            GatherBuddy.Config.Save();
+            if (deactivated)
+                GatherBuddy.Config.Save();
         }
 
         public static void DrawHideFishPopupBox()
@@ -673,15 +680,17 @@ public partial class Interface
 
             var tmp = (int)GatherBuddy.Config.FixNamesPercentage;
             ImGui.SetNextItemWidth(SetInputWidth);
-            if (!ImGui.DragInt("Fish Name Position Percentage".Loc(), ref tmp, 0.1f, 0, 100, "%i%%"))
-                return;
+            var ret         = ImGui.DragInt("Fish Name Position Percentage".Loc(), ref tmp, 0.1f, 0, 100, "%i%%");
+            var deactivated = ImGui.IsItemDeactivatedAfterEdit();
+            if (ret)
+            {
+                tmp = Math.Clamp(tmp, 0, 100);
+                if (tmp != GatherBuddy.Config.FixNamesPercentage)
+                    GatherBuddy.Config.FixNamesPercentage = (byte)tmp;
+            }
 
-            tmp = Math.Clamp(tmp, 0, 100);
-            if (tmp == GatherBuddy.Config.FixNamesPercentage)
-                return;
-
-            GatherBuddy.Config.FixNamesPercentage = (byte)tmp;
-            GatherBuddy.Config.Save();
+            if (deactivated)
+                GatherBuddy.Config.Save();
         }
 
         // Gather Window
