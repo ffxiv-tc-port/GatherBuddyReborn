@@ -2,6 +2,7 @@
 using System.Linq;
 using Dalamud.Game.Command;
 using Dalamud.Game.Text.SeStringHandling;
+using ECommons.LanguageHelpers;
 using GatherBuddy.Enums;
 using GatherBuddy.Plugin;
 using GatherBuddy.Time;
@@ -35,53 +36,54 @@ public partial class GatherBuddy
     {
         _commands["/gatherbuddy"] = new CommandInfo(OnGatherBuddy)
         {
-            HelpMessage = "Use to open the GatherBuddy interface.",
+            HelpMessage = "Use to open the GatherBuddy interface.".Loc(),
             ShowInHelp  = false,
         };
 
         _commands["/gbr"] = new CommandInfo(OnGatherBuddy)
         {
-            HelpMessage = "Use to open the GatherBuddy interface.",
+            HelpMessage = "Use to open the GatherBuddy interface.".Loc(),
             ShowInHelp  = true,
         };
 
         _commands["/gather"] = new CommandInfo(OnGather)
         {
-            HelpMessage = "Mark the nearest node containing the item supplied, teleport to the nearest aetheryte, equip appropriate gear.\n"
-              + "You can use 'alarm' to gather the last triggered alarm or 'next' to gather the same item as before, but in the next-best location.",
+            HelpMessage = ("Mark the nearest node containing the item supplied, teleport to the nearest aetheryte, equip appropriate gear.\n"
+              + "You can use 'alarm' to gather the last triggered alarm or 'next' to gather the same item as before, but in the next-best location.")
+                .Loc(),
             ShowInHelp = true,
         };
 
         _commands["/gatherbtn"] = new CommandInfo(OnGatherBtn)
         {
             HelpMessage =
-                "Mark the nearest botanist node containing the item supplied, teleport to the nearest aetheryte, equip appropriate gear.",
+                "Mark the nearest botanist node containing the item supplied, teleport to the nearest aetheryte, equip appropriate gear.".Loc(),
             ShowInHelp = true,
         };
 
         _commands["/gathermin"] = new CommandInfo(OnGatherMin)
         {
             HelpMessage =
-                "Mark the nearest miner node containing the item supplied, teleport to the nearest aetheryte, equip appropriate gear.",
+                "Mark the nearest miner node containing the item supplied, teleport to the nearest aetheryte, equip appropriate gear.".Loc(),
             ShowInHelp = true,
         };
 
         _commands["/gatherfish"] = new CommandInfo(OnGatherFish)
         {
             HelpMessage =
-                "Mark the nearest fishing spot containing the fish supplied, teleport to the nearest aetheryte and equip fishing gear.",
+                "Mark the nearest fishing spot containing the fish supplied, teleport to the nearest aetheryte and equip fishing gear.".Loc(),
             ShowInHelp = true,
         };
 
         _commands["/gathergroup"] = new CommandInfo(OnGatherGroup)
         {
-            HelpMessage = "Teleport to the node of a group corresponding to current time. Use /gathergroup for more details.",
+            HelpMessage = "Teleport to the node of a group corresponding to current time. Use /gathergroup for more details.".Loc(),
             ShowInHelp  = true,
         };
 
         _commands["/gbc"] = new CommandInfo(OnGatherBuddyShort)
         {
-            HelpMessage = "Some quick toggles for config options. Use without argument for help.",
+            HelpMessage = "Some quick toggles for config options. Use without argument for help.".Loc(),
             ShowInHelp  = true,
         };
 

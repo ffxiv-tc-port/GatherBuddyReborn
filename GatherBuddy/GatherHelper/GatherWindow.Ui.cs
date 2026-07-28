@@ -6,6 +6,7 @@ using System.Text;
 using Dalamud.Game.ClientState.Keys;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Windowing;
+using ECommons.LanguageHelpers;
 using GatherBuddy.AutoGather.Extensions;
 using GatherBuddy.Classes;
 using GatherBuddy.Config;
@@ -314,7 +315,7 @@ public class GatherWindow : Window
             GatherBuddy.AutoGather.Enabled = !GatherBuddy.AutoGather.Enabled;
         }
         color.Pop();
-        ImGuiUtil.HoverTooltip("Click to enable/disable auto-gather");
+        ImGuiUtil.HoverTooltip("Click to enable/disable auto-gather".Loc());
         using var table = ImRaii.Table("##table", GatherBuddy.Config.ShowGatherWindowTimers ? 2 : 1);
         if (!table)
             return;
