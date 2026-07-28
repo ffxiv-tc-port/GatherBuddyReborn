@@ -22,7 +22,9 @@ public partial class FishingParser
                 ClientLanguage.German   => German.Value,
                 ClientLanguage.French   => French.Value,
                 ClientLanguage.Japanese => Japanese.Value,
-                (ClientLanguage)4       => ChineseTraditional.Value,
+                // TC(台服)客戶端在 Dalamud 13.0.0.16 之後回報 ClientLanguage 7(TraditionalChinese),
+                // 舊版回報 4(ChineseSimplified)。用數值比較才能同時相容 CI 釘的 13.0.0.6(列舉沒有 7 這個名字)與執行期新版。
+                (ClientLanguage)4 or (ClientLanguage)5 or (ClientLanguage)7 => ChineseTraditional.Value,
                 _                       => English.Value,
             };
         }
@@ -62,8 +64,9 @@ public partial class FishingParser
             Undiscovered   = "未知の釣り場",
         });
 
-        // The TC client reports ClientLanguage 4 (the ChineseSimplified slot), but its chat text is
-        // Traditional Chinese. Wording verified against aliceric27/ffxiv-datamining-tc:
+        // TC(台服)客戶端在 Dalamud 13.0.0.16 之後回報 ClientLanguage 7(TraditionalChinese),
+        // 舊版回報 4(ChineseSimplified)。用數值比較才能同時相容 CI 釘的 13.0.0.6(列舉沒有 7 這個名字)與執行期新版。
+        // 聊天訊息本身是繁體中文,用字已對照 aliceric27/ffxiv-datamining-tc 驗證:
         // LogMessage 1110 (cast), 1115 (area discovered), 1121 (mooch), Addon 3811 (undiscovered).
         private static readonly Lazy<Regexes> ChineseTraditional = new(() => new Regexes
         {
