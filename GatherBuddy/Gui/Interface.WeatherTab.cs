@@ -5,7 +5,7 @@ using Dalamud.Interface.Utility;
 using ECommons.LanguageHelpers;
 using GatherBuddy.Config;
 using GatherBuddy.Time;
-using ImGuiNET;
+using Dalamud.Bindings.ImGui;
 using OtterGui;
 using OtterGui.Table;
 using ImRaii = OtterGui.Raii.ImRaii;
@@ -145,7 +145,7 @@ public partial class Interface
         {
             var cursor = ImGui.GetCursorPos();
             if (icon.TryGetWrap(out var wrap, out _))
-                ImGui.Image(wrap.ImGuiHandle, WeatherIconSize);
+                ImGui.Image(wrap.Handle, WeatherIconSize);
             else
                 ImGui.Dummy(WeatherIconSize);
             ImGui.SetCursorPos(cursor + new Vector2(WeatherIconSize.X + ItemSpacing.X / 2, _textHeightIconOffset));
@@ -156,7 +156,7 @@ public partial class Interface
         {
             ImGui.SetCursorPosX(ImGui.GetCursorPosX() + offset);
             if (icon.TryGetWrap(out var wrap, out _))
-                ImGui.Image(wrap.ImGuiHandle, WeatherIconSize);
+                ImGui.Image(wrap.Handle, WeatherIconSize);
             else
                 ImGui.Dummy(WeatherIconSize);
             ImGuiUtil.HoverTooltip($"{weather.Name} ({weather.Id})");

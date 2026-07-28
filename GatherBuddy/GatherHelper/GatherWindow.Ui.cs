@@ -12,7 +12,7 @@ using GatherBuddy.Config;
 using GatherBuddy.Gui;
 using GatherBuddy.Interfaces;
 using GatherBuddy.Time;
-using ImGuiNET;
+using Dalamud.Bindings.ImGui;
 using OtterGui;
 using Functions = GatherBuddy.Plugin.Functions;
 using ImRaii = OtterGui.Raii.ImRaii;
@@ -127,7 +127,7 @@ public class GatherWindow : Window
         {
             using var style = ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, ImGui.GetStyle().ItemSpacing / 2);
             if (Icons.DefaultStorage.TryLoadIcon(item.ItemData.Icon, out var icon))
-                ImGuiUtil.HoverIcon(icon.ImGuiHandle, icon.Size, new Vector2(ImGui.GetTextLineHeight()));
+                ImGuiUtil.HoverIcon(icon.Handle, icon.Size, new Vector2(ImGui.GetTextLineHeight()));
             else
                 ImGui.Dummy(new Vector2(ImGui.GetTextLineHeight()));
             ImGui.SameLine();

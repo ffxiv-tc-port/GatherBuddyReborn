@@ -7,7 +7,7 @@ using ECommons.LanguageHelpers;
 using GatherBuddy.Config;
 using GatherBuddy.Interfaces;
 using GatherBuddy.Time;
-using ImGuiNET;
+using Dalamud.Bindings.ImGui;
 using OtterGui;
 using OtterGui.Table;
 using OtterGui.Text;
