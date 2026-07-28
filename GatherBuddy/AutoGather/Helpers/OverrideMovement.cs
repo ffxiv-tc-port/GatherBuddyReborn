@@ -25,18 +25,11 @@ public unsafe struct PlayerMoveControllerFlyInput
     [FieldOffset(0x15)] public byte HaveBackwardOrStrafe;
 }
 
-[StructLayout(LayoutKind.Explicit, Size = 0x2B0)]
-public unsafe struct CameraEx
-{
-    [FieldOffset(0x130)] public float DirH; // 0 is north, increases CW
-    [FieldOffset(0x134)] public float DirV; // 0 is horizontal, positive is looking up, negative looking down
-    [FieldOffset(0x138)] public float InputDeltaHAdjusted;
-    [FieldOffset(0x13C)] public float InputDeltaVAdjusted;
-    [FieldOffset(0x140)] public float InputDeltaH;
-    [FieldOffset(0x144)] public float InputDeltaV;
-    [FieldOffset(0x148)] public float DirVMin; // -85deg by default
-    [FieldOffset(0x14C)] public float DirVMax; // +45deg by default
-}
+// NOTE: the old hand-rolled `CameraEx` struct is gone on purpose (same fix as vnavmesh/Lifestream on
+// TC 7.20). Its 0x130-based FieldOffsets are the pre-7.20 layout — TC 7.20 shifted the native struct
+// +0x10, so DirH at 0x130 now reads FoV, which sent legacy-mode steering in a garbage direction.
+// GetActiveCamera() already returns FFXIVClientStructs.FFXIV.Client.Game.Camera*, which carries the
+// current layout, so use it directly.
 
 public unsafe class OverrideMovement : IDisposable
 {
@@ -129,7 +122,7 @@ public unsafe class OverrideMovement : IDisposable
 
         var activeCamera = _legacyMode && CameraManager.Instance() != null ? CameraManager.Instance()->GetActiveCamera() : null;
         var refDir = activeCamera != null
-            ? ((CameraEx*)activeCamera)->DirH.Radians() + 180.Degrees()
+            ? activeCamera->DirH.Radians() + 180.Degrees()
             : player.Rotation.Radians();
         return (dirH - refDir, dirV);
     }
