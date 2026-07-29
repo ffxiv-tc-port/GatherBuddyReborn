@@ -71,6 +71,7 @@ namespace GatherBuddy.AutoGather
         public bool GoHomeWhenDone { get; set; } = true;
         public bool UseSkillsForFallbackItems { get; set; } = false;
         public bool AbandonNodes { get; set; } = false;
+        public bool FinishTimedNodes { get; set; } = true;
         public uint ExecutionDelay { get; set; } = 0;
         public bool ConfigConversionFixed { get; set; } = false;
         public bool RotationSolverConversionDone { get; set; } = false;

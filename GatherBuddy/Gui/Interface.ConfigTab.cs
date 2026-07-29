@@ -79,6 +79,15 @@ public partial class Interface
               + "or if the node didn't have any needed items on the first place.").Loc(),
                 GatherBuddy.Config.AutoGatherConfig.AbandonNodes, b => GatherBuddy.Config.AutoGatherConfig.AbandonNodes = b);
 
+        public static void DrawFinishTimedNodesBox()
+            => DrawCheckbox("Use up timed nodes".Loc(),
+                ("On timed nodes (unspoiled, legendary and ephemeral), keep gathering until the node runs out\n"
+              + "of integrity even after enough items have been gathered, instead of leaving right away.\n"
+              + "Their gathering attempts do not come back, so leaving early throws them away.\n"
+              + "Regular nodes are not affected.").Loc(),
+                GatherBuddy.Config.AutoGatherConfig.FinishTimedNodes,
+                b => GatherBuddy.Config.AutoGatherConfig.FinishTimedNodes = b);
+
         public static void DrawCheckRetainersBox()
         {
             DrawCheckbox("Check Retainer Inventories".Loc(), "Use Allagan Tools to check retainer inventories when doing inventory calculations".Loc(),
@@ -854,6 +863,7 @@ public partial class Interface
                 ConfigFunctions.DrawGoHomeBox();
                 ConfigFunctions.DrawUseSkillsForFallabckBox();
                 ConfigFunctions.DrawAbandonNodesBox();
+                ConfigFunctions.DrawFinishTimedNodesBox();
                 ConfigFunctions.DrawCheckRetainersBox();
                 ConfigFunctions.DrawFishCollectionBox();
                 ConfigFunctions.DrawAlwaysMapsBox();
