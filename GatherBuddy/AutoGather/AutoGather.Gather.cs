@@ -24,7 +24,23 @@ namespace GatherBuddy.AutoGather
             if (targetSystem == null)
                 return;
 
-            TaskManager.Enqueue(() => targetSystem->OpenObjectInteraction((FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)gameObject.Address));
+            // ⚠️ .Address 寫在 lambda「內部」也沒用:Dalamud 的 GameObject.Address
+            // 在建構時就凍結、永不重新解析(GameObject.cs:137-139),所以晚點讀等於
+            // 讀到當初那個值。而 IGameObject.IsValid() 只檢查「玩家有沒有登入」、
+            // 完全不驗證位址(GameObject.cs:170-177)。
+            // 這個任務是在後續的幀才執行的,採集點在那之前消失(採完枯竭、換區、
+            // 其他人採走)就會解參考已釋放的記憶體 → 攔不到的 AccessViolation。
+            // 正解:只捕獲 GameObjectId,執行時重查物件表,查不到就放棄這次互動。
+            var nodeId = gameObject.GameObjectId;
+
+            TaskManager.Enqueue(() =>
+            {
+                var node = Svc.Objects.SearchById(nodeId);
+                if (node == null)
+                    return;
+
+                targetSystem->OpenObjectInteraction((FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)node.Address);
+            });
             TaskManager.Enqueue(() => Dalamud.Conditions[ConditionFlag.Gathering], 500);
         }
 
