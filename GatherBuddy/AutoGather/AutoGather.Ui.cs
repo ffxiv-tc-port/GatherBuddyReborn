@@ -181,8 +181,12 @@ namespace GatherBuddy.AutoGather
         {
             ImGui.PushItemWidth(300);
             var ps = PlayerState.Instance();
-            var preview = Dalamud.GameData.GetExcelSheet<Mount>().First(x => x.RowId == GatherBuddy.Config.AutoGatherConfig.AutoGatherMountId)
-                .Singular.ToString().ToProperCase();
+            // 原為 First(x => x.RowId == …MountId):對整張 Mount 表做 O(n) 線性走訪找主鍵,
+            // 而這裡在 Draw 路徑上。GetRowOrDefault 是索引查詢 O(1);找不到時回傳空字串,
+            // 正好落進下面既有的「Mount Roulette」後備,比原本的 First() 直接拋例外更穩。
+            var preview = Dalamud.GameData.GetExcelSheet<Mount>()
+                .GetRowOrDefault(GatherBuddy.Config.AutoGatherConfig.AutoGatherMountId)
+                ?.Singular.ToString().ToProperCase() ?? "";
             if (string.IsNullOrEmpty(preview))
                 preview = "Mount Roulette".Loc();
             if (ImGui.BeginCombo("Select Mount".Loc(), preview))
