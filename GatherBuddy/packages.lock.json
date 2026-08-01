@@ -67,7 +67,7 @@
       "autoretainerapi": {
         "type": "Project",
         "dependencies": {
-          "ECommons": "[1.0.0--imgui-bindings, )"
+          "ECommons": "[3.0.1.5, )"
         }
       },
       "ecommons": {
@@ -90,12 +90,8 @@
         "type": "Project",
         "dependencies": {
           "JetBrains.Annotations": "[2024.3.0, )",
-          "Microsoft.Extensions.DependencyInjection": "[9.0.2, )",
-          "OtterGuiInternal": "[1.0.0, )"
+          "Microsoft.Extensions.DependencyInjection": "[9.0.2, )"
         }
-      },
-      "otterguiinternal": {
-        "type": "Project"
       }
     }
   }
