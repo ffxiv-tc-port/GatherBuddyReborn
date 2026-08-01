@@ -20,10 +20,11 @@ public class Identificator
         var languages = new[]
         {
             GatherBuddy.Language,
-            (ClientLanguage)(((int)GatherBuddy.Language + 1) % 4),
-            (ClientLanguage)(((int)GatherBuddy.Language + 2) % 4),
-            (ClientLanguage)(((int)GatherBuddy.Language + 3) % 4),
-        };
+            ClientLanguage.English,
+            ClientLanguage.German,
+            ClientLanguage.French,
+            ClientLanguage.Japanese,
+        }.Distinct().ToArray();
 
         _gatherableFromLanguage = languages.Select(CreateGatherableDictionary).ToArray();
         _fishFromLanguage       = languages.Select(CreateFishDictionary).ToArray();
