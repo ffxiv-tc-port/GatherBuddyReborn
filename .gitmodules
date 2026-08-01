@@ -1,7 +1,7 @@
 [submodule "OtterGui"]
 	path = OtterGui
 	url = https://github.com/ffxiv-tc-port/OtterGui.git
-	branch = main
+	branch = tc-7.20
 [submodule "ECommons"]
 	path = ECommons
 	url = https://github.com/ffxiv-tc-port/ECommons.git
