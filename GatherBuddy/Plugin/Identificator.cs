@@ -1,5 +1,6 @@
 ﻿using Dalamud.Game;
 using GatherBuddy.Classes;
+using System;
 using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Linq;
@@ -26,8 +27,29 @@ public class Identificator
             ClientLanguage.Japanese,
         }.Distinct().ToArray();
 
-        _gatherableFromLanguage = languages.Select(CreateGatherableDictionary).ToArray();
-        _fishFromLanguage       = languages.Select(CreateFishDictionary).ToArray();
+        // 部分用戶端(例如台服)Lumina 對任何請求語言都會回傳同一份資料,
+        // 使下面各語言建出來的字典內容其實逐條完全相同。這裡不假設「台服」這個特例,
+        // 而是實際比對取得的名稱是否相同,相同就直接複用主要語言(languages[0])已建好的
+        // 字典,不重複讀取、不重複配置——國際服四語言彼此有別,行為完全不受影響。
+        _gatherableFromLanguage = BuildLanguageDictionaries(languages, CreateGatherableDictionary,
+            (a, b) => _data.Gatherables.Values.All(g => g.Name[a] == g.Name[b]));
+        _fishFromLanguage = BuildLanguageDictionaries(languages, CreateFishDictionary,
+            (a, b) => _data.Fishes.Values.All(f => f.Name[a] == f.Name[b]));
+    }
+
+    /// <summary>
+    /// 依序建立每個語言對應的字典。若某語言在目前資料下實際取得的名稱與主要語言
+    /// (languages[0])逐條完全相同,直接複用已建好的字典,不重新建置。
+    /// </summary>
+    private static TDict[] BuildLanguageDictionaries<TDict>(ClientLanguage[] languages,
+        Func<ClientLanguage, TDict> createDictionary, Func<ClientLanguage, ClientLanguage, bool> producesIdenticalNames)
+    {
+        var result = new TDict[languages.Length];
+        result[0] = createDictionary(languages[0]);
+        for (var i = 1; i < languages.Length; ++i)
+            result[i] = producesIdenticalNames(languages[0], languages[i]) ? result[0] : createDictionary(languages[i]);
+
+        return result;
     }
 
     private FrozenDictionary<string, Gatherable> CreateGatherableDictionary(ClientLanguage l)
