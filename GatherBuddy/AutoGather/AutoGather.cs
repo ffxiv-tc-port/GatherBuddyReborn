@@ -248,6 +248,13 @@ namespace GatherBuddy.AutoGather
                 return;
             }
 
+            // Clean up lock that may have been left behind by cancelled or timed-out tasks.
+            // Every Lock()/Unlock() pair lives inside a single task batch, so an idle task manager
+            // means nothing can still be relying on the lock. This MUST stay above the CanAct gate
+            // below: a task chain that timed out while the player is Occupied would otherwise never
+            // reach it, and the lock is a cross-plugin flag that keeps YesAlready globally disabled.
+            YesAlready.Unlock();
+
             if (!_homeWorldWarning && !Functions.OnHomeWorld())
             {
                 _homeWorldWarning = true;
@@ -267,8 +274,6 @@ namespace GatherBuddy.AutoGather
                 AutoStatus = Dalamud.Conditions[ConditionFlag.Gathering] ? "Gathering...".Loc() : "Player is busy...";
                 return;
             }
-
-            YesAlready.Unlock(); // Clean up lock that may have been left behind by cancelled tasks
 
             if (FreeInventorySlots == 0)
             {
