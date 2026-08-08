@@ -75,7 +75,7 @@ public partial class FishingParser : IDisposable
         byte unk10, byte unk11, byte unk12)
     {
         if (!GatherBuddy.Config.HideFishSizePopup)
-            _catchHook!.Original(module, fishId, large, size, amount, level, unk7, unk8, unk9, unk10, unk11, unk12);
+            _catchHook!.OriginalDisposeSafe(module, fishId, large, size, amount, level, unk7, unk8, unk9, unk10, unk11, unk12);
 
         try
         {
@@ -121,6 +121,6 @@ public partial class FishingParser : IDisposable
             OnDetourError(nameof(OnUseAction), ex);
         }
 
-        return _hookHook!.Original(manager, actionType, actionId, targetId, a4, a5, a6, a7);
+        return _hookHook!.OriginalDisposeSafe(manager, actionType, actionId, targetId, a4, a5, a6, a7);
     }
 }
