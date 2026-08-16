@@ -20,6 +20,19 @@
     <CopyLocalLockfileAssemblies>true</CopyLocalLockfileAssemblies>
     <Configurations>Debug;Release</Configurations>
     <Platforms>x64</Platforms>
+
+    <!-- 🔴 建 GatherBuddy.sln 時,MSBuild 預設會把 Configuration/Platform 從 ProjectReference 上
+         「解掉」(ShouldUnsetParentConfigurationAndPlatform 預設 true),改由方案的組態對應表
+         決定子專案要建哪個組態。AutoRetainerAPI 是子模組、沒有被收進 GatherBuddy.sln
+         (ECommons／OtterGui 等其他被參考的專案都在裡面,只有它不在),AssignProjectConfiguration
+         查不到對應就退回它自己的預設值 Debug —— 於是 `dotnet build GatherBuddy.sln -c Release`
+         會把 **Debug 版**的 AutoRetainerAPI.dll 複製進 GatherBuddy/bin/Release/,而建置本身
+         0 error、完全沒有徵兆。
+         ⚠️ 在 ProjectReference 上寫 SetConfiguration 沒有用:AssignProjectConfiguration 會
+         覆寫掉那份 metadata。
+         直接建 .csproj 時本來就是繼承父組態,所以這對 CI 與發版路徑(兩者都是直接建 .csproj)
+         是 no-op。 -->
+    <ShouldUnsetParentConfigurationAndPlatform>false</ShouldUnsetParentConfigurationAndPlatform>
 	</PropertyGroup>
 
 	<PropertyGroup>
