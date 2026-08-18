@@ -99,7 +99,7 @@ public class ContextMenu : IDisposable
                 "RecipeTree"         => CheckGameObjectItem(AgentById(AgentId.RecipeItemContext), Offsets.AgentItemContextItemId),
                 "RecipeMaterialList" => CheckGameObjectItem(AgentById(AgentId.RecipeItemContext), Offsets.AgentItemContextItemId),
                 "GatheringNote"      => CheckGatheringNote(args),
-                "ItemSearch"         => HandleItem((uint)AgentContext.Instance()->UpdateCheckerParam),
+                "ItemSearch"         => HandleItemSearch(),
                 "ChatLog"            => CheckGameObjectItem("ChatLog", Offsets.ChatLogContextItemId, ValidateChatLogContext),
                 _                    => null,
             };
@@ -124,6 +124,24 @@ public class ContextMenu : IDisposable
             return null;
 
         return HandleItem(*(uint*)(agent + Offsets.GatheringNoteContextItemId));
+    }
+
+    /// <summary>
+    /// ItemSearch(市場搜尋)右鍵選單的道具 id 放在 AgentContext.UpdateCheckerParam(+0x17D0)。
+    /// </summary>
+    /// <remarks>
+    /// AgentContext.Instance() 走 AgentModule.Instance(),而後者在 UIModule 尚未建立時回 null
+    /// (CS 手寫實作逐字是 uiModule == null ? null : uiModule-&gt;GetAgentModule())。原本是
+    /// 無條件解參考。取不到就回 null —— 與這個 switch 其他分支、以及 HandleSatisfactionSupply
+    /// 的失敗形式一致(這次不掛選單項目,不影響遊戲原本的右鍵選單)。
+    /// </remarks>
+    private static unsafe IGatherable? HandleItemSearch()
+    {
+        var agentContext = AgentContext.Instance();
+        if (agentContext == null)
+            return null;
+
+        return HandleItem((uint)agentContext->UpdateCheckerParam);
     }
 
     private static IGatherable? HandleItem(uint itemId)
