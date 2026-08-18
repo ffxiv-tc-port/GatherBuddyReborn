@@ -155,7 +155,7 @@ public unsafe class OverrideMovement : IDisposable
 
     private (Angle h, Angle v)? DirectionToDestination(bool allowVertical)
     {
-        var player = Svc.ClientState.LocalPlayer;
+        var player = Svc.Objects.LocalPlayer;
         if (player == null)
             return null;
 

@@ -117,7 +117,7 @@ namespace GatherBuddy.AutoGather
                 var obj = Svc.Targets.Target ?? Svc.Targets.PreviousTarget;
                 if (obj is { ObjectKind: ObjectKind.GatheringPoint })
                 {
-                    var node = FindNodeByObjectDataId(obj.DataId);
+                    var node = FindNodeByObjectDataId(obj.BaseId);
                     if (node != null)
                         return node;
                 }

@@ -99,7 +99,7 @@ namespace GatherBuddy.AutoGather
 
         public unsafe bool GetIsFoodBuffUp(uint itemId)
         {
-            var buff = Dalamud.ClientState?.LocalPlayer?.StatusList.FirstOrDefault(s => s.StatusId == 48);
+            var buff = Dalamud.Objects?.LocalPlayer?.StatusList.FirstOrDefault(s => s.StatusId == 48);
             if (buff == null)
             {
                 return false;
@@ -120,7 +120,7 @@ namespace GatherBuddy.AutoGather
 
         public unsafe bool GetIsPotionBuffUp(uint itemId)
         {
-            var buff = Dalamud.ClientState?.LocalPlayer?.StatusList.FirstOrDefault(s => s.StatusId == 49);
+            var buff = Dalamud.Objects?.LocalPlayer?.StatusList.FirstOrDefault(s => s.StatusId == 49);
             if (buff == null)
             {
                 return false;
@@ -139,13 +139,13 @@ namespace GatherBuddy.AutoGather
             }
         }
 
-        public unsafe bool IsManualBuffUp => Dalamud.ClientState?.LocalPlayer?.StatusList.Any(s => s.StatusId == 46) ?? false;
+        public unsafe bool IsManualBuffUp => Dalamud.Objects?.LocalPlayer?.StatusList.Any(s => s.StatusId == 46) ?? false;
 
         public unsafe bool GetIsSquadronManualBuffUp(uint itemId)
         {
             if (SquadronManualItemIdBuffId.TryGetValue(itemId, out var requiredBuffId))
             {
-                return Dalamud.ClientState?.LocalPlayer?.StatusList.Any(s => s.StatusId == requiredBuffId) ?? false;
+                return Dalamud.Objects?.LocalPlayer?.StatusList.Any(s => s.StatusId == requiredBuffId) ?? false;
             }
             else
             {
@@ -157,7 +157,7 @@ namespace GatherBuddy.AutoGather
         {
             if (SquadronPassItemIdBuffId.TryGetValue(itemId, out var requiredBuffId))
             {
-                return Dalamud.ClientState?.LocalPlayer?.StatusList.Any(s => s.StatusId == requiredBuffId) ?? false;
+                return Dalamud.Objects?.LocalPlayer?.StatusList.Any(s => s.StatusId == requiredBuffId) ?? false;
             }
             else
             {

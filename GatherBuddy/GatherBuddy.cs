@@ -181,7 +181,7 @@ public partial class GatherBuddy : IDalamudPlugin
             LastObjectsScan = DateTime.Now;
             var objs = Svc.Objects.Where(o => o.ObjectKind == ObjectKind.GatheringPoint);
             foreach (var obj in objs)
-                WorldData.AddLocation(obj.DataId, obj.Position);
+                WorldData.AddLocation(obj.BaseId, obj.Position);
         }
 
         try

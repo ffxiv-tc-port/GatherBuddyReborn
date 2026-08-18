@@ -93,12 +93,12 @@ namespace GatherBuddy.AutoGather
             if (Dalamud.Conditions[ConditionFlag.InFlight] || Dalamud.Conditions[ConditionFlag.Diving])
                 return true;
 
-            if (GatherBuddy.Config.AutoGatherConfig.ForceWalking || Dalamud.ClientState.LocalPlayer == null)
+            if (GatherBuddy.Config.AutoGatherConfig.ForceWalking || Dalamud.Objects.LocalPlayer == null)
             {
                 return false;
             }
 
-            return Vector3.Distance(Dalamud.ClientState.LocalPlayer.Position, destination)
+            return Vector3.Distance(Dalamud.Objects.LocalPlayer.Position, destination)
              >= GatherBuddy.Config.AutoGatherConfig.MountUpDistance;
         }
 
@@ -187,7 +187,7 @@ namespace GatherBuddy.AutoGather
         {
             get
             {
-                if (Dalamud.ClientState.LocalPlayer == null)
+                if (Dalamud.Objects.LocalPlayer == null)
                     return false;
                 if (Dalamud.Conditions[ConditionFlag.BetweenAreas]
                  || Dalamud.Conditions[ConditionFlag.BetweenAreas51]
@@ -206,7 +206,7 @@ namespace GatherBuddy.AutoGather
                  || Dalamud.Conditions[ConditionFlag.MountOrOrnamentTransition] // Mounting up
                     //Node is open? Fades off shortly after closing the node, can't use items (but can mount) while it's set
                  || Dalamud.Conditions[85] && !Dalamud.Conditions[ConditionFlag.Gathering]
-                 || Dalamud.ClientState.LocalPlayer.IsDead
+                 || Dalamud.Objects.LocalPlayer.IsDead
                  || Player.IsAnimationLocked)
                     return false;
 
@@ -215,7 +215,7 @@ namespace GatherBuddy.AutoGather
         }
 
         private static unsafe bool HasGivingLandBuff
-            => Dalamud.ClientState.LocalPlayer?.StatusList.Any(s => s.StatusId == 1802) ?? false;
+            => Dalamud.Objects.LocalPlayer?.StatusList.Any(s => s.StatusId == 1802) ?? false;
 
         public static unsafe bool IsGivingLandOffCooldown
             => ActionManager.Instance()->IsActionOffCooldown(ActionType.Action, Actions.GivingLand.ActionId);

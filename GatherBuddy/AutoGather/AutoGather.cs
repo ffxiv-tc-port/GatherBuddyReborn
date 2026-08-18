@@ -213,11 +213,11 @@ namespace GatherBuddy.AutoGather
                     var gatherable = gatherTarget.Value.Gatherable;
                     var node = gatherTarget.Value.Node;
                     if (gatherable != null && (gatherable.NodeType == NodeType.Regular || gatherable.NodeType == NodeType.Ephemeral)
-                        && (VisitedNodes.Last?.Value != targetNode.DataId)
-                        && node != null && node.WorldPositions.ContainsKey(targetNode.DataId))
+                        && (VisitedNodes.Last?.Value != targetNode.BaseId)
+                        && node != null && node.WorldPositions.ContainsKey(targetNode.BaseId))
                     {
                         FarNodesSeenSoFar.Clear();
-                        VisitedNodes.AddLast(targetNode.DataId);
+                        VisitedNodes.AddLast(targetNode.BaseId);
                         while (VisitedNodes.Count > (node.WorldPositions.Count <= 4 ? 2 : 4))
                             VisitedNodes.RemoveFirst();
                     }
@@ -308,7 +308,7 @@ namespace GatherBuddy.AutoGather
                 if (_currentGatherTarget == null)
                 {
                     if (!_activeItemList.IsInitialized)
-                        _currentGatherTarget = _activeItemList.GetNextOrDefault([Svc.Targets.Target!.DataId]).FirstOrDefault();
+                        _currentGatherTarget = _activeItemList.GetNextOrDefault([Svc.Targets.Target!.BaseId]).FirstOrDefault();
                     else
                         _currentGatherTarget = _activeItemList.CurrentOrDefault;
                 }
@@ -406,7 +406,7 @@ namespace GatherBuddy.AutoGather
                 }
             }
 
-            var nearbyNodes = Svc.Objects.Where(o => o.ObjectKind == ObjectKind.GatheringPoint && o.IsTargetable).Select(o => o.DataId);
+            var nearbyNodes = Svc.Objects.Where(o => o.ObjectKind == ObjectKind.GatheringPoint && o.IsTargetable).Select(o => o.BaseId);
             var next = _activeItemList.GetNextOrDefault(nearbyNodes)
                 .OrderByDescending(nodes => nodes.Item.ItemId);
             if (!next.Any())
@@ -499,7 +499,7 @@ namespace GatherBuddy.AutoGather
 
             if (territoryId == 886 && next.First().Node.Territory.Id is 901 or 929 or 939)
             {
-                var dutyNpc                    = Svc.Objects.FirstOrDefault(o => o.DataId == 1031694);
+                var dutyNpc                    = Svc.Objects.FirstOrDefault(o => o.BaseId == 1031694);
                 var selectStringAddon          = Dalamud.GameGui.GetAddonByName("SelectString");
                 var talkAddon                  = Dalamud.GameGui.GetAddonByName("Talk");
                 var selectYesNoAddon           = Dalamud.GameGui.GetAddonByName("SelectYesno");
@@ -719,7 +719,7 @@ namespace GatherBuddy.AutoGather
             if (closestTargetableNode != null)
             {
                 AutoStatus = "Moving to node...".Loc();
-                var targetItem = next.First(ti => ti.Node != null && ti.Node.WorldPositions.ContainsKey(closestTargetableNode.DataId))
+                var targetItem = next.First(ti => ti.Node != null && ti.Node.WorldPositions.ContainsKey(closestTargetableNode.BaseId))
                     .Gatherable;
                 MoveToCloseNode(closestTargetableNode, targetItem, config);
                 return;

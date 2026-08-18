@@ -517,9 +517,9 @@ namespace GatherBuddy.AutoGather
                 return false;
 
             var yield = slot.Yield;
-            if (Dalamud.ClientState.LocalPlayer!.StatusList.Any(s => s.StatusId == Actions.Bountiful.EffectId))
+            if (Dalamud.Objects.LocalPlayer!.StatusList.Any(s => s.StatusId == Actions.Bountiful.EffectId))
                 yield -= 1;
-            if (Dalamud.ClientState.LocalPlayer!.StatusList.Any(s => s.StatusId == Actions.BountifulII.EffectId))
+            if (Dalamud.Objects.LocalPlayer!.StatusList.Any(s => s.StatusId == Actions.BountifulII.EffectId))
                 yield -= CalculateBountifulBonus(slot.Item);
             if (yield < config.SolidAge.MinYieldTotal)
                 return false;

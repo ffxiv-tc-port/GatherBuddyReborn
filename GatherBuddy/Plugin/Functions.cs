@@ -126,8 +126,8 @@ public static class Functions
 
     public static bool OnHomeWorld()
     {
-        var world = Dalamud.ClientState.LocalPlayer?.CurrentWorld;
-        var home = Dalamud.ClientState.LocalPlayer?.HomeWorld;
+        var world = Dalamud.Objects.LocalPlayer?.CurrentWorld;
+        var home = Dalamud.Objects.LocalPlayer?.HomeWorld;
         return world?.Value.RowId == home?.Value.RowId;
     }
 
