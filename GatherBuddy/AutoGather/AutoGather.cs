@@ -791,7 +791,18 @@ namespace GatherBuddy.AutoGather
 
         private unsafe void LeaveTheDiadem()
         {
-            AgentModule.Instance()->GetAgentByInternalId(AgentId.ContentsFinderMenu)->Show();
+            // AgentModule.Instance() 走 UIModule，UI 尚未建立時回 null（CS 手寫實作逐字是
+            // uiModule == null ? null : uiModule->GetAgentModule()），GetAgentByInternalId 也可能回 null。
+            // 取不到就不開選單直接返回——與同 repo Plugin/ContextMenu.cs HandleItemSearch 相同的失敗形式。
+            var agentModule = AgentModule.Instance();
+            if (agentModule == null)
+                return;
+
+            var contentsFinderMenu = agentModule->GetAgentByInternalId(AgentId.ContentsFinderMenu);
+            if (contentsFinderMenu == null)
+                return;
+
+            contentsFinderMenu->Show();
             if (GenericHelpers.TryGetAddonByName("ContentsFinderMenu", out AtkUnitBase* addon))
             {
                 TaskManager.Enqueue(YesAlready.Lock);
