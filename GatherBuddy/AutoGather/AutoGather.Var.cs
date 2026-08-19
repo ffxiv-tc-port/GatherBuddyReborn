@@ -106,7 +106,29 @@ namespace GatherBuddy.AutoGather
         {
             get
             {
-                var map     = FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentMap.Instance();
+                // 🔴 AgentMap.Instance() 由 [Agent(AgentId.Map)] 產生:內部鏈
+                //    AgentModule -> UIModule -> Framework,任一層回 null 整條就回 null
+                //    (登入前、切場景、登出後都是常態),底層 [StaticAddress]/[MemberFunction]
+                //    特徵碼失配時改為擲 InvalidOperationException——兩種失效模式並存,
+                //    只擋一種等於假防護。裸解參考 null 原生指標是 AccessViolationException,
+                //    在 .NET Core 屬 corrupted-state exception,try/catch 攔不到 ⇒ 只能事前判空。
+                //    ⚠️ 下面原有的 markers == null 擋不到這件事:MiniMapGatheringMarkers 是
+                //    FixedSizeArray6 產生的 Span 屬性,它是從 map 的位址算出來的,map 為 null
+                //    時 span 照樣「建得出來」,真正的爆點在 foreach 讀取那一刻。
+                //    這裡跑在自動採集的每輪判斷(高頻),所以 fail-closed 靜默回 null,不寫 log。
+                FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentMap* map;
+                try
+                {
+                    map = FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentMap.Instance();
+                }
+                catch
+                {
+                    return null;
+                }
+
+                if (map == null)
+                    return null;
+
                 var markers = map->MiniMapGatheringMarkers;
                 if (markers == null)
                     return null;

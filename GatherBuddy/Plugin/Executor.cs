@@ -264,7 +264,20 @@ public class Executor
         if (_location.IntegralXCoord == 100 || _location.IntegralYCoord == 100)
             return;
 
-        var instance = AgentMap.Instance();
+        // 下面已經有 instance != null 的守衛(擋 AVE),但 AgentMap.Instance() 的另一半失效
+        // 模式是「擲 InvalidOperationException」——底層 [StaticAddress]/[MemberFunction]
+        // 特徵碼失配時走的就是那條,而台服正是特徵碼最容易漂移的地方。
+        // 兩種失效模式並存,只擋一種等於假防護 ⇒ 在這裡把「擲出」也轉成「回 null」,
+        // 交給既有的守衛處理(印座標不需要 agent,順序刻意維持不變)。
+        AgentMap* instance;
+        try
+        {
+            instance = AgentMap.Instance();
+        }
+        catch
+        {
+            instance = null;
+        }
 
         var link = new SeStringBuilder().AddFullMapLink(_location.Name, _location.Territory, _location.IntegralXCoord / 100f,
             _location.IntegralYCoord / 100f).BuiltString;
