@@ -803,16 +803,48 @@ namespace GatherBuddy.AutoGather
                 return;
 
             contentsFinderMenu->Show();
-            if (GenericHelpers.TryGetAddonByName("ContentsFinderMenu", out AtkUnitBase* addon))
+            if (GenericHelpers.TryGetAddonByName<AtkUnitBase>("ContentsFinderMenu", out _))
             {
                 TaskManager.Enqueue(YesAlready.Lock);
-                TaskManager.Enqueue(() => Callback.Fire(addon, true,  0));
-                TaskManager.Enqueue(() => Callback.Fire(addon, false, -2));
+                TaskManager.Enqueue(() => FireOnAddon("ContentsFinderMenu", true,  0));
+                TaskManager.Enqueue(() => FireOnAddon("ContentsFinderMenu", false, -2));
                 TaskManager.DelayNext(1000);
-                TaskManager.Enqueue(() => Callback.Fire((AtkUnitBase*)(nint)Dalamud.GameGui.GetAddonByName("SelectYesno"), true, 0));
+                TaskManager.Enqueue(() => FireOnAddon("SelectYesno", true, 0));
                 TaskManager.Enqueue(YesAlready.Unlock);
                 return;
             }
+        }
+
+        /// <remarks>
+        /// 🔴 ECommons 的 <c>Callback.Fire</c> 在送出之前先做
+        /// <c>PluginLog.Verbose($"Firing callback: {Base->Name.Read()} …")</c> ——
+        /// <c>Base</c> 為 null 時**第一行就解參考 null**，而且 ECommons 的 log 沒有寫入端閘門，
+        /// Verbose 關著那個內插字串照樣求值。AccessViolationException 在 .NET Core 是
+        /// corrupted-state exception，<c>try</c>/<c>catch</c> 與 <c>ExecuteSafe</c> 一律攔不到。
+        /// <para>
+        /// 原本這裡有兩種缺陷並存：
+        /// ① <c>SelectYesno</c> 那一顆是 <c>GameGui.GetAddonByName(...)</c> 的回傳值**完全沒判**
+        ///    就轉型成 <c>AtkUnitBase*</c>；那條路徑走 <c>RaptureAtkUnitManager</c>，找不到視窗時
+        ///    **合法回 0**，而它是 <c>DelayNext(1000)</c> 之後才跑的延遲工作 —— 確認對話框沒跳出來
+        ///    （網路延遲、遊戲直接省略確認）本來就是常態。
+        /// ② <c>ContentsFinderMenu</c> 那兩顆把**在 enqueue 那一幀取得的原生指標**捕獲進 lambda，
+        ///    等佇列跑到時已經過了好幾幀；視窗中途被 Finalize 掉就是拿已釋放的位址去用。
+        /// 兩者的正解相同：**存名字、跑到的時候重新查**（艦隊硬規則：絕不跨幀保存原生指標）。
+        /// </para>
+        /// 這是使用者觸發的動作型路徑（自動採集離開雲冠群島），不是每幀路徑，所以取不到時
+        /// 記一行 <c>Information</c>（使用者跑 LogLevel 2，Debug/Verbose 收不到）再跳過。
+        /// 行為不變：視窗在的時候送出的回呼與參數逐字相同。
+        /// </remarks>
+        private static unsafe void FireOnAddon(string addonName, bool updateState, params object[] values)
+        {
+            if (GenericHelpers.TryGetAddonByName(addonName, out AtkUnitBase* addon))
+            {
+                Callback.Fire(addon, updateState, values);
+                return;
+            }
+
+            GatherBuddy.Log.Information(
+                $"LeaveTheDiadem: 視窗 \"{addonName}\" 已經不在了，略過這次回呼（不送出，避免解參考空指標）。");
         }
 
         private void AbortAutoGather(string? status = null)

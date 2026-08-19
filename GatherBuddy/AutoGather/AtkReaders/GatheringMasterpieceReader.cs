@@ -36,10 +36,28 @@ public unsafe class GatheringMasterpieceReader(AtkUnitBase* addon) : AtkReader(a
     // ItemSlotReader.Item - use GetValueOrDefault instead of the throwing indexer.
     public Gatherable? Item => ItemId > 0 ? GatherBuddy.GameData.Gatherables.GetValueOrDefault(ItemId) : null;
 
-    public bool HighVisible
-        => addon->GetNodeById(15)->IsVisible();
-    public bool MidVisible => addon->GetNodeById(14)->IsVisible();
-    public bool LowVisible => addon->GetNodeById(13)->IsVisible();
+    // 🔴 原本是 `addon->GetNodeById(N)->IsVisible()` —— 兩層全裸。
+    //    `GetNodeById` 是 [MemberFunction] 原生呼叫，節點 id 不存在時**合法回 null**
+    //    （視窗還沒跑完 setup、切頁的那一瞬間都會取不到；13/14/15 又是寫死的節點 id，
+    //    台服版面不保證跟量測時的版本一致）。把 null 當 this 交給 `IsVisible()` 就是
+    //    AccessViolationException，在 .NET Core 屬 corrupted-state exception，
+    //    try/catch 攔不到 —— 只能事前判空。
+    //    這三顆是自動採集收藏品**每一輪決策**都會讀的輪詢型存取子 ⇒ 取不到就安靜回
+    //    false，不寫 log（高頻路徑寫 log 會把整份 log 洗掉）。
+    //    ⚠️ 行為等價：三顆都 false 時 GetCollectabilityScores 走的是它原本就有的
+    //    「都看不到 ⇒ 用 LowThreshold」分支，不是新的路徑。
+    private bool NodeVisible(uint nodeId)
+    {
+        if (addon == null)
+            return false;
+
+        var node = addon->GetNodeById(nodeId);
+        return node != null && node->IsVisible();
+    }
+
+    public bool HighVisible => NodeVisible(15);
+    public bool MidVisible  => NodeVisible(14);
+    public bool LowVisible  => NodeVisible(13);
     public int  CollectabilityCurrent => (int)SafeReadUInt(13);
     public int  CollectabilityMax     => (int)SafeReadUInt(14);
 
