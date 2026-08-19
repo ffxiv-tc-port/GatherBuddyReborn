@@ -17,8 +17,22 @@ public unsafe class MacroManager : IDisposable
     public const int NumMacroLines    = 15;
     public const int NumRequiredLines = 6;
 
+    // 🔴 原本是三層裸鏈。Framework.Instance() 是 [StaticAddress(..., isPointer: true)]，
+    //    產生器讀「指標的位址」再解參考一層，遊戲尚未建立單例時回 null（不是擲例外）；
+    //    GetUIModule() 在那之前也可能回 null。裸解參考 null 原生指標是 AVE，
+    //    在 .NET Core 屬 corrupted-state exception，try/catch 攔不到 —— 只能事前擋。
+    //    取不到就回 null，由兩個呼叫端（ExecuteMacroLines / Execute）判空後放棄本次巨集。
     public RaptureShellModule* Module
-        => Framework.Instance()->GetUIModule()->GetRaptureShellModule();
+    {
+        get
+        {
+            var framework = Framework.Instance();
+            if (framework == null)
+                return null;
+            var uiModule = framework->GetUIModule();
+            return uiModule == null ? null : uiModule->GetRaptureShellModule();
+        }
+    }
 
     public RaptureMacroModule.Macro* Macro;
 
@@ -121,7 +135,11 @@ public unsafe class MacroManager : IDisposable
         for (var i = lines.Count; i < NumRequiredLines; ++i)
             ClearString(ref Macro->Lines[i]);
 
-        Module->ExecuteMacro(Macro);
+        var module = Module;
+        if (module == null)
+            return false;
+
+        module->ExecuteMacro(Macro);
         return true;
     }
 
@@ -139,5 +157,11 @@ public unsafe class MacroManager : IDisposable
     }
 
     public void Execute()
-        => Module->ExecuteMacro((RaptureMacroModule.Macro*)(byte*)Macro);
+    {
+        var module = Module;
+        if (module == null)
+            return;
+
+        module->ExecuteMacro((RaptureMacroModule.Macro*)(byte*)Macro);
+    }
 }
