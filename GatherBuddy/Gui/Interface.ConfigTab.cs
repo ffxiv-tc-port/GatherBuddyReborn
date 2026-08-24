@@ -290,6 +290,99 @@ public partial class Interface
             ImGuiUtil.HoverTooltip("The time in seconds before the navigation system will consider you stuck.".Loc());
         }
 
+        public static void DrawAntiStuckSettings()
+        {
+            var config = GatherBuddy.Config.AutoGatherConfig.AntiStuck;
+            DrawCheckbox("Enable Anti-Stuck".Loc(),
+                "Recover from being stuck with a short random movement. If that keeps failing and the character never leaves the area, an escalation action can be taken."
+                    .Loc(),
+                config.Enabled, b => config.Enabled = b);
+            if (!config.Enabled)
+                return;
+
+            ImGui.Indent();
+            DrawCheckbox("Enable Local Recovery".Loc(),
+                "Attempt a short random movement whenever vnavmesh appears to be stuck.".Loc(),
+                config.LocalRecoveryEnabled, b => config.LocalRecoveryEnabled = b);
+            DrawCheckbox("Enable Escalation".Loc(),
+                "Only after local recovery has failed the configured number of times does the area stagnation timer start. Disabled by default.".Loc(),
+                config.EscalationEnabled, b => config.EscalationEnabled = b);
+
+            if (config.EscalationEnabled)
+            {
+                ImGui.Indent();
+                var failures = config.EscalationAfterFails;
+                ImGui.SetNextItemWidth(SetInputWidth);
+                if (ImGui.SliderInt("Recovery Failures".Loc(), ref failures, 1, 10))
+                {
+                    config.EscalationAfterFails = Math.Clamp(failures, 1, 10);
+                    GatherBuddy.Config.Save();
+                }
+
+                ImGuiUtil.HoverTooltip("How many local recoveries must fire before escalation is allowed at all.".Loc());
+
+                var radius = config.AreaRadius;
+                ImGui.SetNextItemWidth(SetInputWidth);
+                if (ImGui.SliderFloat("Stagnation Radius".Loc(), ref radius, 10, 100, "%.0f yalms"))
+                {
+                    config.AreaRadius = Math.Clamp(radius, 10, 100);
+                    GatherBuddy.Config.Save();
+                }
+
+                ImGuiUtil.HoverTooltip("Leaving a circle of this radius counts as real progress and cancels the escalation.".Loc());
+
+                var seconds = config.AreaTimeSeconds;
+                ImGui.SetNextItemWidth(SetInputWidth);
+                if (ImGui.SliderInt("Stagnation Time (seconds)".Loc(), ref seconds, 30, 600))
+                {
+                    config.AreaTimeSeconds = Math.Clamp(seconds, 30, 600);
+                    GatherBuddy.Config.Save();
+                }
+
+                var action = (int)config.DrasticAction;
+                var actions = new[]
+                {
+                    "Do nothing".Loc(),
+                    "Force one unstuck movement".Loc(),
+                    "Stop auto-gather".Loc(),
+                };
+                ImGui.SetNextItemWidth(SetInputWidth * 1.5f);
+                if (ImGui.Combo("Escalation Action".Loc(), ref action, actions, actions.Length))
+                {
+                    config.DrasticAction = (AutoGatherConfig.PositionUnstuckAction)action;
+                    GatherBuddy.Config.Save();
+                }
+
+                ImGuiUtil.HoverTooltip("What to do once the character has been stuck in the same area for the configured time.".Loc());
+
+                if (ImGui.TreeNodeEx("Advanced##AntiStuckAdvanced".Loc()))
+                {
+                    var cooldown = config.DrasticCooldownSeconds;
+                    ImGui.SetNextItemWidth(SetInputWidth);
+                    if (ImGui.SliderInt("Escalation Cooldown (seconds)".Loc(), ref cooldown, 60, 1800))
+                    {
+                        config.DrasticCooldownSeconds = Math.Clamp(cooldown, 60, 1800);
+                        GatherBuddy.Config.Save();
+                    }
+
+                    var maximum = config.MaxDrasticPerSession;
+                    ImGui.SetNextItemWidth(SetInputWidth);
+                    if (ImGui.SliderInt("Max Escalations Per Session".Loc(), ref maximum, 1, 10))
+                    {
+                        config.MaxDrasticPerSession = Math.Clamp(maximum, 1, 10);
+                        GatherBuddy.Config.Save();
+                    }
+
+                    ImGuiUtil.HoverTooltip("The budget is replenished every time auto-gather is turned on again.".Loc());
+                    ImGui.TreePop();
+                }
+
+                ImGui.Unindent();
+            }
+
+            ImGui.Unindent();
+        }
+
         public static void DrawSortingMethodCombo()
         {
             var v = GatherBuddy.Config.AutoGatherConfig.SortingMethod;
@@ -889,6 +982,7 @@ public partial class Interface
                 ConfigFunctions.DrawLifestreamCommandTextInput();
                 ConfigFunctions.DrawAntiStuckCooldown();
                 ConfigFunctions.DrawStuckThreshold();
+                ConfigFunctions.DrawAntiStuckSettings();
                 ConfigFunctions.DrawTimedNodePrecog();
                 ConfigFunctions.DrawExecutionDelay();
                 ImGui.TreePop();

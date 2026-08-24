@@ -10,6 +10,7 @@ using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Game.ClientState.Conditions;
 using ECommons.DalamudServices;
 using ECommons.GameHelpers;
+using GatherBuddy.AutoGather.Helpers;
 using GatherBuddy.AutoGather.Movement;
 using GatherBuddy.CustomInfo;
 using GatherBuddy.Enums;
@@ -50,6 +51,7 @@ namespace GatherBuddy.AutoGather
             _plugin                      =  plugin;
             _soundHelper                 =  new SoundHelper();
             _advancedUnstuck             =  new();
+            _antiStuckManager            =  new(_advancedUnstuck);
             _activeItemList              =  new ActiveItemList(plugin.AutoGatherListsManager);
             ArtisanExporter              =  new Reflection.ArtisanExporter(plugin.AutoGatherListsManager);
             Svc.Chat.CheckMessageHandled += OnMessageHandled;
@@ -93,8 +95,9 @@ namespace GatherBuddy.AutoGather
 
         private readonly GatherBuddy     _plugin;
         private readonly SoundHelper     _soundHelper;
-        private readonly AdvancedUnstuck _advancedUnstuck;
-        private readonly ActiveItemList  _activeItemList;
+        private readonly AdvancedUnstuck  _advancedUnstuck;
+        private readonly AntiStuckManager _antiStuckManager;
+        private readonly ActiveItemList   _activeItemList;
 
         public Reflection.ArtisanExporter ArtisanExporter;
         public TaskManager                TaskManager { get; }
@@ -148,6 +151,7 @@ namespace GatherBuddy.AutoGather
                 }
 
                 _enabled = value;
+                _antiStuckManager.OnEnabledChanged(value);
                 _plugin.Ipc.AutoGatherEnabledChanged(value);
             }
         }
@@ -368,7 +372,7 @@ namespace GatherBuddy.AutoGather
             var isPathGenerating = IsPathGenerating;
             var isPathing        = IsPathing;
 
-            switch (_advancedUnstuck.Check(CurrentDestination, isPathGenerating, isPathing))
+            switch (CheckAntiStuck(isPathGenerating, isPathing))
             {
                 case AdvancedUnstuckCheckResult.Pass: break;
                 case AdvancedUnstuckCheckResult.Wait: return;
@@ -1018,6 +1022,7 @@ namespace GatherBuddy.AutoGather
 
         public void Dispose()
         {
+            _antiStuckManager.Dispose();
             _advancedUnstuck.Dispose();
             _activeItemList.Dispose();
             Svc.Chat.CheckMessageHandled -= OnMessageHandled;
