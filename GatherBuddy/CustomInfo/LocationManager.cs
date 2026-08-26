@@ -38,15 +38,20 @@ public class LocationManager
             Save();
     }
 
-    public void SetXCoord(ILocation loc, int newCoord)
+    /// <param name="save">
+    /// Pass false while a drag/slider is still active. Save() re-serializes every gathering node and fishing spot,
+    /// so doing it on every frame of a drag stalls the render thread.
+    /// </param>
+    public void SetXCoord(ILocation loc, int newCoord, bool save = true)
     {
-        if (loc.SetXCoord(newCoord))
+        if (loc.SetXCoord(newCoord) && save)
             Save();
     }
 
-    public void SetYCoord(ILocation loc, int newCoord)
+    /// <param name="save">See <see cref="SetXCoord"/>.</param>
+    public void SetYCoord(ILocation loc, int newCoord, bool save = true)
     {
-        if (loc.SetYCoord(newCoord))
+        if (loc.SetYCoord(newCoord) && save)
             Save();
     }
 
@@ -56,9 +61,10 @@ public class LocationManager
             Save();
     }
 
-    public void SetRadius(ILocation loc, ushort newRadius)
+    /// <param name="save">See <see cref="SetXCoord"/>.</param>
+    public void SetRadius(ILocation loc, ushort newRadius, bool save = true)
     {
-        if (loc.SetRadius(newRadius))
+        if (loc.SetRadius(newRadius) && save)
             Save();
     }
 

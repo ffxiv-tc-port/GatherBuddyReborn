@@ -99,7 +99,7 @@ public class ContextMenu : IDisposable
                 "RecipeTree"         => CheckGameObjectItem(AgentById(AgentId.RecipeItemContext), Offsets.AgentItemContextItemId),
                 "RecipeMaterialList" => CheckGameObjectItem(AgentById(AgentId.RecipeItemContext), Offsets.AgentItemContextItemId),
                 "GatheringNote"      => CheckGatheringNote(args),
-                "ItemSearch"         => HandleItem((uint)AgentContext.Instance()->UpdateCheckerParam),
+                "ItemSearch"         => HandleItemSearch(),
                 "ChatLog"            => CheckGameObjectItem("ChatLog", Offsets.ChatLogContextItemId, ValidateChatLogContext),
                 _                    => null,
             };
@@ -124,6 +124,24 @@ public class ContextMenu : IDisposable
             return null;
 
         return HandleItem(*(uint*)(agent + Offsets.GatheringNoteContextItemId));
+    }
+
+    /// <summary>
+    /// ItemSearch(市場搜尋)右鍵選單的道具 id 放在 AgentContext.UpdateCheckerParam(+0x17D0)。
+    /// </summary>
+    /// <remarks>
+    /// AgentContext.Instance() 走 AgentModule.Instance(),而後者在 UIModule 尚未建立時回 null
+    /// (CS 手寫實作逐字是 uiModule == null ? null : uiModule-&gt;GetAgentModule())。原本是
+    /// 無條件解參考。取不到就回 null —— 與這個 switch 其他分支、以及 HandleSatisfactionSupply
+    /// 的失敗形式一致(這次不掛選單項目,不影響遊戲原本的右鍵選單)。
+    /// </remarks>
+    private static unsafe IGatherable? HandleItemSearch()
+    {
+        var agentContext = AgentContext.Instance();
+        if (agentContext == null)
+            return null;
+
+        return HandleItem((uint)agentContext->UpdateCheckerParam);
     }
 
     private static IGatherable? HandleItem(uint itemId)
@@ -171,9 +189,23 @@ public class ContextMenu : IDisposable
 
     private static unsafe IntPtr AgentById(AgentId id)
     {
-        var uiModule = (UIModule*)Dalamud.GameGui.GetUIModule().Address;
-        var agents   = uiModule->GetAgentModule();
-        var agent    = agents->GetAgentByInternalId(id);
+        // 🔴 這條鏈原本三層全裸。`Dalamud.GameGui.GetUIModule()` 是 Dalamud 的服務包裝
+        //（UIModulePtr），它包的就是 `(nint)UIModule.Instance()` —— **`.Address` 合法為 0**
+        //（UIModule.Instance() 內部是 `Framework.Instance() == null ? null : ...`）。
+        // 把 0 轉型成 UIModule* 再 `->GetAgentModule()` 就是 AccessViolationException，
+        // 而 AVE 是 corrupted-state exception，try/catch 一律攔不到。
+        // 中間每一跳都是獨立的 null 路徑，所以三跳都要各自判。
+        // 呼叫端一律走 `CheckGameObjectItem(IntPtr, int)`，它已經檢查 `agent != IntPtr.Zero`，
+        // 因此回 IntPtr.Zero 就是正確的 fail-closed 值（選單項目不出現），不需要改呼叫端。
+        var uiModuleAddress = Dalamud.GameGui.GetUIModule().Address;
+        if (uiModuleAddress == nint.Zero)
+            return IntPtr.Zero;
+
+        var agents = ((UIModule*)uiModuleAddress)->GetAgentModule();
+        if (agents == null)
+            return IntPtr.Zero;
+
+        var agent = agents->GetAgentByInternalId(id);
         return (IntPtr)agent;
     }
 }

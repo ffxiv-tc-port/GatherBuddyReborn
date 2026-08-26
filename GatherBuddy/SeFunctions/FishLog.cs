@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Dalamud.Game;
 using Dalamud.Plugin.Services;
+using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using GatherBuddy.Classes;
 using GatherBuddy.Plugin;
 using Lumina.Excel.Sheets;
@@ -27,8 +29,12 @@ public unsafe class FishLog
         _numFish      = (uint) gameData.GetExcelSheet<FishParameter>().Count;
         _numSpearFish = (uint) gameData.GetExcelSheet<SpearfishingItem>().Count;
 
-        _fish      = (byte*)new FishLogData(sigScanner).Address;
-        _spearFish = (byte*)new SpearFishLogData(sigScanner).Address;
+        // TC 7.20: 舊的 FishLogData/SpearFishLogData 靜態簽名已失效,比照上游改用
+        // ClientStructs PlayerState 的捕魚紀錄位元陣列(已離線比對 TC 7.20 執行檔,欄位相對位移完全吻合)。
+        var playerState = PlayerState.Instance();
+        _fish      = (byte*)Unsafe.AsPointer(ref playerState->CaughtFishBitmask[0]);
+        _spearFish = (byte*)Unsafe.AsPointer(ref playerState->CaughtSpearfishBitmask[0]);
+        GatherBuddy.Log.Debug($"FishLog pointers: fish 0x{(ulong)_fish:X16}, spearfish 0x{(ulong)_spearFish:X16}.");
 
         _fishStore      = new byte[(_numFish + 7) / 8];
         _spearFishStore = new byte[(_numSpearFish + 7) / 8];

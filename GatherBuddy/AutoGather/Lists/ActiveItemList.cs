@@ -114,7 +114,7 @@ namespace GatherBuddy.AutoGather.Lists
         {
             _gatheredSomething = true;
             // In almost all cases, the target is the first item in the list, so it's O(1).
-            var x = _gatherableItems.FirstOrDefault(x => x.Node.WorldPositions.ContainsKey(target.DataId));
+            var x = _gatherableItems.FirstOrDefault(x => x.Node.WorldPositions.ContainsKey(target.BaseId));
             if (x != default && x.Time != TimeInterval.Always && x.Node?.NodeType is NodeType.Legendary or NodeType.Unspoiled)
                 _visitedTimedNodes[x.Node] = x.Time;
         }

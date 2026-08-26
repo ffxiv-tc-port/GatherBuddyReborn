@@ -70,10 +70,10 @@ public partial class FishRecorder
 
     private void CheckBuffs()
     {
-        if (Dalamud.ClientState.LocalPlayer?.StatusList == null)
+        if (Dalamud.Objects.LocalPlayer?.StatusList == null)
             return;
 
-        foreach (var buff in Dalamud.ClientState.LocalPlayer.StatusList)
+        foreach (var buff in Dalamud.Objects.LocalPlayer.StatusList)
         {
             Record.Flags |= buff.StatusId switch
             {
@@ -98,10 +98,10 @@ public partial class FishRecorder
 
     private void UpdateLure()
     {
-        if (Dalamud.ClientState.LocalPlayer?.StatusList == null)
+        if (Dalamud.Objects.LocalPlayer?.StatusList == null)
             return;
 
-        foreach (var buff in Dalamud.ClientState.LocalPlayer.StatusList)
+        foreach (var buff in Dalamud.Objects.LocalPlayer.StatusList)
         {
             Record.Flags |= buff.StatusId switch
             {
@@ -300,7 +300,7 @@ public partial class FishRecorder
 
     private void UpdateLureStatus()
     {
-        if (Dalamud.ClientState.LocalPlayer?.StatusList.FirstOrDefault(s => s.StatusId is 3972 or 3973) is { } currentStatus
+        if (Dalamud.Objects.LocalPlayer?.StatusList.FirstOrDefault(s => s.StatusId is 3972 or 3973) is { } currentStatus
          && currentStatus.Param != _currentLureStack)
         {
             _currentLureStack = (byte)currentStatus.Param;

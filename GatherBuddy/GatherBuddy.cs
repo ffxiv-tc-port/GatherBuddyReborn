@@ -92,6 +92,9 @@ public partial class GatherBuddy : IDalamudPlugin
         {
             Dalamud.Initialize(pluginInterface);
             ECommonsMain.Init(pluginInterface, this, Module.DalamudReflector);
+            // 讓「呼叫了對方沒有的 IPC 方法」不再完全靜默。
+            // 訂閱越早越好：事件只在 IPC **呼叫**當下才被查閱，在這裡訂閱就涵蓋往後所有呼叫。
+            EzIpcFailureLog.Enable();
             ECommons.LanguageHelpers.Localization.Init("ChineseTraditional");
             Icons.Init(Dalamud.GameData, Dalamud.Textures);
             Log     = new Logger();
@@ -178,7 +181,7 @@ public partial class GatherBuddy : IDalamudPlugin
             LastObjectsScan = DateTime.Now;
             var objs = Svc.Objects.Where(o => o.ObjectKind == ObjectKind.GatheringPoint);
             foreach (var obj in objs)
-                WorldData.AddLocation(obj.DataId, obj.Position);
+                WorldData.AddLocation(obj.BaseId, obj.Position);
         }
 
         try
@@ -209,6 +212,7 @@ public partial class GatherBuddy : IDalamudPlugin
         DisposeCommands();
         Time?.Dispose();
         HttpClient?.Dispose();
+        EzIpcFailureLog.Disable();
         ECommonsMain.Dispose();
     }
 

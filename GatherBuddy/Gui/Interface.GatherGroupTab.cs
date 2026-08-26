@@ -171,7 +171,11 @@ public partial class Interface
 
     private readonly GatherGroupCache _gatherGroupCache;
 
-    private void DrawTimeInput(string label, float width, int value, Action<int> setter)
+    /// <param name="onEditFinished">
+    /// Invoked once when the user lets go of a drag, not on every frame of it. Persisting from <paramref name="setter"/>
+    /// would re-serialize and rewrite every gather group on every frame the drag is held.
+    /// </param>
+    private void DrawTimeInput(string label, float width, int value, Action<int> setter, Action? onEditFinished = null)
     {
         var       hour   = value / RealTime.MinutesPerHour;
         var       minute = value % RealTime.MinutesPerHour;
@@ -180,12 +184,14 @@ public partial class Interface
         ImGui.SetNextItemWidth(width);
         using var style  = ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, Vector2.One * 2 * ImGuiHelpers.GlobalScale);
         var       change = ImGui.DragInt("##hour", ref hour, 0.05f, 0, RealTime.HoursPerDay - 1, "%02d", ImGuiSliderFlags.AlwaysClamp);
+        var       done   = ImGui.IsItemDeactivatedAfterEdit();
         ImGui.SameLine();
         ImGui.Text(":");
         ImGui.SameLine();
         style.Pop();
         ImGui.SetNextItemWidth(width);
         change |= ImGui.DragInt("##minute", ref minute, 0.2f, 0, RealTime.MinutesPerHour - 1, "%02d", ImGuiSliderFlags.AlwaysClamp);
+        done   |= ImGui.IsItemDeactivatedAfterEdit();
 
         if (change)
         {
@@ -193,20 +199,23 @@ public partial class Interface
             if (newValue != value)
                 setter(newValue);
         }
+
+        if (done)
+            onEditFinished?.Invoke();
     }
 
-    private void DrawTimeInput(int fromValue, int toValue, Action<int, int> setter)
+    private void DrawTimeInput(int fromValue, int toValue, Action<int, int> setter, Action? onEditFinished = null)
     {
         var       width = 20 * ImGuiHelpers.GlobalScale;
         using var group = ImRaii.Group();
 
         ImGui.Text(" from ".Loc());
         ImGui.SameLine();
-        DrawTimeInput("##from", width, fromValue, v => setter(v, toValue));
+        DrawTimeInput("##from", width, fromValue, v => setter(v, toValue), onEditFinished);
         ImGui.SameLine();
         ImGui.Text(" to ".Loc());
         ImGui.SameLine();
-        DrawTimeInput("##to", width, toValue, v => setter(fromValue, v));
+        DrawTimeInput("##to", width, toValue, v => setter(fromValue, v), onEditFinished);
         ImGui.SameLine();
         ImGui.Text(" Eorzea Time".Loc());
     }
@@ -257,11 +266,8 @@ public partial class Interface
         DrawTimeInput(node.EorzeaStartMinute, node.EorzeaEndMinute, (from, to) =>
         {
             if (_plugin.GatherGroupManager.ChangeGroupNode(group, i, null, from, to, null, false))
-            {
-                _plugin.GatherGroupManager.Save();
                 _gatherGroupCache.SetDirty();
-            }
-        });
+        }, _plugin.GatherGroupManager.Save);
         ImGui.TableNextColumn();
         DrawLocationInput(group, i, node);
         ImGui.TableNextColumn();

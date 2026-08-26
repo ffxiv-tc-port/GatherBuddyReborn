@@ -281,7 +281,12 @@ namespace GatherBuddy.Plugin
         [EzIPC] internal static readonly Action DisableAllFunctions;
         [EzIPC] internal static readonly Action EnableMultiMode;
         [EzIPC] internal static readonly Func<int> GetInventoryFreeSlotCount;
-        [EzIPC] internal static readonly Action EnqueueHET;
+        // ⚠️ 簽名修正（2026-08-03）：這裡原本宣告成無參數的 Action，但提供端是
+        //    AutoRetainer/Modules/EzIPCManagers/IPC_PluginState.cs 的
+        //    `public void EnqueueHET(Action onFailure)` —— 一個參數。
+        //    參數個數不符時 Dalamud 會丟例外，而這個 class 帶的是 SafeWrapper.IPCException，
+        //    例外會被吞掉、變成完全靜默的空操作。目前全 repo 沒有呼叫點，所以還沒被踩到。
+        [EzIPC] internal static readonly Action<Action> EnqueueHET;
         [EzIPC("AutoRetainer.GC.EnqueueInitiation", applyPrefix: false)] internal static readonly Action EnqueueGCInitiation;
     }
 }

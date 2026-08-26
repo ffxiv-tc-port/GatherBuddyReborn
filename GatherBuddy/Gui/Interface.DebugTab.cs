@@ -741,7 +741,7 @@ public partial class Interface
             {
                 ImGui.PushID(obj.GameObjectId.ToString());
                 var node = GatherBuddy.GameData.GatheringNodes.TryGetValue((uint)obj.GameObjectId, out var n) ? n : null;
-                ImGui.Text($"{obj.GameObjectId}: {obj.Name ?? "Unknown".Loc()} - DataId: {obj.DataId}");
+                ImGui.Text($"{obj.GameObjectId}: {obj.Name ?? "Unknown".Loc()} - DataId: {obj.BaseId}");
                 ImGui.SameLine();
                 if (ImGui.SmallButton("NavTo".Loc()))
                 {
@@ -769,6 +769,24 @@ public partial class Interface
                 ImGui.PopID();
             }
         }
+    }
+
+    /// <remarks>
+    /// 逐節判空版的「收藏品門檻」偵錯列。取不到文字節點就印 <c>&lt;unavailable&gt;</c>、
+    /// 取不到版面節點就印 <c>?</c> —— **不要印成 <c>false</c>**：偵錯面板上把「不知道」
+    /// 畫成一個看起來很正常的值，會讓人拿它當證據去查錯的方向。
+    /// </remarks>
+    private static unsafe void DrawCollectabilityRow(string label, AddonGatheringMasterpiece* addon, uint nodeId)
+    {
+        var component = addon->GetComponentByNodeId(nodeId);
+        var textNode  = component == null ? null : component->GetTextNodeById(3);
+        var atkText   = textNode == null ? null : textNode->GetAsAtkTextNode();
+        var text      = atkText == null ? "<unavailable>" : atkText->NodeText.ToString();
+
+        var resNode = addon->AtkUnitBase.GetNodeById(nodeId);
+        var visible = resNode == null ? "?" : resNode->IsVisible().ToString();
+
+        ImGui.Text($"{label}: {text} {visible}");
     }
 
     private void DrawAutoGatherDebug()
@@ -810,9 +828,15 @@ public partial class Interface
             var addon = (AddonGatheringMasterpiece*)Dalamud.GameGui.GetAddonByName("GatheringMasterpiece").Address;
             if (addon != null && addon->IsFullyLoaded() && addon->IsReady)
             {
-                ImGui.Text($"Min collectability: {addon->GetComponentByNodeId(13)->GetTextNodeById(3)->GetAsAtkTextNode()->NodeText} {addon->AtkUnitBase.GetNodeById(13)->IsVisible()}");
-                ImGui.Text($"Med collectability: {addon->GetComponentByNodeId(14)->GetTextNodeById(3)->GetAsAtkTextNode()->NodeText} {addon->AtkUnitBase.GetNodeById(14)->IsVisible()}");
-                ImGui.Text($"Max collectability: {addon->GetComponentByNodeId(15)->GetTextNodeById(3)->GetAsAtkTextNode()->NodeText} {addon->AtkUnitBase.GetNodeById(15)->IsVisible()}");
+                // 🔴 這三行原本各是一條**四層裸鏈**：GetComponentByNodeId / GetTextNodeById /
+                //    GetAsAtkTextNode / GetNodeById 全都是原生取得器，找不到節點時**合法回 null**
+                //    （節點 id 13/14/15 與 3 都是寫死的，台服版面不保證有；切頁那一瞬間也取不到）。
+                //    把 null 當 this 交給下一跳就是 AccessViolationException —— corrupted-state
+                //    exception，try/catch 完全攔不到，外層那個 addon 判空一點忙都幫不上。
+                //    這是偵錯分頁的每影格繪製路徑 ⇒ 取不到就安靜顯示佔位字元，不寫 log。
+                DrawCollectabilityRow("Min collectability", addon, 13);
+                DrawCollectabilityRow("Med collectability", addon, 14);
+                DrawCollectabilityRow("Max collectability", addon, 15);
             }
         }
 

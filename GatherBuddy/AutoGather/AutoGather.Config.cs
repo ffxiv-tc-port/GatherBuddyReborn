@@ -49,6 +49,7 @@ namespace GatherBuddy.AutoGather
         [Obsolete] public uint MinimumGPForCollectable { get; set; } = 0;
         public float NavResetCooldown { get; set; } = 3.0f;
         public float NavResetThreshold { get; set; } = 2.0f;
+        public AntiStuckConfig AntiStuck { get; set; } = new();
         public bool ForceWalking { get; set; } = false;
         public float FarNodeFilterDistance { get; set; } = 50.0f;
         public bool DisableFlagPathing { get; set; } = false;
@@ -71,6 +72,7 @@ namespace GatherBuddy.AutoGather
         public bool GoHomeWhenDone { get; set; } = true;
         public bool UseSkillsForFallbackItems { get; set; } = false;
         public bool AbandonNodes { get; set; } = false;
+        public bool FinishTimedNodes { get; set; } = true;
         public uint ExecutionDelay { get; set; } = 0;
         public bool ConfigConversionFixed { get; set; } = false;
         public bool RotationSolverConversionDone { get; set; } = false;
@@ -81,6 +83,33 @@ namespace GatherBuddy.AutoGather
         public bool AlwaysGatherMaps { get; set; } = false;
         public int MaxFishingSpotMinutes { get; set; } = 20;
         public bool UseNavigation { get; set; } = true;
+
+        /// <summary>
+        /// Escalation action taken when local recovery has repeatedly failed and the
+        /// character never left the stuck area. Restricted to capabilities auto-gather
+        /// already has: no teleporting, no item use, no chat commands.
+        /// </summary>
+        public enum PositionUnstuckAction
+        {
+            Off            = 0,
+            ForceUnstuck   = 1,
+            StopAutoGather = 2,
+        }
+
+        public sealed class AntiStuckConfig
+        {
+            public bool  Enabled               { get; set; } = true;
+            public bool  LocalRecoveryEnabled  { get; set; } = true;
+            public bool  EscalationEnabled     { get; set; } = false;
+            public int   EscalationAfterFails  { get; set; } = 3;
+            public float AreaRadius            { get; set; } = 50.0f;
+            public int   AreaTimeSeconds       { get; set; } = 600;
+
+            public PositionUnstuckAction DrasticAction { get; set; } = PositionUnstuckAction.StopAutoGather;
+
+            public int DrasticCooldownSeconds { get; set; } = 600;
+            public int MaxDrasticPerSession   { get; set; } = 2;
+        }
 
         public enum SortingType
         {

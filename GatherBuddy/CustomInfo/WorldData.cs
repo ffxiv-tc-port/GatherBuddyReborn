@@ -148,7 +148,7 @@ namespace GatherBuddy.CustomInfo
                 lock (WorldLocationsByNodeId)
                     list.Add(location);
 
-                Task.Run(() => { lock (WorldLocationsByNodeId) SaveLocationsToFile(); });
+                Task.Run(SaveLocationsToFile);
                 GatherBuddy.Log.Debug($"Added location {location} to node {nodeId}");
                 WorldLocationsChanged?.Invoke();
             }
@@ -156,11 +156,27 @@ namespace GatherBuddy.CustomInfo
 
         public static event Action? WorldLocationsChanged;
 
+        /// <summary>
+        /// Serializes writers against each other. Deliberately not <see cref="WorldLocationsByNodeId"/>: that one is
+        /// also taken by the framework thread in <see cref="AddLocation"/>, and it must never have to wait on file I/O.
+        /// </summary>
+        private static readonly object SaveLocationsLock = new();
+
         public static void SaveLocationsToFile()
         {
-            var locJson = Newtonsoft.Json.JsonConvert.SerializeObject(WorldLocationsByNodeId, Newtonsoft.Json.Formatting.Indented);
+            // Only the snapshot is taken under the data lock; serializing and writing happen outside it. Previously the
+            // caller held the data lock for the entire serialize + WriteAllText, so the framework thread stalled inside
+            // AddLocation until the write completed - which it hit repeatedly while discovering new nodes in a fresh zone.
+            lock (SaveLocationsLock)
+            {
+                Dictionary<uint, List<Vector3>> snapshot;
+                lock (WorldLocationsByNodeId)
+                    snapshot = WorldLocationsByNodeId.ToDictionary(kvp => kvp.Key, kvp => new List<Vector3>(kvp.Value));
 
-            File.WriteAllText(WorldLocationsPath, locJson);
+                var locJson = Newtonsoft.Json.JsonConvert.SerializeObject(snapshot, Newtonsoft.Json.Formatting.Indented);
+
+                File.WriteAllText(WorldLocationsPath, locJson);
+            }
         }
 
         [MemberNotNull(nameof(IlvConvertTable))]

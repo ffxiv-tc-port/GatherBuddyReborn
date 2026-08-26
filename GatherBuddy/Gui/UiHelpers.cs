@@ -120,7 +120,7 @@ public partial class Interface
 
         ImGuiUtil.HoverTooltip(tooltip);
 
-        if (ImGuiUtil.DrawDisabledButton("Default", Vector2.Zero, defaultValue, defaultValue == oldValue))
+        if (ImGuiUtil.DrawDisabledButton("Default".Loc(), Vector2.Zero, defaultValue, defaultValue == oldValue))
         {
             setValue(defaultValue);
             GatherBuddy.Config.Save();
@@ -189,7 +189,7 @@ public partial class Interface
         if (GatherBuddy.Config.HideClippy)
             return;
 
-        var textSize   = ImGui.CalcTextSize(text).X;
+        var textSize   = ImGui.CalcTextSize(text.Loc()).X;
         var buttonSize = new Vector2(Math.Max(200, textSize) * ImGuiHelpers.GlobalScale, ImGui.GetFrameHeight());
         var padding    = ImGuiHelpers.ScaledVector2(9, 9);
 
@@ -200,7 +200,7 @@ public partial class Interface
 
         using var color = ImRaii.PushColor(ImGuiCol.Button, 0xFFA06020);
 
-        if (ImGui.Button(text, buttonSize))
+        if (ImGui.Button(text.Loc(), buttonSize))
             ImGui.OpenPopup(popupName);
         if (ImGui.IsItemClicked(ImGuiMouseButton.Right) && ImGui.GetIO().KeyCtrl && ImGui.GetIO().KeyShift)
         {
@@ -208,8 +208,8 @@ public partial class Interface
             GatherBuddy.Config.Save();
         }
 
-        ImGuiUtil.HoverTooltip("Click for some help navigating this table.\n"
-          + "Control + Shift + Right-Click to permanently hide this button.");
+        ImGuiUtil.HoverTooltip(("Click for some help navigating this table.\n"
+          + "Control + Shift + Right-Click to permanently hide this button.").Loc());
 
         color.Pop();
         var windowSize = new Vector2(1024 * ImGuiHelpers.GlobalScale,
@@ -222,27 +222,32 @@ public partial class Interface
             return;
 
         ImGui.BulletText(
-            "You can use text filters like \"Item Name...\" to only show entries that contain the given string. They are case-insensitive and are not stored for your next session.");
+            "You can use text filters like \"Item Name...\" to only show entries that contain the given string. They are case-insensitive and are not stored for your next session."
+                .Loc());
         ImGui.BulletText(
-            "Text filters also support regular expressions, e.g. \"(blue|green)\" matches all entries that contain either blue or green.");
-        ImGui.BulletText("Button filters like \"Next Uptime\", \"Node Type\" or \"Fish Type\" allow you to filter specific types on click.");
-        ImGui.BulletText("Those filters are stored across sessions. For columns with active filters, the filter buttons are tinted red.");
+            "Text filters also support regular expressions, e.g. \"(blue|green)\" matches all entries that contain either blue or green.".Loc());
+        ImGui.BulletText("Button filters like \"Next Uptime\", \"Node Type\" or \"Fish Type\" allow you to filter specific types on click.".Loc());
+        ImGui.BulletText("Those filters are stored across sessions. For columns with active filters, the filter buttons are tinted red.".Loc());
         ImGui.NewLine();
         ImGui.BulletText(
-            "You can click in the blank space of a header to sort the table in this column, ascending or descending. This is signified with a little triangle pointing up or down.");
+            "You can click in the blank space of a header to sort the table in this column, ascending or descending. This is signified with a little triangle pointing up or down."
+                .Loc());
         ImGui.BulletText(
-            "You can right-click in the blank space of a header to open the table context menu, in which you can hide columns you are not interested in.");
+            "You can right-click in the blank space of a header to open the table context menu, in which you can hide columns you are not interested in.".Loc());
         ImGui.BulletText(
-            "You can resize text columns by dragging the small separation markers of the column. It highlights the line in blue. Size is stored across sessions.");
+            "You can resize text columns by dragging the small separation markers of the column. It highlights the line in blue. Size is stored across sessions."
+                .Loc());
         ImGui.BulletText(
-            "You can reorder most columns by left-clicking in the blank space, holding the mouse button and dragging them. Ordering is stored across sessions.");
+            "You can reorder most columns by left-clicking in the blank space, holding the mouse button and dragging them. Ordering is stored across sessions."
+                .Loc());
         ImGui.NewLine();
         ImGui.BulletText(
-            "You can right-click item names and a few other columns (like bait and fishing spot) to open further context menus with object-specific options.");
-        ImGui.BulletText("You can also re-order the tabs themselves, though that is not stored across sessions.");
+            "You can right-click item names and a few other columns (like bait and fishing spot) to open further context menus with object-specific options."
+                .Loc());
+        ImGui.BulletText("You can also re-order the tabs themselves, though that is not stored across sessions.".Loc());
 
         ImGui.SetCursorPosY(windowSize.Y - ImGui.GetFrameHeight() - ImGui.GetStyle().WindowPadding.Y);
-        if (ImGui.Button("Understood", -Vector2.UnitX))
+        if (ImGui.Button("Understood".Loc(), -Vector2.UnitX))
             ImGui.CloseCurrentPopup();
     }
 }

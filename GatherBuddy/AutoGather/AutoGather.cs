@@ -10,6 +10,7 @@ using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Game.ClientState.Conditions;
 using ECommons.DalamudServices;
 using ECommons.GameHelpers;
+using GatherBuddy.AutoGather.Helpers;
 using GatherBuddy.AutoGather.Movement;
 using GatherBuddy.CustomInfo;
 using GatherBuddy.Enums;
@@ -50,6 +51,7 @@ namespace GatherBuddy.AutoGather
             _plugin                      =  plugin;
             _soundHelper                 =  new SoundHelper();
             _advancedUnstuck             =  new();
+            _antiStuckManager            =  new(_advancedUnstuck);
             _activeItemList              =  new ActiveItemList(plugin.AutoGatherListsManager);
             ArtisanExporter              =  new Reflection.ArtisanExporter(plugin.AutoGatherListsManager);
             Svc.Chat.CheckMessageHandled += OnMessageHandled;
@@ -93,8 +95,9 @@ namespace GatherBuddy.AutoGather
 
         private readonly GatherBuddy     _plugin;
         private readonly SoundHelper     _soundHelper;
-        private readonly AdvancedUnstuck _advancedUnstuck;
-        private readonly ActiveItemList  _activeItemList;
+        private readonly AdvancedUnstuck  _advancedUnstuck;
+        private readonly AntiStuckManager _antiStuckManager;
+        private readonly ActiveItemList   _activeItemList;
 
         public Reflection.ArtisanExporter ArtisanExporter;
         public TaskManager                TaskManager { get; }
@@ -148,6 +151,7 @@ namespace GatherBuddy.AutoGather
                 }
 
                 _enabled = value;
+                _antiStuckManager.OnEnabledChanged(value);
                 _plugin.Ipc.AutoGatherEnabledChanged(value);
             }
         }
@@ -213,11 +217,11 @@ namespace GatherBuddy.AutoGather
                     var gatherable = gatherTarget.Value.Gatherable;
                     var node = gatherTarget.Value.Node;
                     if (gatherable != null && (gatherable.NodeType == NodeType.Regular || gatherable.NodeType == NodeType.Ephemeral)
-                        && (VisitedNodes.Last?.Value != targetNode.DataId)
-                        && node != null && node.WorldPositions.ContainsKey(targetNode.DataId))
+                        && (VisitedNodes.Last?.Value != targetNode.BaseId)
+                        && node != null && node.WorldPositions.ContainsKey(targetNode.BaseId))
                     {
                         FarNodesSeenSoFar.Clear();
-                        VisitedNodes.AddLast(targetNode.DataId);
+                        VisitedNodes.AddLast(targetNode.BaseId);
                         while (VisitedNodes.Count > (node.WorldPositions.Count <= 4 ? 2 : 4))
                             VisitedNodes.RemoveFirst();
                     }
@@ -248,6 +252,13 @@ namespace GatherBuddy.AutoGather
                 return;
             }
 
+            // Clean up lock that may have been left behind by cancelled or timed-out tasks.
+            // Every Lock()/Unlock() pair lives inside a single task batch, so an idle task manager
+            // means nothing can still be relying on the lock. This MUST stay above the CanAct gate
+            // below: a task chain that timed out while the player is Occupied would otherwise never
+            // reach it, and the lock is a cross-plugin flag that keeps YesAlready globally disabled.
+            YesAlready.Unlock();
+
             if (!_homeWorldWarning && !Functions.OnHomeWorld())
             {
                 _homeWorldWarning = true;
@@ -267,8 +278,6 @@ namespace GatherBuddy.AutoGather
                 AutoStatus = Dalamud.Conditions[ConditionFlag.Gathering] ? "Gathering...".Loc() : "Player is busy...";
                 return;
             }
-
-            YesAlready.Unlock(); // Clean up lock that may have been left behind by cancelled tasks
 
             if (FreeInventorySlots == 0)
             {
@@ -303,7 +312,7 @@ namespace GatherBuddy.AutoGather
                 if (_currentGatherTarget == null)
                 {
                     if (!_activeItemList.IsInitialized)
-                        _currentGatherTarget = _activeItemList.GetNextOrDefault([Svc.Targets.Target!.DataId]).FirstOrDefault();
+                        _currentGatherTarget = _activeItemList.GetNextOrDefault([Svc.Targets.Target!.BaseId]).FirstOrDefault();
                     else
                         _currentGatherTarget = _activeItemList.CurrentOrDefault;
                 }
@@ -363,7 +372,7 @@ namespace GatherBuddy.AutoGather
             var isPathGenerating = IsPathGenerating;
             var isPathing        = IsPathing;
 
-            switch (_advancedUnstuck.Check(CurrentDestination, isPathGenerating, isPathing))
+            switch (CheckAntiStuck(isPathGenerating, isPathing))
             {
                 case AdvancedUnstuckCheckResult.Pass: break;
                 case AdvancedUnstuckCheckResult.Wait: return;
@@ -401,7 +410,7 @@ namespace GatherBuddy.AutoGather
                 }
             }
 
-            var nearbyNodes = Svc.Objects.Where(o => o.ObjectKind == ObjectKind.GatheringPoint && o.IsTargetable).Select(o => o.DataId);
+            var nearbyNodes = Svc.Objects.Where(o => o.ObjectKind == ObjectKind.GatheringPoint && o.IsTargetable).Select(o => o.BaseId);
             var next = _activeItemList.GetNextOrDefault(nearbyNodes)
                 .OrderByDescending(nodes => nodes.Item.ItemId);
             if (!next.Any())
@@ -494,7 +503,7 @@ namespace GatherBuddy.AutoGather
 
             if (territoryId == 886 && next.First().Node.Territory.Id is 901 or 929 or 939)
             {
-                var dutyNpc                    = Svc.Objects.FirstOrDefault(o => o.DataId == 1031694);
+                var dutyNpc                    = Svc.Objects.FirstOrDefault(o => o.BaseId == 1031694);
                 var selectStringAddon          = Dalamud.GameGui.GetAddonByName("SelectString");
                 var talkAddon                  = Dalamud.GameGui.GetAddonByName("Talk");
                 var selectYesNoAddon           = Dalamud.GameGui.GetAddonByName("SelectYesno");
@@ -714,7 +723,7 @@ namespace GatherBuddy.AutoGather
             if (closestTargetableNode != null)
             {
                 AutoStatus = "Moving to node...".Loc();
-                var targetItem = next.First(ti => ti.Node != null && ti.Node.WorldPositions.ContainsKey(closestTargetableNode.DataId))
+                var targetItem = next.First(ti => ti.Node != null && ti.Node.WorldPositions.ContainsKey(closestTargetableNode.BaseId))
                     .Gatherable;
                 MoveToCloseNode(closestTargetableNode, targetItem, config);
                 return;
@@ -786,17 +795,60 @@ namespace GatherBuddy.AutoGather
 
         private unsafe void LeaveTheDiadem()
         {
-            AgentModule.Instance()->GetAgentByInternalId(AgentId.ContentsFinderMenu)->Show();
-            if (GenericHelpers.TryGetAddonByName("ContentsFinderMenu", out AtkUnitBase* addon))
+            // AgentModule.Instance() 走 UIModule，UI 尚未建立時回 null（CS 手寫實作逐字是
+            // uiModule == null ? null : uiModule->GetAgentModule()），GetAgentByInternalId 也可能回 null。
+            // 取不到就不開選單直接返回——與同 repo Plugin/ContextMenu.cs HandleItemSearch 相同的失敗形式。
+            var agentModule = AgentModule.Instance();
+            if (agentModule == null)
+                return;
+
+            var contentsFinderMenu = agentModule->GetAgentByInternalId(AgentId.ContentsFinderMenu);
+            if (contentsFinderMenu == null)
+                return;
+
+            contentsFinderMenu->Show();
+            if (GenericHelpers.TryGetAddonByName<AtkUnitBase>("ContentsFinderMenu", out _))
             {
                 TaskManager.Enqueue(YesAlready.Lock);
-                TaskManager.Enqueue(() => Callback.Fire(addon, true,  0));
-                TaskManager.Enqueue(() => Callback.Fire(addon, false, -2));
+                TaskManager.Enqueue(() => FireOnAddon("ContentsFinderMenu", true,  0));
+                TaskManager.Enqueue(() => FireOnAddon("ContentsFinderMenu", false, -2));
                 TaskManager.DelayNext(1000);
-                TaskManager.Enqueue(() => Callback.Fire((AtkUnitBase*)(nint)Dalamud.GameGui.GetAddonByName("SelectYesno"), true, 0));
+                TaskManager.Enqueue(() => FireOnAddon("SelectYesno", true, 0));
                 TaskManager.Enqueue(YesAlready.Unlock);
                 return;
             }
+        }
+
+        /// <remarks>
+        /// 🔴 ECommons 的 <c>Callback.Fire</c> 在送出之前先做
+        /// <c>PluginLog.Verbose($"Firing callback: {Base->Name.Read()} …")</c> ——
+        /// <c>Base</c> 為 null 時**第一行就解參考 null**，而且 ECommons 的 log 沒有寫入端閘門，
+        /// Verbose 關著那個內插字串照樣求值。AccessViolationException 在 .NET Core 是
+        /// corrupted-state exception，<c>try</c>/<c>catch</c> 與 <c>ExecuteSafe</c> 一律攔不到。
+        /// <para>
+        /// 原本這裡有兩種缺陷並存：
+        /// ① <c>SelectYesno</c> 那一顆是 <c>GameGui.GetAddonByName(...)</c> 的回傳值**完全沒判**
+        ///    就轉型成 <c>AtkUnitBase*</c>；那條路徑走 <c>RaptureAtkUnitManager</c>，找不到視窗時
+        ///    **合法回 0**，而它是 <c>DelayNext(1000)</c> 之後才跑的延遲工作 —— 確認對話框沒跳出來
+        ///    （網路延遲、遊戲直接省略確認）本來就是常態。
+        /// ② <c>ContentsFinderMenu</c> 那兩顆把**在 enqueue 那一幀取得的原生指標**捕獲進 lambda，
+        ///    等佇列跑到時已經過了好幾幀；視窗中途被 Finalize 掉就是拿已釋放的位址去用。
+        /// 兩者的正解相同：**存名字、跑到的時候重新查**（艦隊硬規則：絕不跨幀保存原生指標）。
+        /// </para>
+        /// 這是使用者觸發的動作型路徑（自動採集離開雲冠群島），不是每幀路徑，所以取不到時
+        /// 記一行 <c>Information</c>（使用者跑 LogLevel 2，Debug/Verbose 收不到）再跳過。
+        /// 行為不變：視窗在的時候送出的回呼與參數逐字相同。
+        /// </remarks>
+        private static unsafe void FireOnAddon(string addonName, bool updateState, params object[] values)
+        {
+            if (GenericHelpers.TryGetAddonByName(addonName, out AtkUnitBase* addon))
+            {
+                Callback.Fire(addon, updateState, values);
+                return;
+            }
+
+            GatherBuddy.Log.Information(
+                $"LeaveTheDiadem: 視窗 \"{addonName}\" 已經不在了，略過這次回呼（不送出，避免解參考空指標）。");
         }
 
         private void AbortAutoGather(string? status = null)
@@ -970,6 +1022,7 @@ namespace GatherBuddy.AutoGather
 
         public void Dispose()
         {
+            _antiStuckManager.Dispose();
             _advancedUnstuck.Dispose();
             _activeItemList.Dispose();
             Svc.Chat.CheckMessageHandled -= OnMessageHandled;
