@@ -41,6 +41,9 @@ public partial class Interface : Window, IDisposable
 
     public override void PreDraw()
     {
+        // Dalamud 的每視窗不透明度是在 Window.PreDraw() 裡 push 的,不呼叫 base 會讓右鍵選單的
+        // 「不透明度」滑桿靜默失效(PostDraw 由旗標配對,未 push 就不會 pop,不會失衡)。
+        base.PreDraw();
         SetupValues();
         // Skip dalamud size constraints because that would just require unscaling, then scaling.
         var minSize = new Vector2(MinSize,     17 * ImGui.GetTextLineHeightWithSpacing());
