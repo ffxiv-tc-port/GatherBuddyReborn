@@ -22,7 +22,8 @@ public partial class FishingParser
                 ClientLanguage.German   => German.Value,
                 ClientLanguage.French   => French.Value,
                 ClientLanguage.Japanese => Japanese.Value,
-                _                       => throw new InvalidEnumArgumentException(),
+                (ClientLanguage)4       => ChineseTraditional.Value,
+                _                       => English.Value,
             };
         }
 
@@ -59,6 +60,17 @@ public partial class FishingParser
             AreaDiscovered = new Regex(@"釣り手帳に新しい釣り場「(?<FishingSpot>.+)」の情報を記録した！", RegexOptions.Compiled | RegexOptions.NonBacktracking | RegexOptions.ExplicitCapture),
             Mooch          = new Regex(@"は釣り上げた.+を慎重に投げ込み、泳がせ釣りを試みた。",            RegexOptions.Compiled | RegexOptions.NonBacktracking | RegexOptions.ExplicitCapture),
             Undiscovered   = "未知の釣り場",
+        });
+
+        // The TC client reports ClientLanguage 4 (the ChineseSimplified slot), but its chat text is
+        // Traditional Chinese. Wording verified against aliceric27/ffxiv-datamining-tc:
+        // LogMessage 1110 (cast), 1115 (area discovered), 1121 (mooch), Addon 3811 (undiscovered).
+        private static readonly Lazy<Regexes> ChineseTraditional = new(() => new Regexes
+        {
+            Cast           = new Regex(@"在(?<FishingSpot>.+)甩出了魚線開始釣魚。",             RegexOptions.Compiled | RegexOptions.NonBacktracking | RegexOptions.ExplicitCapture),
+            AreaDiscovered = new Regex(@"將新釣場“(?<FishingSpot>.+)”記錄到了釣魚筆記中！",       RegexOptions.Compiled | RegexOptions.NonBacktracking | RegexOptions.ExplicitCapture),
+            Mooch          = new Regex(@"開始利用上鉤的.+嘗試以小釣大。",                          RegexOptions.Compiled | RegexOptions.NonBacktracking | RegexOptions.ExplicitCapture),
+            Undiscovered   = "未發現的釣場",
         });
         // @formatter:on
     }

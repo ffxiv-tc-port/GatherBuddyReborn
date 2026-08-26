@@ -92,6 +92,7 @@ public partial class GatherBuddy : IDalamudPlugin
         {
             Dalamud.Initialize(pluginInterface);
             ECommonsMain.Init(pluginInterface, this, Module.DalamudReflector);
+            ECommons.LanguageHelpers.Localization.Init("ChineseTraditional");
             Icons.Init(Dalamud.GameData, Dalamud.Textures);
             Log     = new Logger();
             Version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "";

@@ -8,6 +8,7 @@ using GatherBuddy.AutoGather;
 using System.Text.RegularExpressions;
 using Dalamud.Game;
 using ECommons.DalamudServices;
+using ECommons.LanguageHelpers;
 using GatherBuddy.Classes;
 using GatherBuddy.CustomInfo;
 using GatherBuddy.Enums;
@@ -147,19 +148,19 @@ public partial class Interface
 
     private void DrawDebugButtons()
     {
-        if (ImGui.CollapsingHeader("Debug"))
+        if (ImGui.CollapsingHeader("Debug".Loc()))
         {
-            if (ImGui.Button("Set Weather Dirty"))
+            if (ImGui.Button("Set Weather Dirty".Loc()))
                 _weatherTable.SetDirty();
-            if (ImGui.Button("Set Locations Dirty"))
+            if (ImGui.Button("Set Locations Dirty".Loc()))
                 GatherBuddy.UptimeManager.ResetLocations();
-            if (ImGui.Button("Populate Diadem List"))
+            if (ImGui.Button("Populate Diadem List".Loc()))
             {
                 var diademItems = GatherBuddy.GameData.Gatherables.Values.Where(g => g.Name[ClientLanguage.English].Contains("Grade 4 Skybuilder", StringComparison.InvariantCultureIgnoreCase));
                 var list = new AutoGatherList()
                 {
-                    Name        = "Diadem Debug",
-                    Description = "Debug list for diadem gatherables",
+                    Name        = "Diadem Debug".Loc(),
+                    Description = "Debug list for diadem gatherables".Loc(),
                 };
                 foreach (var item in diademItems)
                 {
@@ -188,7 +189,7 @@ public partial class Interface
 
     private static unsafe void DrawDebugTime()
     {
-        if (!ImGui.CollapsingHeader("Time"))
+        if (!ImGui.CollapsingHeader("Time".Loc()))
             return;
 
         using var table = ImRaii.Table("##Times", 2);
@@ -221,11 +222,11 @@ public partial class Interface
 
     private static unsafe void DrawDebugFishingState()
     {
-        if (!ImGui.CollapsingHeader("Fishing State"))
+        if (!ImGui.CollapsingHeader("Fishing State".Loc()))
             return;
 
         ImGui.Text($"Remote Task State (Upload): {_plugin.FishRecorder.RemoteRecordsUploadTask.Status}");
-        if (ImGui.Button("Force Cancellation"))
+        if (ImGui.Button("Force Cancellation".Loc()))
         {
             _plugin.FishRecorder.StopRemoteRecordsRequests();
         }
@@ -312,7 +313,7 @@ public partial class Interface
 
     private unsafe void DrawDebugFishingTimes()
     {
-        if (!ImGui.CollapsingHeader("Fishing Times"))
+        if (!ImGui.CollapsingHeader("Fishing Times".Loc()))
             return;
 
         using var table = ImRaii.Table("##Fishing Times", 6);
@@ -344,7 +345,7 @@ public partial class Interface
 
     private static void DrawUptimeManagerTable()
     {
-        if (!ImGui.CollapsingHeader($"Uptimes ({GatherBuddy.GameData.TimedGatherables})"))
+        if (!ImGui.CollapsingHeader("Uptimes".Loc() + $" ({GatherBuddy.GameData.TimedGatherables})"))
             return;
 
         using var table = ImRaii.Table("##Uptimes", 6, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit);
@@ -424,7 +425,7 @@ public partial class Interface
 
     private void DrawAlarmDebug()
     {
-        if (!ImGui.CollapsingHeader("Alarms##AlarmDebug"))
+        if (!ImGui.CollapsingHeader("Alarms".Loc() + "##AlarmDebug"))
             return;
 
         using var table = ImRaii.Table("##Alarms", 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit);
@@ -468,7 +469,7 @@ public partial class Interface
 
     private void DrawWaymarkTab()
     {
-        if (!ImGui.CollapsingHeader("Waymarks##WaymarkDebug"))
+        if (!ImGui.CollapsingHeader("Waymarks".Loc() + "##WaymarkDebug"))
             return;
 
         ImGui.TextUnformatted($"Waymark Manager: 0x{GatherBuddy.WaymarkManager.Address:X}");
@@ -483,10 +484,10 @@ public partial class Interface
             using var id = ImRaii.PushId(i);
             var waymark = GatherBuddy.WaymarkManager[i];
             ImGui.TableNextColumn();
-            if (ImGui.Button("Clear"))
+            if (ImGui.Button("Clear".Loc()))
                 GatherBuddy.WaymarkManager.ClearWaymark(i);
             ImGui.TableNextColumn();
-            if (ImGui.Button("Set"))
+            if (ImGui.Button("Set".Loc()))
                 GatherBuddy.WaymarkManager.SetWaymark(i);
             ImGuiUtil.DrawTableColumn(waymark.Active.ToString());
             ImGuiUtil.DrawTableColumn(waymark.Position.X.ToString());
@@ -500,7 +501,7 @@ public partial class Interface
 
     private static void DrawOceanTab()
     {
-        if (!ImGui.CollapsingHeader("Ocean Routes##OceanDebug"))
+        if (!ImGui.CollapsingHeader("Ocean Routes".Loc() + "##OceanDebug"))
             return;
 
         using (var table = ImRaii.Table("##Ocean", 8, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
@@ -541,7 +542,7 @@ public partial class Interface
 
     private static void DrawCosmicTab()
     {
-        if (!ImUtf8.CollapsingHeader("Cosmic Exploration Fishing Missions##CosmicDebug"u8))
+        if (!ImUtf8.CollapsingHeader("Cosmic Exploration Fishing Missions".Loc() + "##CosmicDebug"))
             return;
 
         using (var table = ImUtf8.Table("##Cosmic", 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
@@ -558,8 +559,8 @@ public partial class Interface
     private void DrawDebugTab()
     {
         using var id = ImRaii.PushId("Debug");
-        using var tab = ImRaii.TabItem("Debug");
-        ImGuiUtil.HoverTooltip("I really hope there is a good reason for you seeing this.");
+        using var tab = ImRaii.TabItem("Debug".Loc());
+        ImGuiUtil.HoverTooltip("I really hope there is a good reason for you seeing this.".Loc());
 
         if (!tab)
             return;
@@ -577,34 +578,34 @@ public partial class Interface
         DrawAlarmDebug();
         DrawAutoGatherDebug();
         DrawReflectionDebug();
-        ImGuiTable.DrawTabbedTable($"Aetherytes ({GatherBuddy.GameData.Aetherytes.Count})", GatherBuddy.GameData.Aetherytes.Values,
+        ImGuiTable.DrawTabbedTable("Aetherytes".Loc() + $" ({GatherBuddy.GameData.Aetherytes.Count})", GatherBuddy.GameData.Aetherytes.Values,
             DrawDebugAetheryte, flags, "Id", "Name", "Territory", "Coords", "Aetherstream");
-        ImGuiTable.DrawTabbedTable($"Territories ({GatherBuddy.GameData.WeatherTerritories.Length})", GatherBuddy.GameData.WeatherTerritories,
+        ImGuiTable.DrawTabbedTable("Territories".Loc() + $" ({GatherBuddy.GameData.WeatherTerritories.Length})", GatherBuddy.GameData.WeatherTerritories,
             DrawDebugTerritory, flags, "Id", "Name", "SizeFactor", "#Weathers", "Weathers");
-        ImGuiTable.DrawTabbedTable($"Bait ({GatherBuddy.GameData.Bait.Count})", GatherBuddy.GameData.Bait.Values,
+        ImGuiTable.DrawTabbedTable("Bait".Loc() + $" ({GatherBuddy.GameData.Bait.Count})", GatherBuddy.GameData.Bait.Values,
             DrawDebugBait, flags, "Id", "Name");
-        ImGuiTable.DrawTabbedTable($"Gatherables ({GatherBuddy.GameData.Gatherables.Count})",
+        ImGuiTable.DrawTabbedTable("Gatherables".Loc() + $" ({GatherBuddy.GameData.Gatherables.Count})",
             GatherBuddy.GameData.Gatherables.Values.OrderBy(g => g.ItemId),
             DrawGatherableDebug, flags, "ItemId", "GatheringId", "Name", "Level", "#Nodes");
-        ImGuiTable.DrawTabbedTable($"Gathering Nodes ({GatherBuddy.GameData.GatheringNodes.Count})", GatherBuddy.GameData.GatheringNodes.Values,
+        ImGuiTable.DrawTabbedTable("Gathering Nodes".Loc() + $" ({GatherBuddy.GameData.GatheringNodes.Count})", GatherBuddy.GameData.GatheringNodes.Values,
             DrawGatheringNodeDebug, flags, "Id", "Name", "Job", "Level", "Type", "Territory", "Coords", "Aetheryte", "Folklore", "Times",
             "Items", "World Coords");
-        ImGuiTable.DrawTabbedTable($"Fish ({GatherBuddy.GameData.Fishes.Count})", GatherBuddy.GameData.Fishes.Values,
+        ImGuiTable.DrawTabbedTable("Fish".Loc() + $" ({GatherBuddy.GameData.Fishes.Count})", GatherBuddy.GameData.Fishes.Values,
             DrawFishDebug, flags, "ItemId", "FishId", "Name", "Restrictions", "Folklore", "InLog", "Big", "Fishing Spots");
-        ImGuiTable.DrawTabbedTable($"Fishing Spots ({GatherBuddy.GameData.FishingSpots.Count})", GatherBuddy.GameData.FishingSpots.Values,
+        ImGuiTable.DrawTabbedTable("Fishing Spots".Loc() + $" ({GatherBuddy.GameData.FishingSpots.Count})", GatherBuddy.GameData.FishingSpots.Values,
             DrawFishingSpotDebug, flags, "Id", "Name", "Territory", "Aetheryte", "Coords", "Shadow", "Fishes");
         DrawUptimeManagerTable();
         DrawOceanTab();
         DrawCosmicTab();
         DrawWaymarkTab();
-        if (ImGui.CollapsingHeader("GatheringTree"))
+        if (ImGui.CollapsingHeader("GatheringTree".Loc()))
         {
             id.Push("GatheringTree");
             PrintNode(GatherBuddy.GameData.GatherablesTrie.Root);
             id.Pop();
         }
 
-        if (ImGui.CollapsingHeader("FishingTree"))
+        if (ImGui.CollapsingHeader("FishingTree".Loc()))
         {
             id.Push("FishingTree");
             PrintNode(GatherBuddy.GameData.FishTrie.Root);
@@ -668,7 +669,7 @@ public partial class Interface
                 ImGui.TableNextColumn();
                 ImGui.Text($"void {GatherBuddy.InternalName}.SetAutoGatherEnabled(bool)");
                 ImGui.TableNextColumn();
-                if (ImGui.Button("Toggle"))
+                if (ImGui.Button("Toggle".Loc()))
                 {
                     Dalamud.PluginInterface.GetIpcSubscriber<bool, object>($"{GatherBuddy.InternalName}.SetAutoGatherEnabled")
                         .InvokeAction(!autoGatherEnabled);
@@ -730,18 +731,18 @@ public partial class Interface
             }
         }
 
-        if (ImGui.CollapsingHeader("World Objects"))
+        if (ImGui.CollapsingHeader("World Objects".Loc()))
         {
             using var group = ImRaii.Group();
-            ImGui.Text("Gatherables within 200 yalms");
+            ImGui.Text("Gatherables within 200 yalms".Loc());
             var gatherables = Svc.Objects.Where(o => o.ObjectKind == ObjectKind.GatheringPoint);
             foreach (var obj in gatherables)
             {
                 ImGui.PushID(obj.GameObjectId.ToString());
                 var node = GatherBuddy.GameData.GatheringNodes.TryGetValue((uint)obj.GameObjectId, out var n) ? n : null;
-                ImGui.Text($"{obj.GameObjectId}: {obj.Name ?? "Unknown"} - DataId: {obj.DataId}");
+                ImGui.Text($"{obj.GameObjectId}: {obj.Name ?? "Unknown".Loc()} - DataId: {obj.DataId}");
                 ImGui.SameLine();
-                if (ImGui.SmallButton("NavTo"))
+                if (ImGui.SmallButton("NavTo".Loc()))
                 {
                     VNavmesh.SimpleMove.PathfindAndMoveTo(obj.Position, true);
                 }
@@ -750,10 +751,10 @@ public partial class Interface
             }
         }
 
-        if (ImGui.CollapsingHeader("Saved World Objects"))
+        if (ImGui.CollapsingHeader("Saved World Objects".Loc()))
         {
             using var group = ImRaii.Group();
-            ImGui.Text("Saved Gatherables");
+            ImGui.Text("Saved Gatherables".Loc());
             foreach (var kvp in WorldData.WorldLocationsByNodeId)
             {
                 ImGui.PushID(kvp.Key.ToString());
@@ -771,10 +772,10 @@ public partial class Interface
 
     private void DrawAutoGatherDebug()
     {
-        if (!ImGui.CollapsingHeader("AutoGather"))
+        if (!ImGui.CollapsingHeader("AutoGather".Loc()))
             return;
 
-        if (ImGui.Button("Clear Timed Node Memory"))
+        if (ImGui.Button("Clear Timed Node Memory".Loc()))
         {
             GatherBuddy.Log.Information("Timed node memory cleared manually!");
             GatherBuddy.AutoGather.DebugClearVisited();
@@ -814,7 +815,7 @@ public partial class Interface
             }
         }
 
-        if (ImGui.CollapsingHeader("Timed Node Memory"))
+        if (ImGui.CollapsingHeader("Timed Node Memory".Loc()))
         {
             foreach (var (location, time) in GatherBuddy.AutoGather.DebugVisitedTimedLocations)
             {
@@ -822,7 +823,7 @@ public partial class Interface
             }
         }
 
-        if (ImGui.CollapsingHeader("Visited Nodes"))
+        if (ImGui.CollapsingHeader("Visited Nodes".Loc()))
         {
             foreach (var pos in GatherBuddy.AutoGather.VisitedNodes)
             {
@@ -830,7 +831,7 @@ public partial class Interface
             }
         }
 
-        if (ImGui.CollapsingHeader("Far Nodes Seen So Far"))
+        if (ImGui.CollapsingHeader("Far Nodes Seen So Far".Loc()))
         {
             foreach (var pos in GatherBuddy.AutoGather.FarNodesSeenSoFar)
             {
@@ -838,7 +839,7 @@ public partial class Interface
             }
         }
 
-        if (ImGui.CollapsingHeader("Items to Gather"))
+        if (ImGui.CollapsingHeader("Items to Gather".Loc()))
         {
             foreach (var x in GatherBuddy.AutoGather.ItemsToGather)
             {
@@ -846,13 +847,13 @@ public partial class Interface
                 if (x.Time == TimeInterval.Always || x.Node.NodeType is not Enums.NodeType.Unspoiled and not Enums.NodeType.Legendary)
                     continue;
                 ImGui.SameLine();
-                if (ImGui.Button("Mark Visited"))
+                if (ImGui.Button("Mark Visited".Loc()))
                     GatherBuddy.AutoGather.DebugMarkVisited(x);
             }
         }
 
         var tr = GatherBuddy.AutoGather.GatheringWindowReader;
-        if (ImGui.CollapsingHeader("Gather Window Reader"))
+        if (ImGui.CollapsingHeader("Gather Window Reader".Loc()))
         {
             var text = new StringBuilder();
             if (tr != null)
@@ -897,7 +898,7 @@ public partial class Interface
     private void DrawReflectionDebug()
     {
 
-        if (!ImGui.CollapsingHeader("Reflection"))
+        if (!ImGui.CollapsingHeader("Reflection".Loc()))
             return;
 
         var exporter = GatherBuddy.AutoGather.ArtisanExporter;
@@ -917,7 +918,7 @@ public partial class Interface
         ImUtf8.InputScalar($"End ID: {GatherBuddy.GameData.FishingSpots.GetValueOrDefault(_endId)?.Name}",     ref _endId);
         ImGui.PopItemWidth();
 
-        if (!ImUtf8.Button("Copy Most Recent Unknown Fish Data"u8))
+        if (!ImUtf8.Button("Copy Most Recent Unknown Fish Data".Loc()))
             return;
 
         var patch = $"{nameof(Patch)}.{Enum.GetValues<Patch>().Last()}";

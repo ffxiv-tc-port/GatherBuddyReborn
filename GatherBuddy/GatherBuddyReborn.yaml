@@ -1,12 +1,12 @@
 name: GatherBuddy Reborn
 author: The Combat Reborn Team
 description: |-
-  Adds commands to simplify gathering by finding nodes and fish and their locations
-  via item name and a UI to keep track of special uptime and weather conditions.
-punchline: Simplify Gathering and Fishing.
-repo_url: https://github.com/FFXIV-CombatReborn/GatherBuddyReborn
-DalamudApiLevel: 11
-TestingDalamudApiLevel: 11
+  透過物品名稱簡化採集流程，找出節點/魚群位置，並用 UI 追蹤特殊開放時段與天氣條件。
+punchline: 把採集與釣魚簡化到極致。
+repo_url: https://github.com/ffxiv-tc-port/GatherBuddyReborn
+icon_url: https://raw.githubusercontent.com/ffxiv-tc-port/DalamudPluginsTC/main/icons/GatherBuddyReborn.png
+DalamudApiLevel: 12
+TestingDalamudApiLevel: 12
 tags:
   - Gathering
   - Fishing

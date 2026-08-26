@@ -14,6 +14,7 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Windowing;
 using ECommons.DalamudServices;
 using ECommons.ImGuiMethods;
+using ECommons.LanguageHelpers;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using GatherBuddy.CustomInfo;
 using Newtonsoft.Json;
@@ -29,18 +30,18 @@ namespace GatherBuddy.AutoGather
         public static void DrawAutoGatherStatus()
         {
             var enabled = GatherBuddy.AutoGather.Enabled;
-            if (ImGui.Checkbox("Enabled", ref enabled))
+            if (ImGui.Checkbox("Enabled".Loc(), ref enabled))
             {
                 GatherBuddy.AutoGather.Enabled = enabled;
             }
 
-            ImGui.Text($"Status: {GatherBuddy.AutoGather.AutoStatus}");
+            ImGui.Text("Status: ".Loc() + GatherBuddy.AutoGather.AutoStatus);
             var lastNavString = GatherBuddy.AutoGather.LastNavigationResult.HasValue
                 ? GatherBuddy.AutoGather.LastNavigationResult.Value
-                    ? "Successful"
-                    : "Failed (If you're seeing this you probably need to restart your game)"
-                : "None";
-            ImGui.Text($"Navigation: {lastNavString}");
+                    ? "Successful".Loc()
+                    : "Failed (If you're seeing this you probably need to restart your game)".Loc()
+                : "None".Loc();
+            ImGui.Text("Navigation: ".Loc() + lastNavString);
         }
 
 
@@ -133,7 +134,7 @@ namespace GatherBuddy.AutoGather
                     {
                         if (GatherBuddy.AutoGather.Enabled)
                         {
-                            Communicator.PrintError("[GatherBuddyReborn] Auto-Gather is enabled! Unable to navigate.");
+                            Communicator.PrintError("[GatherBuddyReborn] Auto-Gather is enabled! Unable to navigate.".Loc());
                             return;
                         }
                         //VNavmesh_IPCSubscriber.Nav_PathfindCancelAll();
@@ -153,7 +154,7 @@ namespace GatherBuddy.AutoGather
                         {
                             if (GatherBuddy.AutoGather.Enabled)
                             {
-                                Communicator.PrintError("[GatherBuddyReborn] Auto-Gather is enabled! Unable to navigate.");
+                                Communicator.PrintError("[GatherBuddyReborn] Auto-Gather is enabled! Unable to navigate.".Loc());
                                 return;
                             }
                             //VNavmesh_IPCSubscriber.Nav_PathfindCancelAll();
@@ -183,10 +184,10 @@ namespace GatherBuddy.AutoGather
             var preview = Dalamud.GameData.GetExcelSheet<Mount>().First(x => x.RowId == GatherBuddy.Config.AutoGatherConfig.AutoGatherMountId)
                 .Singular.ToString().ToProperCase();
             if (string.IsNullOrEmpty(preview))
-                preview = "Mount Roulette";
-            if (ImGui.BeginCombo("Select Mount", preview))
+                preview = "Mount Roulette".Loc();
+            if (ImGui.BeginCombo("Select Mount".Loc(), preview))
             {
-                if (ImGui.Selectable("Mount Roulette", GatherBuddy.Config.AutoGatherConfig.AutoGatherMountId == 0))
+                if (ImGui.Selectable("Mount Roulette".Loc(), GatherBuddy.Config.AutoGatherConfig.AutoGatherMountId == 0))
                 {
                     GatherBuddy.Config.AutoGatherConfig.AutoGatherMountId = 0;
                     GatherBuddy.Config.Save();

@@ -8,6 +8,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using Dalamud.Game;
 using Dalamud.Game.Text.SeStringHandling;
+using ECommons.LanguageHelpers;
 using GatherBuddy.Alarms;
 using GatherBuddy.AutoGather.Lists;
 using GatherBuddy.Classes;
@@ -23,7 +24,8 @@ namespace GatherBuddy.Gui;
 
 public partial class Interface
 {
-    private const string AutomaticallyGenerated = "Automatically generated from context menu.";
+    private static string AutomaticallyGenerated
+        => "Automatically generated from context menu.".Loc();
 
     private void DrawAddAlarm(IGatherable item)
     {
@@ -32,7 +34,7 @@ public partial class Interface
             return;
 
         var current = _alarmCache.Selector.EnsureCurrent();
-        if (ImGui.Selectable("Add to Alarm Preset"))
+        if (ImGui.Selectable("Add to Alarm Preset".Loc()))
         {
             if (current == null)
             {
@@ -52,14 +54,14 @@ public partial class Interface
 
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip(
-                $"Add {item.Name[GatherBuddy.Language]} to {(current == null ? "a new alarm preset." : CheckUnnamed(current.Name))}");
+                "Add ?? to ??".Loc(item.Name[GatherBuddy.Language], current == null ? "a new alarm preset.".Loc() : CheckUnnamed(current.Name)));
     }
 
     private void DrawAddToGatherGroup(IGatherable item)
     {
         var       current = _gatherGroupCache.Selector.EnsureCurrent();
         using var color   = ImRaii.PushColor(ImGuiCol.Text, ColorId.DisabledText.Value(), current == null);
-        if (ImGui.Selectable("Add to Gather Group") && current != null)
+        if (ImGui.Selectable("Add to Gather Group".Loc()) && current != null)
             if (_plugin.GatherGroupManager.ChangeGroupNode(current, current.Nodes.Count, item, null, null, null, false))
                 _plugin.GatherGroupManager.Save();
 
@@ -67,15 +69,15 @@ public partial class Interface
 
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip(current == null
-                ? "Requires a Gather Group to be setup and selected."
-                : $"Add {item.Name[GatherBuddy.Language]} to {current.Name}");
+                ? "Requires a Gather Group to be setup and selected.".Loc()
+                : "Add ?? to ??".Loc(item.Name[GatherBuddy.Language], current.Name));
     }
 
     private void DrawAddGatherWindow(IGatherable item)
     {
         var current = _gatherWindowCache.Selector.EnsureCurrent();
 
-        if (ImGui.Selectable("Add to Gather Window Preset"))
+        if (ImGui.Selectable("Add to Gather Window Preset".Loc()))
         {
             if (current == null)
                 _plugin.GatherWindowManager.AddPreset(new GatherWindowPreset
@@ -90,7 +92,7 @@ public partial class Interface
 
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip(
-                $"Add {item.Name[GatherBuddy.Language]} to {(current == null ? "a new gather window preset." : CheckUnnamed(current.Name))}");
+                "Add ?? to ??".Loc(item.Name[GatherBuddy.Language], current == null ? "a new gather window preset.".Loc() : CheckUnnamed(current.Name)));
     }
 
     private static string TeamCraftAddressEnd(string type, uint id)
@@ -120,7 +122,7 @@ public partial class Interface
         if (itemId == 0)
             return;
 
-        if (!ImGui.Selectable("Open in GarlandTools"))
+        if (!ImGui.Selectable("Open in GarlandTools".Loc()))
             return;
 
         try
@@ -138,10 +140,10 @@ public partial class Interface
         if (itemId == 0)
             return;
 
-        if (ImGui.Selectable("Open in TeamCraft (Browser)"))
+        if (ImGui.Selectable("Open in TeamCraft (Browser)".Loc()))
             OpenInTeamCraftWeb(TeamCraftAddressEnd("item", itemId));
 
-        if (ImGui.Selectable("Open in TeamCraft (App)"))
+        if (ImGui.Selectable("Open in TeamCraft (App)".Loc()))
             OpenInTeamCraftLocal(TeamCraftAddressEnd("item", itemId));
     }
 
@@ -185,10 +187,10 @@ public partial class Interface
         if (fs.Id == 0)
             return;
 
-        if (ImGui.Selectable("Open in TeamCraft (Browser)"))
+        if (ImGui.Selectable("Open in TeamCraft (Browser)".Loc()))
             OpenInTeamCraftWeb(TeamCraftAddressEnd(fs));
 
-        if (ImGui.Selectable("Open in TeamCraft (App)"))
+        if (ImGui.Selectable("Open in TeamCraft (App)".Loc()))
             OpenInTeamCraftLocal(TeamCraftAddressEnd(fs));
     }
 
@@ -205,19 +207,20 @@ public partial class Interface
         DrawAddToGatherGroup(item);
         DrawAddGatherWindow(item);
         DrawAddToAutoGather(item);
-        if (ImGui.Selectable("Create Link"))
+        if (ImGui.Selectable("Create Link".Loc()))
             Communicator.Print(SeString.CreateItemLink(item.ItemId));
         DrawOpenInGarlandTools(item.ItemId);
         DrawOpenInTeamCraft(item.ItemId);
     }
 
-    private const string PresetName = "From Gatherables List";
+    private static string PresetName
+        => "From Gatherables List".Loc();
 
     private void DrawAddToAutoGather(IGatherable item)
     {
         var current = _autoGatherListsCache.Selector.EnsureCurrent();
 
-        if (ImGui.Selectable("Add to Auto-Gather List"))
+        if (ImGui.Selectable("Add to Auto-Gather List".Loc()))
         {
             if (current == null)
                 CreateAndAddPreset(item);
@@ -227,7 +230,7 @@ public partial class Interface
 
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip(
-                $"Add {item.Name[GatherBuddy.Language]} to {(current == null ? "a new gather window preset." : CheckUnnamed(current.Name))}");
+                "Add ?? to ??".Loc(item.Name[GatherBuddy.Language], current == null ? "a new gather window preset.".Loc() : CheckUnnamed(current.Name)));
     }
 
     private static AutoGatherList CreateAndAddPreset(IGatherable item)
@@ -253,7 +256,7 @@ public partial class Interface
         if (!popup)
             return;
 
-        if (ImGui.Selectable("Create Link"))
+        if (ImGui.Selectable("Create Link".Loc()))
             Communicator.Print(SeString.CreateItemLink(item.ItemId));
         DrawOpenInGarlandTools(item.ItemId);
         DrawOpenInTeamCraft(item.ItemId);
@@ -271,7 +274,7 @@ public partial class Interface
         if (!popup)
             return;
 
-        if (ImGui.Selectable("Create Link"))
+        if (ImGui.Selectable("Create Link".Loc()))
             Communicator.Print(SeString.CreateItemLink(bait.Id));
         DrawOpenInGarlandTools(bait.Id);
         DrawOpenInTeamCraft(bait.Id);

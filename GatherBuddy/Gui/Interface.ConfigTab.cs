@@ -4,6 +4,7 @@ using Dalamud.Game.Text;
 using Dalamud.Interface.Utility;
 using ECommons.DalamudServices;
 using ECommons.ImGuiMethods;
+using ECommons.LanguageHelpers;
 using FFXIVClientStructs.STD;
 using GatherBuddy.Alarms;
 using GatherBuddy.AutoGather;
@@ -27,13 +28,13 @@ public partial class Interface
         {
             var tmp = oldName;
             ImGui.SetNextItemWidth(SetInputWidth);
-            if (ImGui.InputText($"{jobName} Set", ref tmp, 15) && tmp != oldName)
+            if (ImGui.InputText("?? Set".Loc(jobName), ref tmp, 15) && tmp != oldName)
             {
                 setName(tmp);
                 GatherBuddy.Config.Save();
             }
 
-            ImGuiUtil.HoverTooltip($"Set the name of your {jobName.ToLowerInvariant()} set. Can also be the numerical id instead.");
+            ImGuiUtil.HoverTooltip("Set the name of your ?? set. Can also be the numerical id instead.".Loc(jobName.ToLowerInvariant()));
         }
 
         private static void DrawCheckbox(string label, string description, bool oldValue, Action<bool> setter)
@@ -51,37 +52,36 @@ public partial class Interface
 
         // Auto-Gather Config
         public static void DrawAutoGatherBox()
-            => DrawCheckbox("Enable Gathering Window Interaction (DISABLING THIS IS UNSUPPORTED)",
-                "Toggle whether to automatically gather items. (Disable this for 'nav only mode')",
+            => DrawCheckbox("Enable Gathering Window Interaction (DISABLING THIS IS UNSUPPORTED)".Loc(),
+                "Toggle whether to automatically gather items. (Disable this for 'nav only mode')".Loc(),
                 GatherBuddy.Config.AutoGatherConfig.DoGathering, b => GatherBuddy.Config.AutoGatherConfig.DoGathering = b);
 
         public static void DrawGoHomeBox()
         {
-            DrawCheckbox("Go home when done",                       "Uses the '/li auto' command to take you home when done gathering",
+            DrawCheckbox("Go home when done".Loc(),                       "Uses the '/li auto' command to take you home when done gathering".Loc(),
                 GatherBuddy.Config.AutoGatherConfig.GoHomeWhenDone, b => GatherBuddy.Config.AutoGatherConfig.GoHomeWhenDone = b);
             ImGui.SameLine();
             ImGuiEx.PluginAvailabilityIndicator([new("Lifestream")]);
-            DrawCheckbox("Go home when idle",                       "Uses the '/li auto' command to take you home when waiting for timed nodes",
+            DrawCheckbox("Go home when idle".Loc(),                       "Uses the '/li auto' command to take you home when waiting for timed nodes".Loc(),
                 GatherBuddy.Config.AutoGatherConfig.GoHomeWhenIdle, b => GatherBuddy.Config.AutoGatherConfig.GoHomeWhenIdle = b);
             ImGui.SameLine();
             ImGuiEx.PluginAvailabilityIndicator([new("Lifestream")]);
-            Svc.Framework.Run
         }
 
         public static void DrawUseSkillsForFallabckBox()
-            => DrawCheckbox("Use skills for fallback items", "Use skills when gathering items from fallback presets",
+            => DrawCheckbox("Use skills for fallback items".Loc(), "Use skills when gathering items from fallback presets".Loc(),
                 GatherBuddy.Config.AutoGatherConfig.UseSkillsForFallbackItems,
                 b => GatherBuddy.Config.AutoGatherConfig.UseSkillsForFallbackItems = b);
 
         public static void DrawAbandonNodesBox()
-            => DrawCheckbox("Abandon nodes without needed items",
-                "Stop gathering and abandon the node when you have gathered enough items,\n"
-              + "or if the node didn't have any needed items on the first place.",
+            => DrawCheckbox("Abandon nodes without needed items".Loc(),
+                ("Stop gathering and abandon the node when you have gathered enough items,\n"
+              + "or if the node didn't have any needed items on the first place.").Loc(),
                 GatherBuddy.Config.AutoGatherConfig.AbandonNodes, b => GatherBuddy.Config.AutoGatherConfig.AbandonNodes = b);
 
         public static void DrawCheckRetainersBox()
         {
-            DrawCheckbox("Check Retainer Inventories", "Use Allagan Tools to check retainer inventories when doing inventory calculations",
+            DrawCheckbox("Check Retainer Inventories".Loc(), "Use Allagan Tools to check retainer inventories when doing inventory calculations".Loc(),
                 GatherBuddy.Config.AutoGatherConfig.CheckRetainers, b => GatherBuddy.Config.AutoGatherConfig.CheckRetainers = b);
             ImGui.SameLine();
             ImGuiEx.PluginAvailabilityIndicator([new("InventoryTools", "Allagan Tools")]);
@@ -91,7 +91,7 @@ public partial class Interface
         {
             ImGui.SetNextItemWidth(150);
             var volume = GatherBuddy.Config.AutoGatherConfig.SoundPlaybackVolume;
-            if (ImGui.DragInt("Playback Volume", ref volume, 1, 0, 100))
+            if (ImGui.DragInt("Playback Volume".Loc(), ref volume, 1, 0, 100))
             {
                 if (volume < 0)
                     volume = 0;
@@ -102,44 +102,44 @@ public partial class Interface
             }
 
             ImGuiUtil.HoverTooltip(
-                "The volume of the sound played when auto-gathering shuts down because your list is complete.\nHold CTRL and click to enter custom value");
+                "The volume of the sound played when auto-gathering shuts down because your list is complete.\nHold CTRL and click to enter custom value".Loc());
         }
 
         public static void DrawHonkModeBox()
-            => DrawCheckbox("Play a sound when done gathering", "Play a sound when auto-gathering shuts down because your list is complete",
+            => DrawCheckbox("Play a sound when done gathering".Loc(), "Play a sound when auto-gathering shuts down because your list is complete".Loc(),
                 GatherBuddy.Config.AutoGatherConfig.HonkMode,   b => GatherBuddy.Config.AutoGatherConfig.HonkMode = b);
 
         public static void DrawRepairBox()
-            => DrawCheckbox("Repair gear when needed",        "Repair gear when it is almost broken",
+            => DrawCheckbox("Repair gear when needed".Loc(),        "Repair gear when it is almost broken".Loc(),
                 GatherBuddy.Config.AutoGatherConfig.DoRepair, b => GatherBuddy.Config.AutoGatherConfig.DoRepair = b);
 
         public static void DrawRepairThreshold()
         {
             var tmp = GatherBuddy.Config.AutoGatherConfig.RepairThreshold;
-            if (ImGui.DragInt("Repair Threshold", ref tmp, 1, 1, 100))
+            if (ImGui.DragInt("Repair Threshold".Loc(), ref tmp, 1, 1, 100))
             {
                 GatherBuddy.Config.AutoGatherConfig.RepairThreshold = tmp;
                 GatherBuddy.Config.Save();
             }
 
-            ImGuiUtil.HoverTooltip("The percentage of durability at which you will repair your gear.");
+            ImGuiUtil.HoverTooltip("The percentage of durability at which you will repair your gear.".Loc());
         }
 
         public static void DrawFishingSpotMinutes()
         {
             var tmp = GatherBuddy.Config.AutoGatherConfig.MaxFishingSpotMinutes;
-            if (ImGui.DragInt("Max Fishing Spot Minutes", ref tmp, 1, 1, 40))
+            if (ImGui.DragInt("Max Fishing Spot Minutes".Loc(), ref tmp, 1, 1, 40))
             {
                 GatherBuddy.Config.AutoGatherConfig.MaxFishingSpotMinutes = tmp;
                 GatherBuddy.Config.Save();
             }
 
-            ImGuiUtil.HoverTooltip("The maximum number of minutes you will fish at a fishing spot.");
+            ImGuiUtil.HoverTooltip("The maximum number of minutes you will fish at a fishing spot.".Loc());
         }
 
         public static void DrawAutoretainerBox()
         {
-            DrawCheckbox("Wait for AutoRetainer Multi-mode", "Pause GBR automatically when AutoRetainer has retainers to process during Multi-mode",
+            DrawCheckbox("Wait for AutoRetainer Multi-mode".Loc(), "Pause GBR automatically when AutoRetainer has retainers to process during Multi-mode".Loc(),
                 GatherBuddy.Config.AutoGatherConfig.AutoRetainerMultiMode, b => GatherBuddy.Config.AutoGatherConfig.AutoRetainerMultiMode = b);
             ImGui.SameLine();
             ImGuiEx.PluginAvailabilityIndicator([new ImGuiEx.RequiredPluginInfo("AutoRetainer")]);
@@ -148,7 +148,7 @@ public partial class Interface
         public static void DrawLifestreamCommandTextInput()
         {
             var tmp = GatherBuddy.Config.AutoGatherConfig.LifestreamCommand;
-            if (ImGui.InputText("Lifestream Command", ref tmp, 100))
+            if (ImGui.InputText("Lifestream Command".Loc(), ref tmp, 100))
             {
                 if (string.IsNullOrEmpty(tmp))
                     tmp = "auto";
@@ -157,124 +157,124 @@ public partial class Interface
             }
 
             ImGuiUtil.HoverTooltip(
-                "The command used when idling or done gathering. DO NOT include '/li'\nBe careful when changing this, GBR does not validate this command!");
+                "The command used when idling or done gathering. DO NOT include '/li'\nBe careful when changing this, GBR does not validate this command!".Loc());
         }
 
         public static void DrawFishCollectionBox()
-            => DrawCheckbox("Opt-in to fishing data collection",
-                "With this enabled, whenever you catch a fish the data for that fish will be uploaded to a remote server\n"
+            => DrawCheckbox("Opt-in to fishing data collection".Loc(),
+                ("With this enabled, whenever you catch a fish the data for that fish will be uploaded to a remote server\n"
               + "The purpose of this data collection is to allow for a usable auto-fishing feature to be built\n"
               + "No personal information about you or your character will be collected, only data relevant to the caught fish\n"
-              + "You can opt-out again at any time by simply disabling this checkbox.", GatherBuddy.Config.AutoGatherConfig.FishDataCollection,
+              + "You can opt-out again at any time by simply disabling this checkbox.").Loc(), GatherBuddy.Config.AutoGatherConfig.FishDataCollection,
                 b => GatherBuddy.Config.AutoGatherConfig.FishDataCollection = b);
 
         public static void DrawMaterialExtraction()
-            => DrawCheckbox("Enable materia extraction",
-                "Automatically extract materia from items with a complete spiritbond",
+            => DrawCheckbox("Enable materia extraction".Loc(),
+                "Automatically extract materia from items with a complete spiritbond".Loc(),
                 GatherBuddy.Config.AutoGatherConfig.DoMaterialize,
                 b => GatherBuddy.Config.AutoGatherConfig.DoMaterialize = b);
 
         public static void DrawAetherialReduction()
-            => DrawCheckbox("Enable Aetherial Reduction",
-                "Automatically perform Aetherial Reduction when idling or the inventory is full",
+            => DrawCheckbox("Enable Aetherial Reduction".Loc(),
+                "Automatically perform Aetherial Reduction when idling or the inventory is full".Loc(),
                 GatherBuddy.Config.AutoGatherConfig.DoReduce,
                 b => GatherBuddy.Config.AutoGatherConfig.DoReduce = b);
 
         public static void DrawUseFlagBox()
-            => DrawCheckbox("Disable map marker navigation",            "Whether or not to navigate using map markers (timed nodes only)",
+            => DrawCheckbox("Disable map marker navigation".Loc(),            "Whether or not to navigate using map markers (timed nodes only)".Loc(),
                 GatherBuddy.Config.AutoGatherConfig.DisableFlagPathing, b => GatherBuddy.Config.AutoGatherConfig.DisableFlagPathing = b);
 
         public static void DrawFarNodeFilterDistance()
         {
             var tmp = GatherBuddy.Config.AutoGatherConfig.FarNodeFilterDistance;
-            if (ImGui.DragFloat("Far Node Filter Distance", ref tmp, 0.1f, 0.1f, 100f))
+            if (ImGui.DragFloat("Far Node Filter Distance".Loc(), ref tmp, 0.1f, 0.1f, 100f))
             {
                 GatherBuddy.Config.AutoGatherConfig.FarNodeFilterDistance = tmp;
                 GatherBuddy.Config.Save();
             }
 
             ImGuiUtil.HoverTooltip(
-                "When looking for non-empty nodes GBR will filter out any nodes that are closer to you than this. Prevents checking nodes you can already see are empty.");
+                "When looking for non-empty nodes GBR will filter out any nodes that are closer to you than this. Prevents checking nodes you can already see are empty.".Loc());
         }
 
         public static void DrawTimedNodePrecog()
         {
             var tmp = GatherBuddy.Config.AutoGatherConfig.TimedNodePrecog;
-            if (ImGui.DragInt("Timed Node Precognition (Seconds)", ref tmp, 1, 0, 600))
+            if (ImGui.DragInt("Timed Node Precognition (Seconds)".Loc(), ref tmp, 1, 0, 600))
             {
                 GatherBuddy.Config.AutoGatherConfig.TimedNodePrecog = tmp;
                 GatherBuddy.Config.Save();
             }
 
-            ImGuiUtil.HoverTooltip("How far in advance of the node actually being up GBR should consider the node to be up");
+            ImGuiUtil.HoverTooltip("How far in advance of the node actually being up GBR should consider the node to be up".Loc());
         }
 
         public static void DrawExecutionDelay()
         {
             var tmp = (int)GatherBuddy.Config.AutoGatherConfig.ExecutionDelay;
-            if (ImGui.DragInt("Execution delay (Milliseconds)", ref tmp, 1, 0, 1500))
+            if (ImGui.DragInt("Execution delay (Milliseconds)".Loc(), ref tmp, 1, 0, 1500))
             {
                 GatherBuddy.Config.AutoGatherConfig.ExecutionDelay = (uint)Math.Min(Math.Max(0, tmp), 10000);
                 GatherBuddy.Config.Save();
             }
 
-            ImGuiUtil.HoverTooltip("Delay executing each action by the specified amount.");
+            ImGuiUtil.HoverTooltip("Delay executing each action by the specified amount.".Loc());
         }
 
         public static void DrawUseGivingLandOnCooldown()
-            => DrawCheckbox("Gather any crystals when The Giving Land is off cooldown",
-                "Gather random crystals on any regular node when The Giving Land is avaiable regardles of current target item.",
+            => DrawCheckbox("Gather any crystals when The Giving Land is off cooldown".Loc(),
+                "Gather random crystals on any regular node when The Giving Land is avaiable regardles of current target item.".Loc(),
                 GatherBuddy.Config.AutoGatherConfig.UseGivingLandOnCooldown,
                 b => GatherBuddy.Config.AutoGatherConfig.UseGivingLandOnCooldown = b);
 
         public static void DrawMountUpDistance()
         {
             var tmp = GatherBuddy.Config.AutoGatherConfig.MountUpDistance;
-            if (ImGui.DragFloat("Mount Up Distance", ref tmp, 0.1f, 0.1f, 100f))
+            if (ImGui.DragFloat("Mount Up Distance".Loc(), ref tmp, 0.1f, 0.1f, 100f))
             {
                 GatherBuddy.Config.AutoGatherConfig.MountUpDistance = tmp;
                 GatherBuddy.Config.Save();
             }
 
-            ImGuiUtil.HoverTooltip("The distance at which you will mount up to move to a node.");
+            ImGuiUtil.HoverTooltip("The distance at which you will mount up to move to a node.".Loc());
         }
 
         public static void DrawMoveWhileMounting()
-            => DrawCheckbox("Move while mounting up",
-                "Begin pathfinding to the next node while summoning a mount",
+            => DrawCheckbox("Move while mounting up".Loc(),
+                "Begin pathfinding to the next node while summoning a mount".Loc(),
                 GatherBuddy.Config.AutoGatherConfig.MoveWhileMounting,
                 b => GatherBuddy.Config.AutoGatherConfig.MoveWhileMounting = b);
 
         public static void DrawAntiStuckCooldown()
         {
             var tmp = GatherBuddy.Config.AutoGatherConfig.NavResetCooldown;
-            if (ImGui.DragFloat("Anti-Stuck Cooldown", ref tmp, 0.1f, 0.1f, 10f))
+            if (ImGui.DragFloat("Anti-Stuck Cooldown".Loc(), ref tmp, 0.1f, 0.1f, 10f))
             {
                 GatherBuddy.Config.AutoGatherConfig.NavResetCooldown = tmp;
                 GatherBuddy.Config.Save();
             }
 
-            ImGuiUtil.HoverTooltip("The time in seconds before the navigation system will reset if you are stuck.");
+            ImGuiUtil.HoverTooltip("The time in seconds before the navigation system will reset if you are stuck.".Loc());
         }
 
         public static void DrawForceWalkingBox()
-            => DrawCheckbox("Force Walking",                      "Force walking to nodes instead of using mounts.",
+            => DrawCheckbox("Force Walking".Loc(),                      "Force walking to nodes instead of using mounts.".Loc(),
                 GatherBuddy.Config.AutoGatherConfig.ForceWalking, b => GatherBuddy.Config.AutoGatherConfig.ForceWalking = b);
 
         public static void DrawUseNavigationBox()
-            => DrawCheckbox("Use vnavmesh Navigation",             "Use vnavmesh Navigation to move your character automatically",
+            => DrawCheckbox("Use vnavmesh Navigation".Loc(),             "Use vnavmesh Navigation to move your character automatically".Loc(),
                 GatherBuddy.Config.AutoGatherConfig.UseNavigation, b => GatherBuddy.Config.AutoGatherConfig.UseNavigation = b);
 
         public static void DrawStuckThreshold()
         {
             var tmp = GatherBuddy.Config.AutoGatherConfig.NavResetThreshold;
-            if (ImGui.DragFloat("Stuck Threshold", ref tmp, 0.1f, 0.1f, 10f))
+            if (ImGui.DragFloat("Stuck Threshold".Loc(), ref tmp, 0.1f, 0.1f, 10f))
             {
                 GatherBuddy.Config.AutoGatherConfig.NavResetThreshold = tmp;
                 GatherBuddy.Config.Save();
             }
 
-            ImGuiUtil.HoverTooltip("The time in seconds before the navigation system will consider you stuck.");
+            ImGuiUtil.HoverTooltip("The time in seconds before the navigation system will consider you stuck.".Loc());
         }
 
         public static void DrawSortingMethodCombo()
@@ -282,8 +282,8 @@ public partial class Interface
             var v = GatherBuddy.Config.AutoGatherConfig.SortingMethod;
             ImGui.SetNextItemWidth(SetInputWidth);
 
-            using var combo = ImRaii.Combo("Item Sorting Method", v.ToString());
-            ImGuiUtil.HoverTooltip("What method to use when sorting items internally");
+            using var combo = ImRaii.Combo("Item Sorting Method".Loc(), v.ToString());
+            ImGuiUtil.HoverTooltip("What method to use when sorting items internally".Loc());
             if (!combo)
                 return;
 
@@ -302,13 +302,13 @@ public partial class Interface
 
         // General Config
         public static void DrawOpenOnStartBox()
-            => DrawCheckbox("Open Config UI On Start",
-                "Toggle whether the GatherBuddy GUI should be visible after you start the game.",
+            => DrawCheckbox("Open Config UI On Start".Loc(),
+                "Toggle whether the GatherBuddy GUI should be visible after you start the game.".Loc(),
                 GatherBuddy.Config.OpenOnStart, b => GatherBuddy.Config.OpenOnStart = b);
 
         public static void DrawLockPositionBox()
-            => DrawCheckbox("Lock Config UI Movement",
-                "Toggle whether the GatherBuddy GUI movement should be locked.",
+            => DrawCheckbox("Lock Config UI Movement".Loc(),
+                "Toggle whether the GatherBuddy GUI movement should be locked.".Loc(),
                 GatherBuddy.Config.MainWindowLockPosition, b =>
                 {
                     GatherBuddy.Config.MainWindowLockPosition = b;
@@ -316,8 +316,8 @@ public partial class Interface
                 });
 
         public static void DrawLockResizeBox()
-            => DrawCheckbox("Lock Config UI Size",
-                "Toggle whether the GatherBuddy GUI size should be locked.",
+            => DrawCheckbox("Lock Config UI Size".Loc(),
+                "Toggle whether the GatherBuddy GUI size should be locked.".Loc(),
                 GatherBuddy.Config.MainWindowLockResize, b =>
                 {
                     GatherBuddy.Config.MainWindowLockResize = b;
@@ -325,8 +325,8 @@ public partial class Interface
                 });
 
         public static void DrawRespectEscapeBox()
-            => DrawCheckbox("Escape Closes Main Window",
-                "Toggle whether pressing escape while having the main window focused shall close it.",
+            => DrawCheckbox("Escape Closes Main Window".Loc(),
+                "Toggle whether pressing escape while having the main window focused shall close it.".Loc(),
                 GatherBuddy.Config.CloseOnEscape, b =>
                 {
                     GatherBuddy.Config.CloseOnEscape = b;
@@ -334,74 +334,74 @@ public partial class Interface
                 });
 
         public static void DrawGearChangeBox()
-            => DrawCheckbox("Enable Gear Change",
-                "Toggle whether to automatically switch gear to the correct job gear for a node.\nUses Miner Set, Botanist Set and Fisher Set.",
+            => DrawCheckbox("Enable Gear Change".Loc(),
+                "Toggle whether to automatically switch gear to the correct job gear for a node.\nUses Miner Set, Botanist Set and Fisher Set.".Loc(),
                 GatherBuddy.Config.UseGearChange, b => GatherBuddy.Config.UseGearChange = b);
 
         public static void DrawTeleportBox()
-            => DrawCheckbox("Enable Teleport",
-                "Toggle whether to automatically teleport to a chosen node.",
+            => DrawCheckbox("Enable Teleport".Loc(),
+                "Toggle whether to automatically teleport to a chosen node.".Loc(),
                 GatherBuddy.Config.UseTeleport, b => GatherBuddy.Config.UseTeleport = b);
 
         public static void DrawMapOpenBox()
-            => DrawCheckbox("Open Map With Location",
-                "Toggle whether to automatically open the map of the territory of the chosen node with its gathering location highlighted.",
+            => DrawCheckbox("Open Map With Location".Loc(),
+                "Toggle whether to automatically open the map of the territory of the chosen node with its gathering location highlighted.".Loc(),
                 GatherBuddy.Config.UseCoordinates, b => GatherBuddy.Config.UseCoordinates = b);
 
         public static void DrawPlaceMarkerBox()
-            => DrawCheckbox("Place Flag Marker on Map",
-                "Toggle whether to automatically set a red flag marker on the approximate location of the chosen node without opening the map.",
+            => DrawCheckbox("Place Flag Marker on Map".Loc(),
+                "Toggle whether to automatically set a red flag marker on the approximate location of the chosen node without opening the map.".Loc(),
                 GatherBuddy.Config.UseFlag, b => GatherBuddy.Config.UseFlag = b);
 
         public static void DrawMapMarkerPrintBox()
-            => DrawCheckbox("Print Map Location",
-                "Toggle whether to automatically write a map link to the approximate location of the chosen node to chat.",
+            => DrawCheckbox("Print Map Location".Loc(),
+                "Toggle whether to automatically write a map link to the approximate location of the chosen node to chat.".Loc(),
                 GatherBuddy.Config.WriteCoordinates, b => GatherBuddy.Config.WriteCoordinates = b);
 
         public static void DrawPlaceWaymarkBox()
-            => DrawCheckbox("Place Custom Waymarks",
-                "Toggle whether to place custom Waymarks you set manually set up for certain locations.",
+            => DrawCheckbox("Place Custom Waymarks".Loc(),
+                "Toggle whether to place custom Waymarks you set manually set up for certain locations.".Loc(),
                 GatherBuddy.Config.PlaceCustomWaymarks, b => GatherBuddy.Config.PlaceCustomWaymarks = b);
 
         public static void DrawPrintUptimesBox()
-            => DrawCheckbox("Print Node Uptimes On Gather",
-                "Print the uptimes of nodes you try to /gather in the chat if they are not always up.",
+            => DrawCheckbox("Print Node Uptimes On Gather".Loc(),
+                "Print the uptimes of nodes you try to /gather in the chat if they are not always up.".Loc(),
                 GatherBuddy.Config.PrintUptime, b => GatherBuddy.Config.PrintUptime = b);
 
         public static void DrawSkipTeleportBox()
-            => DrawCheckbox("Skip Nearby Teleports",
-                "Skips teleports if you are in the same map and closer to the target than the selected aetheryte already.",
+            => DrawCheckbox("Skip Nearby Teleports".Loc(),
+                "Skips teleports if you are in the same map and closer to the target than the selected aetheryte already.".Loc(),
                 GatherBuddy.Config.SkipTeleportIfClose, b => GatherBuddy.Config.SkipTeleportIfClose = b);
 
         public static void DrawShowStatusLineBox()
-            => DrawCheckbox("Show Status Line",
-                "Show a status line below the gatherables and fish tables.",
+            => DrawCheckbox("Show Status Line".Loc(),
+                "Show a status line below the gatherables and fish tables.".Loc(),
                 GatherBuddy.Config.ShowStatusLine, v => GatherBuddy.Config.ShowStatusLine = v);
 
         public static void DrawHideClippyBox()
-            => DrawCheckbox("Hide GatherClippy Button",
-                "Permanently hide the GatherClippy Button in the Gatherables and Fish tabs.",
+            => DrawCheckbox("Hide GatherClippy Button".Loc(),
+                "Permanently hide the GatherClippy Button in the Gatherables and Fish tabs.".Loc(),
                 GatherBuddy.Config.HideClippy, v => GatherBuddy.Config.HideClippy = v);
 
-        private const string ChatInformationString =
-            "Note that the message only gets printed to your chat log, regardless of the selected channel"
-          + " - other people will not see your 'Say' message.";
+        private static string ChatInformationString
+            => ("Note that the message only gets printed to your chat log, regardless of the selected channel"
+          + " - other people will not see your 'Say' message.").Loc();
 
         public static void DrawPrintTypeSelector()
-            => DrawChatTypeSelector("Chat Type for Messages",
-                "The chat type used to print regular messages issued by GatherBuddy.\n"
+            => DrawChatTypeSelector("Chat Type for Messages".Loc(),
+                "The chat type used to print regular messages issued by GatherBuddy.\n".Loc()
               + ChatInformationString,
                 GatherBuddy.Config.ChatTypeMessage, t => GatherBuddy.Config.ChatTypeMessage = t);
 
         public static void DrawErrorTypeSelector()
-            => DrawChatTypeSelector("Chat Type for Errors",
-                "The chat type used to print error messages issued by GatherBuddy.\n"
+            => DrawChatTypeSelector("Chat Type for Errors".Loc(),
+                "The chat type used to print error messages issued by GatherBuddy.\n".Loc()
               + ChatInformationString,
                 GatherBuddy.Config.ChatTypeError, t => GatherBuddy.Config.ChatTypeError = t);
 
         public static void DrawContextMenuBox()
-            => DrawCheckbox("Add In-Game Context Menus",
-                "Add a 'Gather' entry to in-game right-click context menus for gatherable items.",
+            => DrawCheckbox("Add In-Game Context Menus".Loc(),
+                "Add a 'Gather' entry to in-game right-click context menus for gatherable items.".Loc(),
                 GatherBuddy.Config.AddIngameContextMenus, b =>
                 {
                     GatherBuddy.Config.AddIngameContextMenus = b;
@@ -414,17 +414,17 @@ public partial class Interface
         public static void DrawPreferredJobSelect()
         {
             var v       = GatherBuddy.Config.PreferredGatheringType;
-            var current = v == GatheringType.Multiple ? "No Preference" : v.ToString();
+            var current = v == GatheringType.Multiple ? "No Preference".Loc() : v.ToString();
             ImGui.SetNextItemWidth(SetInputWidth);
-            using var combo = ImRaii.Combo("Preferred Job", current);
+            using var combo = ImRaii.Combo("Preferred Job".Loc(), current);
             ImGuiUtil.HoverTooltip(
-                "Choose your job preference when gathering items that can be gathered by miners as well as botanists.\n"
+                ("Choose your job preference when gathering items that can be gathered by miners as well as botanists.\n"
               + "This effectively turns the regular gather command to /gathermin or /gatherbtn when an item can be gathered by both, "
-              + "ignoring the other options even on successive tries.");
+              + "ignoring the other options even on successive tries.").Loc());
             if (!combo)
                 return;
 
-            if (ImGui.Selectable("No Preference", v == GatheringType.Multiple) && v != GatheringType.Multiple)
+            if (ImGui.Selectable("No Preference".Loc(), v == GatheringType.Multiple) && v != GatheringType.Multiple)
             {
                 GatherBuddy.Config.PreferredGatheringType = GatheringType.Multiple;
                 GatherBuddy.Config.Save();
@@ -444,19 +444,19 @@ public partial class Interface
         }
 
         public static void DrawPrintClipboardBox()
-            => DrawCheckbox("Print Clipboard Information",
-                "Print to the chat whenever you save an object to the clipboard. Failures will be printed regardless.",
+            => DrawCheckbox("Print Clipboard Information".Loc(),
+                "Print to the chat whenever you save an object to the clipboard. Failures will be printed regardless.".Loc(),
                 GatherBuddy.Config.PrintClipboardMessages, b => GatherBuddy.Config.PrintClipboardMessages = b);
 
         // Weather Tab
         public static void DrawWeatherTabNamesBox()
-            => DrawCheckbox("Show Names in Weather Tab",
-                "Toggle whether to write the names in the table for the weather tab, or just the icons with names on hover.",
+            => DrawCheckbox("Show Names in Weather Tab".Loc(),
+                "Toggle whether to write the names in the table for the weather tab, or just the icons with names on hover.".Loc(),
                 GatherBuddy.Config.ShowWeatherNames, b => GatherBuddy.Config.ShowWeatherNames = b);
 
         // Alarms
         public static void DrawAlarmToggle()
-            => DrawCheckbox("Enable Alarms", "Toggle all alarms on or off.", GatherBuddy.Config.AlarmsEnabled,
+            => DrawCheckbox("Enable Alarms".Loc(), "Toggle all alarms on or off.".Loc(), GatherBuddy.Config.AlarmsEnabled,
                 b =>
                 {
                     if (b)
@@ -468,11 +468,11 @@ public partial class Interface
         private static bool _gatherDebug = false;
 
         public static void DrawAlarmsInDutyToggle()
-            => DrawCheckbox("Enable Alarms in Duty", "Set whether alarms should trigger while you are bound by a duty.",
+            => DrawCheckbox("Enable Alarms in Duty".Loc(), "Set whether alarms should trigger while you are bound by a duty.".Loc(),
                 GatherBuddy.Config.AlarmsInDuty,     b => GatherBuddy.Config.AlarmsInDuty = b);
 
         public static void DrawAlarmsOnlyWhenLoggedInToggle()
-            => DrawCheckbox("Enable Alarms Only In-Game",  "Set whether alarms should trigger while you are not logged into any character.",
+            => DrawCheckbox("Enable Alarms Only In-Game".Loc(),  "Set whether alarms should trigger while you are not logged into any character.".Loc(),
                 GatherBuddy.Config.AlarmsOnlyWhenLoggedIn, b => GatherBuddy.Config.AlarmsOnlyWhenLoggedIn = b);
 
         private static void DrawAlarmPicker(string label, string description, Sounds current, Action<Sounds> setter)
@@ -485,65 +485,65 @@ public partial class Interface
         }
 
         public static void DrawWeatherAlarmPicker()
-            => DrawAlarmPicker("Weather Change Alarm", "Choose a sound that is played every 8 Eorzea hours on regular weather changes.",
+            => DrawAlarmPicker("Weather Change Alarm".Loc(), "Choose a sound that is played every 8 Eorzea hours on regular weather changes.".Loc(),
                 GatherBuddy.Config.WeatherAlarm,       _plugin.AlarmManager.SetWeatherAlarm);
 
         public static void DrawHourAlarmPicker()
-            => DrawAlarmPicker("Eorzea Hour Change Alarm", "Choose a sound that is played every time the current Eorzea hour changes.",
+            => DrawAlarmPicker("Eorzea Hour Change Alarm".Loc(), "Choose a sound that is played every time the current Eorzea hour changes.".Loc(),
                 GatherBuddy.Config.HourAlarm,              _plugin.AlarmManager.SetHourAlarm);
 
         // Fish Timer
         public static void DrawFishTimerBox()
-            => DrawCheckbox("Show Fish Timer",
-                "Toggle whether to show the fish timer window while fishing.",
+            => DrawCheckbox("Show Fish Timer".Loc(),
+                "Toggle whether to show the fish timer window while fishing.".Loc(),
                 GatherBuddy.Config.ShowFishTimer, b => GatherBuddy.Config.ShowFishTimer = b);
 
         public static void DrawFishTimerEditBox()
-            => DrawCheckbox("Edit Fish Timer",
-                "Enable editing the fish timer window.",
+            => DrawCheckbox("Edit Fish Timer".Loc(),
+                "Enable editing the fish timer window.".Loc(),
                 GatherBuddy.Config.FishTimerEdit, b => GatherBuddy.Config.FishTimerEdit = b);
 
         public static void DrawFishTimerClickthroughBox()
-            => DrawCheckbox("Enable Fish Timer Clickthrough",
-                "Allow clicking through the fish timer and disabling the context menus instead.",
+            => DrawCheckbox("Enable Fish Timer Clickthrough".Loc(),
+                "Allow clicking through the fish timer and disabling the context menus instead.".Loc(),
                 GatherBuddy.Config.FishTimerClickthrough, b => GatherBuddy.Config.FishTimerClickthrough = b);
 
         public static void DrawFishTimerHideBox()
-            => DrawCheckbox("Hide Uncaught Fish in Fish Timer",
-                "Hide all fish from the fish timer window that have not been recorded with the given combination of snagging and bait.",
+            => DrawCheckbox("Hide Uncaught Fish in Fish Timer".Loc(),
+                "Hide all fish from the fish timer window that have not been recorded with the given combination of snagging and bait.".Loc(),
                 GatherBuddy.Config.HideUncaughtFish, b => GatherBuddy.Config.HideUncaughtFish = b);
 
         public static void DrawFishTimerHideBox2()
-            => DrawCheckbox("Hide Unavailable Fish in Fish Timer",
-                "Hide all fish from the fish timer window that have have known requirements that are unfulfilled, like Fisher's Intuition or Snagging.",
+            => DrawCheckbox("Hide Unavailable Fish in Fish Timer".Loc(),
+                "Hide all fish from the fish timer window that have have known requirements that are unfulfilled, like Fisher's Intuition or Snagging.".Loc(),
                 GatherBuddy.Config.HideUnavailableFish, b => GatherBuddy.Config.HideUnavailableFish = b);
 
         public static void DrawFishTimerUptimesBox()
-            => DrawCheckbox("Show Uptimes in Fish Timer",
-                "Show the uptimes for restricted fish in the fish timer window.",
+            => DrawCheckbox("Show Uptimes in Fish Timer".Loc(),
+                "Show the uptimes for restricted fish in the fish timer window.".Loc(),
                 GatherBuddy.Config.ShowFishTimerUptimes, b => GatherBuddy.Config.ShowFishTimerUptimes = b);
 
         public static void DrawKeepRecordsBox()
-            => DrawCheckbox("Keep Fish Records",
-                "Store Fish Records on your computer. This is necessary for bite timings for the fish timer window.",
+            => DrawCheckbox("Keep Fish Records".Loc(),
+                "Store Fish Records on your computer. This is necessary for bite timings for the fish timer window.".Loc(),
                 GatherBuddy.Config.StoreFishRecords, b => GatherBuddy.Config.StoreFishRecords = b);
 
         public static void DrawShowLocalTimeInRecordsBox()
-            => DrawCheckbox("Use Local Time in Records",
-                "When displaying timestamps in the Fish Records Tab, use local time instead of Unix time.",
+            => DrawCheckbox("Use Local Time in Records".Loc(),
+                "When displaying timestamps in the Fish Records Tab, use local time instead of Unix time.".Loc(),
                 GatherBuddy.Config.UseUnixTimeFishRecords, b => GatherBuddy.Config.UseUnixTimeFishRecords = b);
         
         public static void DrawFishTimerScale()
         {
             var value = GatherBuddy.Config.FishTimerScale / 1000f;
             ImGui.SetNextItemWidth(SetInputWidth);
-            var ret = ImGui.DragFloat("Fish Timer Bite Time Scale", ref value, 0.1f, FishRecord.MinBiteTime / 500f,
+            var ret = ImGui.DragFloat("Fish Timer Bite Time Scale".Loc(), ref value, 0.1f, FishRecord.MinBiteTime / 500f,
                 FishRecord.MaxBiteTime / 1000f,
-                "%2.3f Seconds");
+                "%2.3f Seconds".Loc());
 
-            ImGuiUtil.HoverTooltip("The fishing timer window bite times are scaled to this value.\n"
+            ImGuiUtil.HoverTooltip(("The fishing timer window bite times are scaled to this value.\n"
               + "If your bite time exceeds the value, the progress bar and bite windows will not be displayed.\n"
-              + "You should probably keep this as high as your highest bite window and as low as possible. About 40 seconds is usually enough.");
+              + "You should probably keep this as high as your highest bite window and as low as possible. About 40 seconds is usually enough.").Loc());
 
             if (!ret)
                 return;
@@ -560,9 +560,9 @@ public partial class Interface
         {
             int value = GatherBuddy.Config.ShowSecondIntervals;
             ImGui.SetNextItemWidth(SetInputWidth);
-            var ret = ImGui.DragInt("Fish Timer Interval Separators", ref value, 0.01f, 0, 16);
-            ImGuiUtil.HoverTooltip("The fishing timer window can show a number of interval lines and corresponding seconds between 0 and 16.\n"
-              + "Set to 0 to turn this feature off.");
+            var ret = ImGui.DragInt("Fish Timer Interval Separators".Loc(), ref value, 0.01f, 0, 16);
+            ImGuiUtil.HoverTooltip(("The fishing timer window can show a number of interval lines and corresponding seconds between 0 and 16.\n"
+              + "Set to 0 to turn this feature off.").Loc());
             if (!ret)
                 return;
 
@@ -573,14 +573,14 @@ public partial class Interface
             GatherBuddy.Config.ShowSecondIntervals = newValue;
             GatherBuddy.Config.Save();
         }
-        
+
         public static void DrawFishTimerIntervalsRounding()
         {
             var value = GatherBuddy.Config.SecondIntervalsRounding;
             ImGui.SetNextItemWidth(SetInputWidth);
-            var ret = ImGui.DragInt("Fish Timer Interval Rounding", ref value, 0.01f, 0, 3);
-            ImGuiUtil.HoverTooltip("Round the displayed second value to this number of digits past the decimal. \n"
-                + "Set to 0 to display only whole numbers.");
+            var ret = ImGui.DragInt("Fish Timer Interval Rounding".Loc(), ref value, 0.01f, 0, 3);
+            ImGuiUtil.HoverTooltip(("Round the displayed second value to this number of digits past the decimal. \n"
+                + "Set to 0 to display only whole numbers.").Loc());
             if (!ret)
                 return;
 
@@ -593,77 +593,77 @@ public partial class Interface
         }
 
         public static void DrawHideFishPopupBox()
-            => DrawCheckbox("Hide Catch Popup",
-                "Prevents the popup window that shows you your caught fish and its size, amount and quality from being shown.",
+            => DrawCheckbox("Hide Catch Popup".Loc(),
+                "Prevents the popup window that shows you your caught fish and its size, amount and quality from being shown.".Loc(),
                 GatherBuddy.Config.HideFishSizePopup, b => GatherBuddy.Config.HideFishSizePopup = b);
 
         public static void DrawCollectableHintPopupBox()
-            => DrawCheckbox("Show Collectable Hints",
-                "Show if a fish is collectable in the fish timer window.",
+            => DrawCheckbox("Show Collectable Hints".Loc(),
+                "Show if a fish is collectable in the fish timer window.".Loc(),
                 GatherBuddy.Config.ShowCollectableHints, b => GatherBuddy.Config.ShowCollectableHints = b);
 
         public static void DrawDoubleHookHintPopupBox()
-            => DrawCheckbox("Show Multi Hook Hints",
-                "Show if a fish can be double or triple hooked in Cosmic Exploration.", // TODO: add ocean fishing when implemented.
+            => DrawCheckbox("Show Multi Hook Hints".Loc(),
+                "Show if a fish can be double or triple hooked in Cosmic Exploration.".Loc(), // TODO: add ocean fishing when implemented.
                 GatherBuddy.Config.ShowMultiHookHints, b => GatherBuddy.Config.ShowMultiHookHints = b);
-        
-        
+
+
         // Fish Stats Window
         public static void DrawEnableFishStats()
-            => DrawCheckbox("Enable Fish Stats",
-                "New tab for aggregating and reporting fish stats based on local records. Currently in testing.",
+            => DrawCheckbox("Enable Fish Stats".Loc(),
+                "New tab for aggregating and reporting fish stats based on local records. Currently in testing.".Loc(),
                 GatherBuddy.Config.EnableFishStats, b => GatherBuddy.Config.EnableFishStats = b);
-        public static void DrawEnableReportTime()  
-            => DrawCheckbox("Copy Time Stats when reporting.",
-                "When copying the report, add min and max times to the report.",
+        public static void DrawEnableReportTime()
+            => DrawCheckbox("Copy Time Stats when reporting.".Loc(),
+                "When copying the report, add min and max times to the report.".Loc(),
                 GatherBuddy.Config.EnableReportTime, b => GatherBuddy.Config.EnableReportTime = b);
-        public static void DrawEnableReportSize()  
-            => DrawCheckbox("Copy Sizes Stats when reporting.",
-                "When copying the report, add min and max sizes to the report.",
+        public static void DrawEnableReportSize()
+            => DrawCheckbox("Copy Sizes Stats when reporting.".Loc(),
+                "When copying the report, add min and max sizes to the report.".Loc(),
                 GatherBuddy.Config.EnableReportSize, b => GatherBuddy.Config.EnableReportSize = b);
-        public static void DrawEnableReportMulti() 
-            => DrawCheckbox("Copy Multi Hook Stats when reporting.",
-                "When copying the report, add stats about multi-hook yields to the report.",
+        public static void DrawEnableReportMulti()
+            => DrawCheckbox("Copy Multi Hook Stats when reporting.".Loc(),
+                "When copying the report, add stats about multi-hook yields to the report.".Loc(),
                 GatherBuddy.Config.EnableReportMulti, b => GatherBuddy.Config.EnableReportMulti = b);
-        public static void DrawEnableGraphs()      
-            => DrawCheckbox("Enable Graphs.",
-                "When viewing a fishing spot, enable visualization of fish report data. Extreme Testing!",
+        public static void DrawEnableGraphs()
+            => DrawCheckbox("Enable Graphs.".Loc(),
+                "When viewing a fishing spot, enable visualization of fish report data. Extreme Testing!".Loc(),
                 GatherBuddy.Config.EnableFishStatsGraphs, b => GatherBuddy.Config.EnableFishStatsGraphs = b);
 
         // Spearfishing Helper
         public static void DrawSpearfishHelperBox()
-            => DrawCheckbox("Show Spearfishing Helper",
-                "Toggle whether to show the Spearfishing Helper while spearfishing.",
+            => DrawCheckbox("Show Spearfishing Helper".Loc(),
+                "Toggle whether to show the Spearfishing Helper while spearfishing.".Loc(),
                 GatherBuddy.Config.ShowSpearfishHelper, b => GatherBuddy.Config.ShowSpearfishHelper = b);
 
         public static void DrawSpearfishNamesBox()
-            => DrawCheckbox("Show Fish Name Overlay",
-                "Toggle whether to show the identified names of fish in the spearfishing window.",
+            => DrawCheckbox("Show Fish Name Overlay".Loc(),
+                "Toggle whether to show the identified names of fish in the spearfishing window.".Loc(),
                 GatherBuddy.Config.ShowSpearfishNames, b => GatherBuddy.Config.ShowSpearfishNames = b);
 
         public static void DrawAvailableSpearfishBox()
-            => DrawCheckbox("Show List of Available Fish",
-                "Toggle whether to show the list of fish available in your current spearfishing spot on the side of the spearfishing window.",
+            => DrawCheckbox("Show List of Available Fish".Loc(),
+                "Toggle whether to show the list of fish available in your current spearfishing spot on the side of the spearfishing window.".Loc(),
                 GatherBuddy.Config.ShowAvailableSpearfish, b => GatherBuddy.Config.ShowAvailableSpearfish = b);
 
         public static void DrawSpearfishSpeedBox()
-            => DrawCheckbox("Show Speed of Fish in Overlay",
-                "Toggle whether to show the speed of fish in the spearfishing window in addition to their names.",
+            => DrawCheckbox("Show Speed of Fish in Overlay".Loc(),
+                "Toggle whether to show the speed of fish in the spearfishing window in addition to their names.".Loc(),
                 GatherBuddy.Config.ShowSpearfishSpeed, b => GatherBuddy.Config.ShowSpearfishSpeed = b);
 
         public static void DrawSpearfishCenterLineBox()
-            => DrawCheckbox("Show Center Line",
-                "Toggle whether to show a straight line up from the center of the spearfishing gig in the spearfishing window.",
+            => DrawCheckbox("Show Center Line".Loc(),
+                "Toggle whether to show a straight line up from the center of the spearfishing gig in the spearfishing window.".Loc(),
                 GatherBuddy.Config.ShowSpearfishCenterLine, b => GatherBuddy.Config.ShowSpearfishCenterLine = b);
 
         public static void DrawSpearfishIconsAsTextBox()
-            => DrawCheckbox("Show Speed and Size as Text",
-                "Toggle whether to show the speed and size of available fish as text instead of icons.",
+            => DrawCheckbox("Show Speed and Size as Text".Loc(),
+                "Toggle whether to show the speed and size of available fish as text instead of icons.".Loc(),
                 GatherBuddy.Config.ShowSpearfishListIconsAsText, b => GatherBuddy.Config.ShowSpearfishListIconsAsText = b);
 
         public static void DrawSpearfishFishNameFixed()
-            => DrawCheckbox("Show Fish Names in Fixed Position",
-                "Toggle whether to show the identified names of fish on the moving fish themselves or in a fixed position.",
+            => DrawCheckbox("Show Fish Names in Fixed Position".Loc(),
+                "Toggle whether to show the identified names of fish on the moving fish themselves or in a fixed position.".Loc(),
                 GatherBuddy.Config.FixNamesOnPosition, b => GatherBuddy.Config.FixNamesOnPosition = b);
 
         public static void DrawSpearfishFishNamePercentage()
@@ -673,7 +673,7 @@ public partial class Interface
 
             var tmp = (int)GatherBuddy.Config.FixNamesPercentage;
             ImGui.SetNextItemWidth(SetInputWidth);
-            if (!ImGui.DragInt("Fish Name Position Percentage", ref tmp, 0.1f, 0, 100, "%i%%"))
+            if (!ImGui.DragInt("Fish Name Position Percentage".Loc(), ref tmp, 0.1f, 0, 100, "%i%%"))
                 return;
 
             tmp = Math.Clamp(tmp, 0, 100);
@@ -686,23 +686,23 @@ public partial class Interface
 
         // Gather Window
         public static void DrawShowGatherWindowBox()
-            => DrawCheckbox("Show Gather Window",
-                "Show a small window with pinned Gatherables and their uptimes.",
+            => DrawCheckbox("Show Gather Window".Loc(),
+                "Show a small window with pinned Gatherables and their uptimes.".Loc(),
                 GatherBuddy.Config.ShowGatherWindow, b => GatherBuddy.Config.ShowGatherWindow = b);
 
         public static void DrawGatherWindowAnchorBox()
-            => DrawCheckbox("Anchor Gather Window to Bottom Left",
-                "Lets the Gather Window grow to the top and shrink from the top instead of the bottom.",
+            => DrawCheckbox("Anchor Gather Window to Bottom Left".Loc(),
+                "Lets the Gather Window grow to the top and shrink from the top instead of the bottom.".Loc(),
                 GatherBuddy.Config.GatherWindowBottomAnchor, b => GatherBuddy.Config.GatherWindowBottomAnchor = b);
 
         public static void DrawGatherWindowTimersBox()
-            => DrawCheckbox("Show Gather Window Timers",
-                "Show the uptimes for gatherables in the gather window.",
+            => DrawCheckbox("Show Gather Window Timers".Loc(),
+                "Show the uptimes for gatherables in the gather window.".Loc(),
                 GatherBuddy.Config.ShowGatherWindowTimers, b => GatherBuddy.Config.ShowGatherWindowTimers = b);
 
         public static void DrawGatherWindowAlarmsBox()
-            => DrawCheckbox("Show Active Alarms in Gather Window",
-                "Additionally show active alarms as a last gather window preset, obeying the regular rules for the window.",
+            => DrawCheckbox("Show Active Alarms in Gather Window".Loc(),
+                "Additionally show active alarms as a last gather window preset, obeying the regular rules for the window.".Loc(),
                 GatherBuddy.Config.ShowGatherWindowAlarms, b =>
                 {
                     GatherBuddy.Config.ShowGatherWindowAlarms = b;
@@ -710,56 +710,56 @@ public partial class Interface
                 });
 
         public static void DrawSortGatherWindowBox()
-            => DrawCheckbox("Sort Gather Window by Uptime",
-                "Sort the items selected for the gather window by their uptimes.",
+            => DrawCheckbox("Sort Gather Window by Uptime".Loc(),
+                "Sort the items selected for the gather window by their uptimes.".Loc(),
                 GatherBuddy.Config.SortGatherWindowByUptime, b => GatherBuddy.Config.SortGatherWindowByUptime = b);
 
         public static void DrawGatherWindowShowOnlyAvailableBox()
-            => DrawCheckbox("Show Only Available Items",
-                "Show only those items from your gather window setup that are currently available.",
+            => DrawCheckbox("Show Only Available Items".Loc(),
+                "Show only those items from your gather window setup that are currently available.".Loc(),
                 GatherBuddy.Config.ShowGatherWindowOnlyAvailable, b => GatherBuddy.Config.ShowGatherWindowOnlyAvailable = b);
 
         public static void DrawHideGatherWindowCompletedItemsBox()
-            => DrawCheckbox("Hide Completed Items",
-                "Hide items that have the required inventory amount present in inventory.",
+            => DrawCheckbox("Hide Completed Items".Loc(),
+                "Hide items that have the required inventory amount present in inventory.".Loc(),
                 GatherBuddy.Config.HideGatherWindowCompletedItems, b => GatherBuddy.Config.HideGatherWindowCompletedItems = b);
 
         public static void DrawHideGatherWindowInDutyBox()
-            => DrawCheckbox("Hide Gather Window in Duty",
-                "Hide the gather window when bound by any duty.",
+            => DrawCheckbox("Hide Gather Window in Duty".Loc(),
+                "Hide the gather window when bound by any duty.".Loc(),
                 GatherBuddy.Config.HideGatherWindowInDuty, b => GatherBuddy.Config.HideGatherWindowInDuty = b);
 
         public static void DrawGatherWindowHoldKey()
         {
-            DrawCheckbox("Only Show Gather Window if Holding Key",
-                "Only show the gather window if you are holding your selected key.",
+            DrawCheckbox("Only Show Gather Window if Holding Key".Loc(),
+                "Only show the gather window if you are holding your selected key.".Loc(),
                 GatherBuddy.Config.OnlyShowGatherWindowHoldingKey, b => GatherBuddy.Config.OnlyShowGatherWindowHoldingKey = b);
 
             if (!GatherBuddy.Config.OnlyShowGatherWindowHoldingKey)
                 return;
 
             ImGui.SetNextItemWidth(SetInputWidth);
-            Widget.KeySelector("Hotkey to Hold", "Set the hotkey to hold to keep the window visible.",
+            Widget.KeySelector("Hotkey to Hold".Loc(), "Set the hotkey to hold to keep the window visible.".Loc(),
                 GatherBuddy.Config.GatherWindowHoldKey,
                 k => GatherBuddy.Config.GatherWindowHoldKey = k, Configuration.ValidKeys);
         }
 
         public static void DrawGatherWindowLockBox()
-            => DrawCheckbox("Lock Gather Window Position",
-                "Prevent moving the gather window by dragging it around.",
+            => DrawCheckbox("Lock Gather Window Position".Loc(),
+                "Prevent moving the gather window by dragging it around.".Loc(),
                 GatherBuddy.Config.LockGatherWindow, b => GatherBuddy.Config.LockGatherWindow = b);
 
 
         public static void DrawGatherWindowHotkeyInput()
         {
-            if (Widget.ModifiableKeySelector("Hotkey to Open Gather Window", "Set a hotkey to open the Gather Window.", SetInputWidth,
+            if (Widget.ModifiableKeySelector("Hotkey to Open Gather Window".Loc(), "Set a hotkey to open the Gather Window.".Loc(), SetInputWidth,
                     GatherBuddy.Config.GatherWindowHotkey, k => GatherBuddy.Config.GatherWindowHotkey = k, Configuration.ValidKeys))
                 GatherBuddy.Config.Save();
         }
 
         public static void DrawMainInterfaceHotkeyInput()
         {
-            if (Widget.ModifiableKeySelector("Hotkey to Open Main Interface", "Set a hotkey to open the main GatherBuddy interface.",
+            if (Widget.ModifiableKeySelector("Hotkey to Open Main Interface".Loc(), "Set a hotkey to open the main GatherBuddy interface.".Loc(),
                     SetInputWidth,
                     GatherBuddy.Config.MainInterfaceHotkey, k => GatherBuddy.Config.MainInterfaceHotkey = k, Configuration.ValidKeys))
                 GatherBuddy.Config.Save();
@@ -769,8 +769,8 @@ public partial class Interface
         public static void DrawGatherWindowDeleteModifierInput()
         {
             ImGui.SetNextItemWidth(SetInputWidth);
-            if (Widget.ModifierSelector("Modifier to Delete Items on Right-Click",
-                    "Set the modifier key to be used while right-clicking items in the gather window to delete them.",
+            if (Widget.ModifierSelector("Modifier to Delete Items on Right-Click".Loc(),
+                    "Set the modifier key to be used while right-clicking items in the gather window to delete them.".Loc(),
                     GatherBuddy.Config.GatherWindowDeleteModifier, k => GatherBuddy.Config.GatherWindowDeleteModifier = k))
                 GatherBuddy.Config.Save();
         }
@@ -780,18 +780,18 @@ public partial class Interface
         {
             var tmp     = GatherBuddy.Config.AetherytePreference == AetherytePreference.Cost;
             var oldPref = GatherBuddy.Config.AetherytePreference;
-            if (ImGui.RadioButton("Prefer Cheaper Aetherytes", tmp))
+            if (ImGui.RadioButton("Prefer Cheaper Aetherytes".Loc(), tmp))
                 GatherBuddy.Config.AetherytePreference = AetherytePreference.Cost;
             var hovered = ImGui.IsItemHovered();
             ImGui.SameLine();
-            if (ImGui.RadioButton("Prefer Less Travel Time", !tmp))
+            if (ImGui.RadioButton("Prefer Less Travel Time".Loc(), !tmp))
                 GatherBuddy.Config.AetherytePreference = AetherytePreference.Distance;
             hovered |= ImGui.IsItemHovered();
             if (hovered)
                 ImGui.SetTooltip(
-                    "Specify whether you prefer aetherytes that are closer to your target (less travel time)"
+                    ("Specify whether you prefer aetherytes that are closer to your target (less travel time)"
                   + " or aetherytes that are cheaper to teleport to when scanning through all available nodes for an item."
-                  + " Only matters if the item is not timed and has multiple sources.");
+                  + " Only matters if the item is not timed and has multiple sources.").Loc());
 
             if (oldPref != GatherBuddy.Config.AetherytePreference)
             {
@@ -801,18 +801,18 @@ public partial class Interface
         }
 
         public static void DrawAlarmFormatInput()
-            => DrawFormatInput("Alarm Chat Format",
-                "Keep empty to have no chat output.\nCan replace:\n- {Alarm} with the alarm name in brackets.\n- {Item} with the item link.\n- {Offset} with the alarm offset in seconds.\n- {DurationString} with 'will be up for the next ...' or 'is currently up for ...'.\n- {Location} with the map flag link and location name.",
+            => DrawFormatInput("Alarm Chat Format".Loc(),
+                "Keep empty to have no chat output.\nCan replace:\n- {Alarm} with the alarm name in brackets.\n- {Item} with the item link.\n- {Offset} with the alarm offset in seconds.\n- {DurationString} with 'will be up for the next ...' or 'is currently up for ...'.\n- {Location} with the map flag link and location name.".Loc(),
                 GatherBuddy.Config.AlarmFormat, Configuration.DefaultAlarmFormat, s => GatherBuddy.Config.AlarmFormat = s);
 
         public static void DrawIdentifiedGatherableFormatInput()
-            => DrawFormatInput("Identified Gatherable Chat Format",
-                "Keep empty to have no chat output.\nCan replace:\n- {Input} with the entered search text.\n- {Item} with the item link.",
+            => DrawFormatInput("Identified Gatherable Chat Format".Loc(),
+                "Keep empty to have no chat output.\nCan replace:\n- {Input} with the entered search text.\n- {Item} with the item link.".Loc(),
                 GatherBuddy.Config.IdentifiedGatherableFormat, Configuration.DefaultIdentifiedGatherableFormat,
                 s => GatherBuddy.Config.IdentifiedGatherableFormat = s);
 
         public static void DrawAlwaysMapsBox()
-            => DrawCheckbox("Always gather maps when available",      "GBR will always grab maps first if it sees one in a node",
+            => DrawCheckbox("Always gather maps when available".Loc(),      "GBR will always grab maps first if it sees one in a node".Loc(),
                 GatherBuddy.Config.AutoGatherConfig.AlwaysGatherMaps, b => GatherBuddy.Config.AutoGatherConfig.AlwaysGatherMaps = b);
     }
 
@@ -820,9 +820,9 @@ public partial class Interface
     private void DrawConfigTab()
     {
         using var id  = ImRaii.PushId("Config");
-        using var tab = ImRaii.TabItem("Config");
-        ImGuiUtil.HoverTooltip("Set up your very own GatherBuddy to your meticulous specifications.\n"
-          + "If you treat him well, he might even become a real boy.");
+        using var tab = ImRaii.TabItem("Config".Loc());
+        ImGuiUtil.HoverTooltip(("Set up your very own GatherBuddy to your meticulous specifications.\n"
+          + "If you treat him well, he might even become a real boy.").Loc());
 
         if (!tab)
             return;
@@ -831,9 +831,9 @@ public partial class Interface
         if (!child)
             return;
 
-        if (ImGui.CollapsingHeader("Auto-Gather"))
+        if (ImGui.CollapsingHeader("Auto-Gather".Loc()))
         {
-            if (ImGui.TreeNodeEx("General##autoGeneral"))
+            if (ImGui.TreeNodeEx("General".Loc() + "##autoGeneral"))
             {
                 ConfigFunctions.DrawHonkModeBox();
                 ConfigFunctions.DrawHonkVolumeSlider();
@@ -851,7 +851,7 @@ public partial class Interface
                 ImGui.TreePop();
             }
 
-            if (ImGui.TreeNodeEx("Advanced"))
+            if (ImGui.TreeNodeEx("Advanced".Loc()))
             {
                 ConfigFunctions.DrawAutoGatherBox();
                 ConfigFunctions.DrawUseFlagBox();
@@ -876,9 +876,9 @@ public partial class Interface
             }
         }
 
-        if (ImGui.CollapsingHeader("General"))
+        if (ImGui.CollapsingHeader("General".Loc()))
         {
-            if (ImGui.TreeNodeEx("Gather Command"))
+            if (ImGui.TreeNodeEx("Gather Command".Loc()))
             {
                 ConfigFunctions.DrawPreferredJobSelect();
                 ConfigFunctions.DrawGearChangeBox();
@@ -892,15 +892,15 @@ public partial class Interface
                 ImGui.TreePop();
             }
 
-            if (ImGui.TreeNodeEx("Set Names"))
+            if (ImGui.TreeNodeEx("Set Names".Loc()))
             {
-                ConfigFunctions.DrawSetInput("Miner",    GatherBuddy.Config.MinerSetName,    s => GatherBuddy.Config.MinerSetName    = s);
-                ConfigFunctions.DrawSetInput("Botanist", GatherBuddy.Config.BotanistSetName, s => GatherBuddy.Config.BotanistSetName = s);
-                ConfigFunctions.DrawSetInput("Fisher",   GatherBuddy.Config.FisherSetName,   s => GatherBuddy.Config.FisherSetName   = s);
+                ConfigFunctions.DrawSetInput("Miner".Loc(),    GatherBuddy.Config.MinerSetName,    s => GatherBuddy.Config.MinerSetName    = s);
+                ConfigFunctions.DrawSetInput("Botanist".Loc(), GatherBuddy.Config.BotanistSetName, s => GatherBuddy.Config.BotanistSetName = s);
+                ConfigFunctions.DrawSetInput("Fisher".Loc(),   GatherBuddy.Config.FisherSetName,   s => GatherBuddy.Config.FisherSetName   = s);
                 ImGui.TreePop();
             }
 
-            if (ImGui.TreeNodeEx("Alarms"))
+            if (ImGui.TreeNodeEx("Alarms".Loc()))
             {
                 ConfigFunctions.DrawAlarmToggle();
                 ConfigFunctions.DrawAlarmsInDutyToggle();
@@ -910,7 +910,7 @@ public partial class Interface
                 ImGui.TreePop();
             }
 
-            if (ImGui.TreeNodeEx("Messages"))
+            if (ImGui.TreeNodeEx("Messages".Loc()))
             {
                 ConfigFunctions.DrawPrintTypeSelector();
                 ConfigFunctions.DrawErrorTypeSelector();
@@ -925,9 +925,9 @@ public partial class Interface
             ImGui.NewLine();
         }
 
-        if (ImGui.CollapsingHeader("Interface"))
+        if (ImGui.CollapsingHeader("Interface".Loc()))
         {
-            if (ImGui.TreeNodeEx("Config Window"))
+            if (ImGui.TreeNodeEx("Config Window".Loc()))
             {
                 ConfigFunctions._base = this;
                 ConfigFunctions.DrawOpenOnStartBox();
@@ -941,7 +941,7 @@ public partial class Interface
                 ImGui.TreePop();
             }
 
-            if (ImGui.TreeNodeEx("Fish Timer"))
+            if (ImGui.TreeNodeEx("Fish Timer".Loc()))
             {
                 ConfigFunctions.DrawKeepRecordsBox();
                 ConfigFunctions.DrawShowLocalTimeInRecordsBox();
@@ -960,7 +960,7 @@ public partial class Interface
                 ImGui.TreePop();
             }
 
-            if (ImGui.TreeNodeEx("Fish Stats [Testing]"))
+            if (ImGui.TreeNodeEx("Fish Stats [Testing]".Loc()))
             {
                 ConfigFunctions.DrawEnableFishStats();
                 ConfigFunctions.DrawEnableReportTime();
@@ -970,7 +970,7 @@ public partial class Interface
                 ImGui.TreePop();
             }
 
-            if (ImGui.TreeNodeEx("Gather Window"))
+            if (ImGui.TreeNodeEx("Gather Window".Loc()))
             {
                 ConfigFunctions.DrawShowGatherWindowBox();
                 ConfigFunctions.DrawGatherWindowAnchorBox();
@@ -987,7 +987,7 @@ public partial class Interface
                 ImGui.TreePop();
             }
 
-            if (ImGui.TreeNodeEx("Spearfishing Helper"))
+            if (ImGui.TreeNodeEx("Spearfishing Helper".Loc()))
             {
                 ConfigFunctions.DrawSpearfishHelperBox();
                 ConfigFunctions.DrawSpearfishNamesBox();
@@ -1003,7 +1003,7 @@ public partial class Interface
             ImGui.NewLine();
         }
 
-        if (ImGui.CollapsingHeader("Colors"))
+        if (ImGui.CollapsingHeader("Colors".Loc()))
         {
             foreach (var color in Enum.GetValues<ColorId>())
             {
@@ -1015,16 +1015,16 @@ public partial class Interface
 
             ImGui.NewLine();
 
-            if (Widget.PaletteColorPicker("Names in Chat", Vector2.One * ImGui.GetFrameHeight(), GatherBuddy.Config.SeColorNames,
+            if (Widget.PaletteColorPicker("Names in Chat".Loc(), Vector2.One * ImGui.GetFrameHeight(), GatherBuddy.Config.SeColorNames,
                     Configuration.DefaultSeColorNames, Configuration.ForegroundColors, out var idx))
                 GatherBuddy.Config.SeColorNames = idx;
-            if (Widget.PaletteColorPicker("Commands in Chat", Vector2.One * ImGui.GetFrameHeight(), GatherBuddy.Config.SeColorCommands,
+            if (Widget.PaletteColorPicker("Commands in Chat".Loc(), Vector2.One * ImGui.GetFrameHeight(), GatherBuddy.Config.SeColorCommands,
                     Configuration.DefaultSeColorCommands, Configuration.ForegroundColors, out idx))
                 GatherBuddy.Config.SeColorCommands = idx;
-            if (Widget.PaletteColorPicker("Arguments in Chat", Vector2.One * ImGui.GetFrameHeight(), GatherBuddy.Config.SeColorArguments,
+            if (Widget.PaletteColorPicker("Arguments in Chat".Loc(), Vector2.One * ImGui.GetFrameHeight(), GatherBuddy.Config.SeColorArguments,
                     Configuration.DefaultSeColorArguments, Configuration.ForegroundColors, out idx))
                 GatherBuddy.Config.SeColorArguments = idx;
-            if (Widget.PaletteColorPicker("Alarm Message in Chat", Vector2.One * ImGui.GetFrameHeight(), GatherBuddy.Config.SeColorAlarm,
+            if (Widget.PaletteColorPicker("Alarm Message in Chat".Loc(), Vector2.One * ImGui.GetFrameHeight(), GatherBuddy.Config.SeColorAlarm,
                     Configuration.DefaultSeColorAlarm, Configuration.ForegroundColors, out idx))
                 GatherBuddy.Config.SeColorAlarm = idx;
 

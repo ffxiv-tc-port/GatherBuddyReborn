@@ -1,7 +1,10 @@
 [submodule "OtterGui"]
 	path = OtterGui
-	url = https://github.com/Ottermandias/OtterGui.git
+	url = https://github.com/ffxiv-tc-port/OtterGui.git
 	branch = main
 [submodule "ECommons"]
 	path = ECommons
 	url = https://github.com/NightmareXIV/ECommons
+[submodule "AutoRetainerAPI"]
+	path = AutoRetainerAPI
+	url = https://github.com/PunishXIV/AutoRetainerAPI

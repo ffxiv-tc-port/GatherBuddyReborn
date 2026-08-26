@@ -10,6 +10,7 @@ using System.Linq;
 using System.Numerics;
 using Dalamud.Game.ClientState.Objects.Types;
 using ECommons.DalamudServices;
+using ECommons.LanguageHelpers;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using GatherBuddy.SeFunctions;
 using GatherBuddy.Data;
@@ -111,7 +112,7 @@ namespace GatherBuddy.AutoGather
                 else if (waitGP)
                 {
                     StopNavigation();
-                    AutoStatus = "Waiting for GP to regenerate...";
+                    AutoStatus = "Waiting for GP to regenerate...".Loc();
                 }
                 else
                 {
@@ -295,7 +296,7 @@ namespace GatherBuddy.AutoGather
             var aetheryte = FindClosestAetheryte(location);
             if (aetheryte == null)
             {
-                Communicator.PrintError("Couldn't find an attuned aetheryte to teleport to.");
+                Communicator.PrintError("Couldn't find an attuned aetheryte to teleport to.".Loc());
                 return false;
             }
 

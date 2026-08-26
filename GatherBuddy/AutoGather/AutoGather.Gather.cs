@@ -28,16 +28,31 @@ namespace GatherBuddy.AutoGather
 
         private unsafe void EnqueueGatherItem(ItemSlot slot)
         {
-            if (slot.Item.ItemData.IsCollectable)
+            // TC note: slot.Item can be null here for the raw-fallback case in
+            // GetItemSlotToGather (an item ID unresolved in GameData.Gatherables on
+            // TC's older patch data) - slot.IsCollectable is read straight from the
+            // addon's own flags, so it doesn't need Item to be resolved.
+            if (slot.Item != null && slot.IsCollectable)
             {
                 // Since it's possible that we are not gathering the top item in the list,
                 // we need to remember what we are going to gather inside MasterpieceAddon
-                CurrentCollectableRotation = new CollectableRotation(MatchConfigPreset(slot.Item), slot.Item, _activeItemList.FirstOrDefault(x => x.Item == slot.Item).Quantity);
+                //
+                // Matching by ItemId rather than `x.Item == slot.Item`: if `Gatherable`
+                // doesn't override equality, that compared object references, which can
+                // differ between the instance backing `_activeItemList` and the instance
+                // resolved fresh from GameData.Gatherables for this slot even for the
+                // exact same item. A reference mismatch silently fell through to the
+                // struct default (Quantity = 0), which made GetNextAction() see
+                // itemsLeft <= 0 on the very first call and immediately abandon the node
+                // (via AbandonNodes) without ever using a single collectable action -
+                // matching "opens the Masterpiece window, does nothing, goes back."
+                var quantity = _activeItemList.FirstOrDefault(x => x.Item?.ItemId == slot.Item.ItemId).Quantity;
+                CurrentCollectableRotation = new CollectableRotation(MatchConfigPreset(slot.Item), slot.Item, quantity);
             }
 
             EnqueueActionWithDelay(slot.Gather);
 
-            if (slot.Item.IsTreasureMap)
+            if (slot.Item?.IsTreasureMap ?? false)
             {
                 TaskManager.Enqueue(() => Dalamud.Conditions[ConditionFlag.Gathering42], 1000);
                 TaskManager.Enqueue(() => !Dalamud.Conditions[ConditionFlag.Gathering42]);
@@ -112,6 +127,25 @@ namespace GatherBuddy.AutoGather
                 return (fallbackSkills && !slot.IsCollectable, slot);
             }
 
+            // TC note: a slot can hold a real item that GameData.Gatherables doesn't
+            // recognize (older TC patch data), which makes it null-Item. That null Item
+            // means it can never match the user's gather/fallback lists above (the Join
+            // there matches by resolved Gatherable object identity), even when the item
+            // genuinely is one the user wants - so without this, a wanted-but-unresolved
+            // item looked indistinguishable from "nothing to gather here" and the
+            // AbandonNodes check right below would immediately abandon the node without
+            // ever attempting to gather anything. Try it before honoring AbandonNodes.
+            // Must also require Enabled and a non-zero GatherChance - without this, a
+            // slot with a 0% gather chance (game refuses the attempt every time) got
+            // retried forever, spamming "Firing callback: Gathering" every tick with
+            // the game rejecting it and never actually gathering anything.
+            var unresolvedSlot = GatheringWindowReader!.ItemSlots
+                .FirstOrDefault(s => !s.IsEmpty && s.Item == null && !s.IsCollectable && s.Enabled && s.GatherChance > 0);
+            if (unresolvedSlot != null)
+            {
+                return (false, unresolvedSlot);
+            }
+
             //Check if we should and can abandon the node
             if (GatherBuddy.Config.AutoGatherConfig.AbandonNodes)
                 throw new NoGatherableItemsInNodeException();
@@ -134,6 +168,7 @@ namespace GatherBuddy.AutoGather
             {
                 return (false, slot);
             }
+
             //Abort if there are no items we can gather
             throw new NoGatherableItemsInNodeException();
         }

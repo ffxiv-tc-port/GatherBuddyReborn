@@ -15,6 +15,7 @@ using ImRaii = OtterGui.Raii.ImRaii;
 using System.Text;
 using Dalamud.Interface.Textures;
 using Dalamud.Interface.Utility;
+using ECommons.LanguageHelpers;
 using GatherBuddy.Models;
 using GatherBuddy.Time;
 using GatherBuddy.Weather;
@@ -53,19 +54,19 @@ public partial class Interface
             }
         }
 
-        private static readonly ContentIdHeader  _contentIdHeader  = new() { Label = "Content ID" };
-        private static readonly BaitHeader       _baitHeader       = new() { Label = "Bait" };
-        private static readonly SpotHeader       _spotHeader       = new() { Label = "Fishing Spot" };
-        private static readonly CatchHeader      _catchHeader      = new() { Label = "Caught Fish" };
-        private static readonly CastStartHeader  _castStartHeader  = new() { Label = "TimeStamp" };
-        private static readonly BiteTypeHeader   _biteTypeHeader   = new() { Label = "Tug" };
-        private static readonly HookHeader       _hookHeader       = new() { Label = "Hookset" };
-        private static readonly DurationHeader   _durationHeader   = new() { Label = "Bite" };
-        private static readonly GatheringHeader  _gatheringHeader  = new() { Label = "Gath." };
-        private static readonly PerceptionHeader _perceptionHeader = new() { Label = "Perc." };
-        private static readonly AmountHeader     _amountHeader     = new() { Label = "Amt" };
-        private static readonly SizeHeader       _sizeHeader       = new() { Label = "Ilm" };
-        private static readonly FlagHeader       _flagHeader       = new() { Label = "Flags" };
+        private static readonly ContentIdHeader  _contentIdHeader  = new() { Label = "Content ID".Loc() };
+        private static readonly BaitHeader       _baitHeader       = new() { Label = "Bait".Loc() };
+        private static readonly SpotHeader       _spotHeader       = new() { Label = "Fishing Spot".Loc() };
+        private static readonly CatchHeader      _catchHeader      = new() { Label = "Caught Fish".Loc() };
+        private static readonly CastStartHeader  _castStartHeader  = new() { Label = "TimeStamp".Loc() };
+        private static readonly BiteTypeHeader   _biteTypeHeader   = new() { Label = "Tug".Loc() };
+        private static readonly HookHeader       _hookHeader       = new() { Label = "Hookset".Loc() };
+        private static readonly DurationHeader   _durationHeader   = new() { Label = "Bite".Loc() };
+        private static readonly GatheringHeader  _gatheringHeader  = new() { Label = "Gath.".Loc() };
+        private static readonly PerceptionHeader _perceptionHeader = new() { Label = "Perc.".Loc() };
+        private static readonly AmountHeader     _amountHeader     = new() { Label = "Amt".Loc() };
+        private static readonly SizeHeader       _sizeHeader       = new() { Label = "Ilm".Loc() };
+        private static readonly FlagHeader       _flagHeader       = new() { Label = "Flags".Loc() };
 
         private sealed class GatheringHeader : ColumnString<FishRecord>
         {
@@ -129,9 +130,9 @@ public partial class Interface
             {
                 var tt = string.Empty;
                 if (record.Flags.HasFlag(Effects.Large))
-                    tt = "Large Catch!";
+                    tt = "Large Catch!".Loc();
                 if (record.Flags.HasFlag(Effects.Collectible))
-                    tt += tt.Length > 0 ? "\nCollectible!" : "Collectible!";
+                    tt += tt.Length > 0 ? "\n" + "Collectible!".Loc() : "Collectible!".Loc();
                 using var color = ImRaii.PushColor(ImGuiCol.Text, ColorId.DisabledText.Value(), tt.Length == 0);
                 ImGuiUtil.RightAlign(ToName(record));
                 ImGuiUtil.HoverTooltip(tt);
@@ -142,7 +143,7 @@ public partial class Interface
         private sealed class ContentIdHeader : ColumnString<FishRecord>
         {
             public override string ToName(FishRecord item)
-                => item.Flags.HasFlag(Effects.Legacy) ? "Legacy" : item.ContentIdHash.ToString("X8");
+                => item.Flags.HasFlag(Effects.Legacy) ? "Legacy".Loc() : item.ContentIdHash.ToString("X8");
 
             public override float Width
                 => 75 * ImGuiHelpers.GlobalScale;
@@ -163,7 +164,7 @@ public partial class Interface
         private sealed class SpotHeader : ColumnString<FishRecord>
         {
             public override string ToName(FishRecord item)
-                => item.FishingSpot?.Name ?? "Unknown";
+                => item.FishingSpot?.Name ?? "Unknown".Loc();
 
             public override float Width
                 => 200 * ImGuiHelpers.GlobalScale;
@@ -178,7 +179,7 @@ public partial class Interface
             }
 
             public override string ToName(FishRecord record)
-                => record.Catch?.Name[GatherBuddy.Language] ?? "None";
+                => record.Catch?.Name[GatherBuddy.Language] ?? "None".Loc();
 
             public override float Width
                 => 200 * ImGuiHelpers.GlobalScale;
@@ -188,7 +189,7 @@ public partial class Interface
                 base.DrawColumn(record, idx);
                 if (ImGui.GetIO().KeyCtrl && ImGui.IsItemClicked(ImGuiMouseButton.Right))
                     _deleteIdx = idx;
-                ImGuiUtil.HoverTooltip("Hold Control and right-click to delete...");
+                ImGuiUtil.HoverTooltip("Hold Control and right-click to delete...".Loc());
             }
         }
 
@@ -406,20 +407,20 @@ public partial class Interface
 
             private static readonly string[] _names =
             [
-                "Large Catch",
-                "Collectible",
-                "Patience",
-                "Patience II",
-                "Intuition",
-                "Snagging",
-                "Fish Eyes",
-                "Chum",
-                "Prize Catch",
-                "Identical Cast",
-                "Surface Slap",
-                "Big Game Fishing",
-                "Ambitious Lure",
-                "Modest Lure",
+                "Large Catch".Loc(),
+                "Collectible".Loc(),
+                "Patience".Loc(),
+                "Patience II".Loc(),
+                "Intuition".Loc(),
+                "Snagging".Loc(),
+                "Fish Eyes".Loc(),
+                "Chum".Loc(),
+                "Prize Catch".Loc(),
+                "Identical Cast".Loc(),
+                "Surface Slap".Loc(),
+                "Big Game Fishing".Loc(),
+                "Ambitious Lure".Loc(),
+                "Modest Lure".Loc(),
             ];
 
             protected override IReadOnlyList<(ColumnEffects On, ColumnEffects Off)> Values
@@ -536,24 +537,24 @@ public partial class Interface
                 switch (item.Flags.AmbitiousLure())
                 {
                     case 0:
-                        DrawIcon(Icons.DefaultStorage.TextureProvider.GetFromGameIcon(218905), false, "Ambitious Lure");
+                        DrawIcon(Icons.DefaultStorage.TextureProvider.GetFromGameIcon(218905), false, "Ambitious Lure".Loc());
                         ImGui.SameLine();
                         switch (item.Flags.ModestLure())
                         {
-                            case 0: DrawIcon(Icons.DefaultStorage.TextureProvider.GetFromGameIcon(218909), false, "Modest Lure"); break;
-                            case 1: DrawIcon(Icons.DefaultStorage.TextureProvider.GetFromGameIcon(218909), true,  "Modest Lure"); break;
-                            case 2: DrawIcon(Icons.DefaultStorage.TextureProvider.GetFromGameIcon(218910), true,  "Modest Lure"); break;
-                            case 3: DrawIcon(Icons.DefaultStorage.TextureProvider.GetFromGameIcon(218911), true,  "Modest Lure"); break;
+                            case 0: DrawIcon(Icons.DefaultStorage.TextureProvider.GetFromGameIcon(218909), false, "Modest Lure".Loc()); break;
+                            case 1: DrawIcon(Icons.DefaultStorage.TextureProvider.GetFromGameIcon(218909), true,  "Modest Lure".Loc()); break;
+                            case 2: DrawIcon(Icons.DefaultStorage.TextureProvider.GetFromGameIcon(218910), true,  "Modest Lure".Loc()); break;
+                            case 3: DrawIcon(Icons.DefaultStorage.TextureProvider.GetFromGameIcon(218911), true,  "Modest Lure".Loc()); break;
                         }
 
                         return;
-                    case 1: DrawIcon(Icons.DefaultStorage.TextureProvider.GetFromGameIcon(218905), true, "Ambitious Lure"); break;
-                    case 2: DrawIcon(Icons.DefaultStorage.TextureProvider.GetFromGameIcon(218906), true, "Ambitious Lure"); break;
-                    case 3: DrawIcon(Icons.DefaultStorage.TextureProvider.GetFromGameIcon(218907), true, "Ambitious Lure"); break;
+                    case 1: DrawIcon(Icons.DefaultStorage.TextureProvider.GetFromGameIcon(218905), true, "Ambitious Lure".Loc()); break;
+                    case 2: DrawIcon(Icons.DefaultStorage.TextureProvider.GetFromGameIcon(218906), true, "Ambitious Lure".Loc()); break;
+                    case 3: DrawIcon(Icons.DefaultStorage.TextureProvider.GetFromGameIcon(218907), true, "Ambitious Lure".Loc()); break;
                 }
 
                 ImGui.SameLine();
-                DrawIcon(Icons.DefaultStorage.TextureProvider.GetFromGameIcon(218909), false, "Modest Lure");
+                DrawIcon(Icons.DefaultStorage.TextureProvider.GetFromGameIcon(218909), false, "Modest Lure".Loc());
             }
         }
 
@@ -619,9 +620,9 @@ public partial class Interface
     private void DrawRecordTab()
     {
         using var id  = ImUtf8.PushId("Fish Records"u8);
-        using var tab = ImUtf8.TabItem("Fish Records"u8);
-        ImUtf8.HoverTooltip("The records of my fishing prowess have been greatly exaggerated.\n"u8
-          + "Find, cleanup and share all data you have collected while fishing."u8);
+        using var tab = ImUtf8.TabItem("Fish Records".Loc());
+        ImUtf8.HoverTooltip(("The records of my fishing prowess have been greatly exaggerated.\n"
+          + "Find, cleanup and share all data you have collected while fishing.").Loc());
         if (!tab)
             return;
 
@@ -634,23 +635,23 @@ public partial class Interface
         else
             ImGuiUtil.DrawTextButton($"{_recordTable.CurrentItems}", textSize, ImGui.GetColorU32(ImGuiCol.Button));
         ImGui.SameLine();
-        if (ImUtf8.Button("Cleanup"u8))
+        if (ImUtf8.Button("Cleanup".Loc()))
         {
             _plugin.FishRecorder.RemoveDuplicates();
             _plugin.FishRecorder.RemoveInvalid();
         }
 
-        ImUtf8.HoverTooltip("Delete all entries that were marked as invalid for some reason,\n"u8
-          + "as well as all entries that have a duplicate (with the same content id and timestamp).\n"u8
-          + "Usually, there should be none such entries.\n"u8
-          + "Use at your own risk, no backup will be created automatically."u8);
+        ImUtf8.HoverTooltip(("Delete all entries that were marked as invalid for some reason,\n"
+          + "as well as all entries that have a duplicate (with the same content id and timestamp).\n"
+          + "Usually, there should be none such entries.\n"
+          + "Use at your own risk, no backup will be created automatically.").Loc());
 
         ImGui.SameLine();
         try
         {
-            if (ImUtf8.Button("Copy to Clipboard"u8))
+            if (ImUtf8.Button("Copy to Clipboard".Loc()))
                 ImGui.SetClipboardText(_plugin.FishRecorder.ExportBase64());
-            ImUtf8.HoverTooltip("Export all fish records to your clipboard, to share them with other people. This may be a lot"u8);
+            ImUtf8.HoverTooltip("Export all fish records to your clipboard, to share them with other people. This may be a lot".Loc());
         }
         catch
         {
@@ -660,9 +661,9 @@ public partial class Interface
         ImGui.SameLine();
         try
         {
-            if (ImUtf8.Button("Import from Clipboard"u8))
+            if (ImUtf8.Button("Import from Clipboard".Loc()))
                 _plugin.FishRecorder.ImportBase64(ImGui.GetClipboardText());
-            ImUtf8.HoverTooltip("Import a set of fish records shared with you from your clipboard. Should automatically skip duplicates."u8);
+            ImUtf8.HoverTooltip("Import a set of fish records shared with you from your clipboard. Should automatically skip duplicates.".Loc());
         }
         catch
         {
@@ -672,13 +673,13 @@ public partial class Interface
         ImGui.SameLine();
         try
         {
-            if (ImUtf8.Button("Export JSON"u8))
+            if (ImUtf8.Button("Export JSON".Loc()))
             {
                 ImGui.OpenPopup(RecordTable.FileNamePopup);
                 WriteJson = true;
             }
 
-            ImUtf8.HoverTooltip("Given a path, export all records as a single JSON file."u8);
+            ImUtf8.HoverTooltip("Given a path, export all records as a single JSON file.".Loc());
         }
         catch
         {
@@ -688,13 +689,13 @@ public partial class Interface
         ImGui.SameLine();
         try
         {
-            if (ImUtf8.Button("Export TSV"u8))
+            if (ImUtf8.Button("Export TSV".Loc()))
             {
                 ImGui.OpenPopup(RecordTable.FileNamePopup);
                 WriteTsv = true;
             }
 
-            ImUtf8.HoverTooltip("Given a path, export all records as a single TSV file."u8);
+            ImUtf8.HoverTooltip("Given a path, export all records as a single TSV file.".Loc());
         }
         catch
         {
@@ -704,11 +705,11 @@ public partial class Interface
         ImGui.SameLine();
         try
         {
-            if (ImUtf8.Button("Copy Caught Fish JSON"u8))
+            if (ImUtf8.Button("Copy Caught Fish JSON".Loc()))
             {
                 var logFish = GatherBuddy.GameData.Fishes.Values.Where(f => f.InLog && f.FishingSpots.Count > 0).ToArray();
                 var ids     = logFish.Where(f => GatherBuddy.FishLog.IsUnlocked(f)).Select(f => f.ItemId).ToArray();
-                Communicator.PrintClipboardMessage("List of ", $"{ids.Length}/{logFish.Length} caught fish ");
+                Communicator.PrintClipboardMessage("List of ".Loc(), "??/?? caught fish ".Loc(ids.Length, logFish.Length));
                 ImGui.SetClipboardText(JsonConvert.SerializeObject(ids, Formatting.Indented));
             }
         }

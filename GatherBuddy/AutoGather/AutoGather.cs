@@ -22,6 +22,7 @@ using Dalamud.Game.Text;
 using Dalamud.Utility;
 using ECommons;
 using ECommons.ExcelServices;
+using ECommons.LanguageHelpers;
 using ECommons.Automation;
 using ECommons.MathHelpers;
 using GatherBuddy.Data;
@@ -122,7 +123,7 @@ namespace GatherBuddy.AutoGather
 
                 if (!value)
                 {
-                    AutoStatus = "Idle...";
+                    AutoStatus = "Idle...".Loc();
                     TaskManager.Abort();
                     YesAlready.Unlock();
 
@@ -231,14 +232,14 @@ namespace GatherBuddy.AutoGather
             {
                 if (!NavReady)
                 {
-                    AutoStatus = "Waiting for Navmesh...";
+                    AutoStatus = "Waiting for Navmesh...".Loc();
                     return;
                 }
             }
             catch (Exception)
             {
                 //GatherBuddy.Log.Error(e.Message);
-                AutoStatus = "vnavmesh communication failed. Do you have it installed??";
+                AutoStatus = "vnavmesh communication failed. Do you have it installed??".Loc();
                 return;
             }
 
@@ -251,20 +252,20 @@ namespace GatherBuddy.AutoGather
             if (!_homeWorldWarning && !Functions.OnHomeWorld())
             {
                 _homeWorldWarning = true;
-                Communicator.PrintError("You are not on your home world, some items will not be gatherable.");
+                Communicator.PrintError("You are not on your home world, some items will not be gatherable.".Loc());
             }
 
             if (DiscipleOfLand.NextTreasureMapAllowance == DateTime.MinValue)
             {
                 //Wait for timer refresh
-                AutoStatus = "Refreshing timers...";
+                AutoStatus = "Refreshing timers...".Loc();
                 DiscipleOfLand.RefreshNextTreasureMapAllowance();
                 return;
             }
 
             if (!CanAct && !_diademQueuingInProgress)
             {
-                AutoStatus = Dalamud.Conditions[ConditionFlag.Gathering] ? "Gathering..." : "Player is busy...";
+                AutoStatus = Dalamud.Conditions[ConditionFlag.Gathering] ? "Gathering...".Loc() : "Player is busy...";
                 return;
             }
 
@@ -291,7 +292,7 @@ namespace GatherBuddy.AutoGather
              && !GatherBuddy.Config.AutoGatherConfig.FishDataCollection)
             {
                 Communicator.PrintError(
-                    "You have fish on your auto-gather list but you have not opted in to fishing data collection. Auto-gather cannot continue. Please enable fishing data collection in your configuration options or remove fish from your auto-gather lists.");
+                    "You have fish on your auto-gather list but you have not opted in to fishing data collection. Auto-gather cannot continue. Please enable fishing data collection in your configuration options or remove fish from your auto-gather lists.".Loc());
                 AbortAutoGather();
                 return;
             }
@@ -313,7 +314,7 @@ namespace GatherBuddy.AutoGather
                 if (!GatherBuddy.Config.AutoGatherConfig.DoGathering)
                     return;
 
-                AutoStatus = "Gathering...";
+                AutoStatus = "Gathering...".Loc();
                 StopNavigation();
 
                 var fish = _activeItemList.GetNextOrDefault(new List<uint>()).Where(g => g.Fish != null);
@@ -341,7 +342,7 @@ namespace GatherBuddy.AutoGather
                 catch (NoCollectableActionsException)
                 {
                     Communicator.PrintError(
-                        "Unable to pick a collectability increasing action to use. Make sure that at least one of the collectable actions is enabled.");
+                        "Unable to pick a collectability increasing action to use. Make sure that at least one of the collectable actions is enabled.".Loc());
                     AbortAutoGather();
                 }
 
@@ -375,7 +376,7 @@ namespace GatherBuddy.AutoGather
 
             if (isPathGenerating)
             {
-                AutoStatus = "Generating path...";
+                AutoStatus = "Generating path...".Loc();
                 return;
             }
 
@@ -428,7 +429,7 @@ namespace GatherBuddy.AutoGather
                     _plugin.Ipc.AutoGatherWaiting();
                 }
 
-                AutoStatus = "No available items to gather";
+                AutoStatus = "No available items to gather".Loc();
                 return;
             }
 
@@ -446,7 +447,7 @@ namespace GatherBuddy.AutoGather
 
             if (!GatherBuddy.Config.AutoGatherConfig.UseNavigation)
             {
-                AutoStatus = "Waiting for Gathering Point... (No Nav Mode)";
+                AutoStatus = "Waiting for Gathering Point... (No Nav Mode)".Loc();
                 return;
             }
 
@@ -461,13 +462,13 @@ namespace GatherBuddy.AutoGather
                 {
                     if (aetheryte.Position.DistanceToPlayer() > 10)
                     {
-                        AutoStatus = "Moving to aetheryte...";
+                        AutoStatus = "Moving to aetheryte...".Loc();
                         if (!isPathing && !isPathGenerating)
                             Navigate(aetheryte.Position, false);
                     }
                     else if (!Lifestream.IsBusy())
                     {
-                        AutoStatus = "Teleporting...";
+                        AutoStatus = "Teleporting...".Loc();
                         StopNavigation();
                         string name = string.Empty;
                         switch (territoryId)
@@ -566,7 +567,7 @@ namespace GatherBuddy.AutoGather
                 if (territoryId == 478 && !Lifestream.Enabled)
                     AutoStatus = $"Install Lifestream or teleport to {next.First().Location.Territory.Name} manually";
                 else
-                    AutoStatus = "Manual teleporting required";
+                    AutoStatus = "Manual teleporting required".Loc();
                 return;
             }
 
@@ -579,7 +580,7 @@ namespace GatherBuddy.AutoGather
             {
                 if (Dalamud.Conditions[ConditionFlag.BoundByDuty] && !Functions.InTheDiadem())
                 {
-                    AutoStatus = "Can not teleport when bound by duty";
+                    AutoStatus = "Can not teleport when bound by duty".Loc();
                     return;
                 }
                 else if (Functions.InTheDiadem())
@@ -588,7 +589,7 @@ namespace GatherBuddy.AutoGather
                     return;
                 }
 
-                AutoStatus = "Teleporting...";
+                AutoStatus = "Teleporting...".Loc();
                 StopNavigation();
 
                 if (!MoveToTerritory(next.First().Location))
@@ -623,7 +624,7 @@ namespace GatherBuddy.AutoGather
                 return;
             }
 
-            AutoStatus = "Fell out of control loop unexpectedly. Please report this error.";
+            AutoStatus = "Fell out of control loop unexpectedly. Please report this error.".Loc();
             return;
         }
 
@@ -672,7 +673,7 @@ namespace GatherBuddy.AutoGather
                     TaskManager.Enqueue(() => SetRotation(fishingSpotData.Rotation));
                 Svc.Log.Debug($"Fishing Spot is valid for {(fishingSpotData.Expiration - DateTime.Now).TotalSeconds} seconds");
 
-                AutoStatus = "Fishing...";
+                AutoStatus = "Fishing...".Loc();
                 DoFishingTasks(next);
                 return;
             }
@@ -680,7 +681,7 @@ namespace GatherBuddy.AutoGather
             if (CurrentDestination != fishingSpotData.Position)
             {
                 StopNavigation();
-                AutoStatus = "Moving to fishing spot...";
+                AutoStatus = "Moving to fishing spot...".Loc();
                 if (IsGathering || IsFishing)
                 {
                     QueueQuitFishingTasks();
@@ -713,14 +714,14 @@ namespace GatherBuddy.AutoGather
 
             if (closestTargetableNode != null)
             {
-                AutoStatus = "Moving to node...";
+                AutoStatus = "Moving to node...".Loc();
                 var targetItem = next.First(ti => ti.Node != null && ti.Node.WorldPositions.ContainsKey(closestTargetableNode.DataId))
                     .Gatherable;
                 MoveToCloseNode(closestTargetableNode, targetItem, config);
                 return;
             }
 
-            AutoStatus = "Moving to far node...";
+            AutoStatus = "Moving to far node...".Loc();
 
             if (CurrentDestination != default)
             {
@@ -754,7 +755,7 @@ namespace GatherBuddy.AutoGather
                 // marker not yet loaded on game
                 if (pos == null || timedNode.Time.Start > GatherBuddy.Time.ServerTime.AddSeconds(-8))
                 {
-                    AutoStatus = "Waiting on flag show up";
+                    AutoStatus = "Waiting on flag show up".Loc();
                     return;
                 }
 
@@ -883,7 +884,7 @@ namespace GatherBuddy.AutoGather
             };
             if (level < Actions.Collect.MinLevel)
             {
-                Communicator.PrintError("You've put a collectable on the gathering list, but your level is not high enough to gather it.");
+                Communicator.PrintError("You've put a collectable on the gathering list, but your level is not high enough to gather it.".Loc());
                 return false;
             }
 
@@ -896,7 +897,7 @@ namespace GatherBuddy.AutoGather
 
             if (questId != 0 && !QuestManager.IsQuestComplete(questId))
             {
-                Communicator.PrintError("You've put a collectable on the gathering list, but you haven't unlocked the collectables.");
+                Communicator.PrintError("You've put a collectable on the gathering list, but you haven't unlocked the collectables.".Loc());
                 var sheet      = Dalamud.GameData.GetExcelSheet<Lumina.Excel.Sheets.Quest>()!;
                 var row        = sheet.GetRow(questId)!;
                 var loc        = row.IssuerLocation.Value!;

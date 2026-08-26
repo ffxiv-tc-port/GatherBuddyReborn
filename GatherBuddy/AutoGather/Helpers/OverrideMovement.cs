@@ -127,8 +127,9 @@ public unsafe class OverrideMovement : IDisposable
         var dirH = Angle.FromDirectionXZ(dist);
         var dirV = allowVertical ? Angle.FromDirection(new(dist.Y, new Vector2(dist.X, dist.Z).Length())) : default;
 
-        var refDir = _legacyMode
-            ? ((CameraEx*)CameraManager.Instance()->GetActiveCamera())->DirH.Radians() + 180.Degrees()
+        var activeCamera = _legacyMode && CameraManager.Instance() != null ? CameraManager.Instance()->GetActiveCamera() : null;
+        var refDir = activeCamera != null
+            ? ((CameraEx*)activeCamera)->DirH.Radians() + 180.Degrees()
             : player.Rotation.Radians();
         return (dirH - refDir, dirV);
     }
@@ -137,6 +138,6 @@ public unsafe class OverrideMovement : IDisposable
     private void UpdateLegacyMode()
     {
         _legacyMode = Svc.GameConfig.UiControl.TryGetUInt("MoveMode", out var mode) && mode == 1;
-        GatherBuddy.Log.Information($"Legacy mode is now {(_legacyMode ? "enabled" : "disabled")}");
+        GatherBuddy.Log.Debug($"Legacy mode is now {(_legacyMode ? "enabled" : "disabled")}");
     }
 }

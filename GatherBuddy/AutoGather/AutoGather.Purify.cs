@@ -5,6 +5,7 @@ using PurifyResult = ECommons.UIHelpers.AddonMasterImplementations.AddonMaster.P
 using ECommons.Automation;
 using ECommons.DalamudServices;
 using ECommons.EzSharedDataManager;
+using ECommons.LanguageHelpers;
 
 namespace GatherBuddy.AutoGather
 {
@@ -19,7 +20,7 @@ namespace GatherBuddy.AutoGather
             {
                 GatherBuddy.Config.AutoGatherConfig.DoReduce = false;
                 Communicator.PrintError(
-                    "[GatherBuddyReborn] Aetherial reduction is enabled, but the relevant quest has not been completed yet. The feature has been disabled.");
+                    "[GatherBuddyReborn] Aetherial reduction is enabled, but the relevant quest has not been completed yet. The feature has been disabled.".Loc());
                 return false;
             }
 
@@ -54,7 +55,7 @@ namespace GatherBuddy.AutoGather
 
         private unsafe void ReduceItems(bool reduceAll)
         {
-            AutoStatus = "Aetherial reduction";
+            AutoStatus = "Aetherial reduction".Loc();
             var delay = (int)GatherBuddy.Config.AutoGatherConfig.ExecutionDelay;
             TaskManager.Enqueue(StopNavigation);
             TaskManager.Enqueue(YesAlready.Lock);

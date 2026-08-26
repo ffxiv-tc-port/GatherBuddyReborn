@@ -22,7 +22,13 @@ public class ItemSlot(int index, ItemSlotReader reader, uint itemSlotFlags, uint
     public bool IsCollectable => reader.IsCollectable;
     public sbyte Yield => reader.Yield;
     public sbyte BoonChance => reader.BoonChance;
-    public bool        IsEmpty => reader.Item == null;
+    // TC note: a slot can hold an item whose ID isn't in GameData.Gatherables (see
+    // ItemSlotReader.Item) because TC runs an older patch than the data sheets that
+    // dictionary is built from. That item is real and occupies the slot - IsEmpty must
+    // check the raw slot ID, not whether we could resolve it to a Gatherable, otherwise
+    // nodes containing an unrecognized item look entirely empty and auto-gather closes
+    // the window without gathering anything from them.
+    public bool        IsEmpty => reader.ItemId == 0;
     public Gatherable? Item    => reader.Item;
 
     public int GatherChance

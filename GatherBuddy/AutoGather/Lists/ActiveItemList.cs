@@ -29,6 +29,8 @@ namespace GatherBuddy.AutoGather.Lists
         private          uint                                    _lastTerritoryId;
         private          bool                                    _activeItemsChanged;
         private          bool                                    _gatheredSomething;
+        private          string                                  _lastLoggedNearbyNodes = string.Empty;
+        private          string                                  _lastLoggedNearbyItems = string.Empty;
 
         internal ReadOnlyDictionary<GatheringNode, TimeInterval> DebugVisitedTimedLocations
             => _visitedTimedNodes.AsReadOnly();
@@ -78,13 +80,29 @@ namespace GatherBuddy.AutoGather.Lists
             if (IsUpdateNeeded())
                 DoUpdate();
 
-            Svc.Log.Verbose($"Nearby nodes: {string.Join(", ", nearbyNodes.Select(x => x.ToString("X8")))}.");
+            // Only log when the nearby set actually changes - this is polled every tick,
+            // and logging unconditionally at Verbose spammed identical lines dozens of
+            // times per second while idle.
+            var nearbyNodesText = string.Join(", ", nearbyNodes.Select(x => x.ToString("X8")));
+            if (nearbyNodesText != _lastLoggedNearbyNodes)
+            {
+                _lastLoggedNearbyNodes = nearbyNodesText;
+                Svc.Log.Verbose($"Nearby nodes: {nearbyNodesText}.");
+            }
+
             IEnumerable<GatherTarget> nearbyItems = [];
             nearbyItems = this.Any(n => !n.Node?.Times.AlwaysUp() ?? false)
                 ? [this.First(n => n.Time.InRange(AutoGather.AdjustedServerTime))]
                 : this.Where(i => i.Node?.WorldPositions.Keys.Any(nearbyNodes.Contains) ?? false);
 
-            Svc.Log.Verbose($"Nearby items: ({nearbyItems.Count()}): {string.Join(", ", nearbyItems.Select(x => x.Item.Name))}.");
+            var nearbyItemsList = nearbyItems.ToList();
+            var nearbyItemsText = $"({nearbyItemsList.Count}): {string.Join(", ", nearbyItemsList.Select(x => x.Item.Name))}.";
+            if (nearbyItemsText != _lastLoggedNearbyItems)
+            {
+                _lastLoggedNearbyItems = nearbyItemsText;
+                Svc.Log.Verbose($"Nearby items: {nearbyItemsText}");
+            }
+            nearbyItems = nearbyItemsList;
             return nearbyItems.Any() ? nearbyItems : _gatherableItems.Where(NeedsGathering);
         }
 

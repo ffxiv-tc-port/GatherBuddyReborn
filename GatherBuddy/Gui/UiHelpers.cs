@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using Dalamud.Interface.Utility;
+using ECommons.LanguageHelpers;
 using GatherBuddy.Config;
 using GatherBuddy.Interfaces;
 using GatherBuddy.Time;
@@ -138,7 +139,7 @@ public partial class Interface
         ImGui.SameLine();
         using var style = ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, Vector2.Zero);
         ImGui.NewLine();
-        ImUtf8.Text($"{table.CurrentItems} / {table.TotalItems} {name} Visible");
+        ImUtf8.Text("?? / ?? ?? Visible".Loc(table.CurrentItems, table.TotalItems, name));
         if (table.TotalColumns != table.VisibleColumns)
         {
             ImGui.SameLine(0, 50 * ImGuiHelpers.GlobalScale);
