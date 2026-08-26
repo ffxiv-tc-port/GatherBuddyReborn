@@ -66,12 +66,15 @@ public partial class FishingParser
 
         // TC(台服)客戶端在 Dalamud 13.0.0.16 之後回報 ClientLanguage 7(TraditionalChinese),
         // 舊版回報 4(ChineseSimplified)。用數值比較才能同時相容 CI 釘的 13.0.0.6(列舉沒有 7 這個名字)與執行期新版。
-        // 聊天訊息本身是繁體中文,用字已對照 aliceric27/ffxiv-datamining-tc 驗證:
+        // 聊天訊息本身是繁體中文,用字已對照 D:\ffxiv-tc-port\exd-tc\7.20 驗證:
         // LogMessage 1110 (cast), 1115 (area discovered), 1121 (mooch), Addon 3811 (undiscovered).
+        // 2026-08-27 修正:1115 的引號原誤用全形彎引號「“ ”」(U+201C/U+201D),
+        // 但台服實際訊息用的是「」直角引號(U+300C/U+300D)——原本永遠比對不到,
+        // 導致新釣場不會被記錄進 FishLog。
         private static readonly Lazy<Regexes> ChineseTraditional = new(() => new Regexes
         {
             Cast           = new Regex(@"在(?<FishingSpot>.+)甩出了魚線開始釣魚。",             RegexOptions.Compiled | RegexOptions.NonBacktracking | RegexOptions.ExplicitCapture),
-            AreaDiscovered = new Regex(@"將新釣場“(?<FishingSpot>.+)”記錄到了釣魚筆記中！",       RegexOptions.Compiled | RegexOptions.NonBacktracking | RegexOptions.ExplicitCapture),
+            AreaDiscovered = new Regex(@"將新釣場「(?<FishingSpot>.+)」記錄到了釣魚筆記中！",       RegexOptions.Compiled | RegexOptions.NonBacktracking | RegexOptions.ExplicitCapture),
             Mooch          = new Regex(@"開始利用上鉤的.+嘗試以小釣大。",                          RegexOptions.Compiled | RegexOptions.NonBacktracking | RegexOptions.ExplicitCapture),
             Undiscovered   = "未發現的釣場",
         });
