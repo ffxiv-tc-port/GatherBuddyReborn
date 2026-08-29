@@ -265,6 +265,8 @@ public class GatherWindow : Window
 
     public override void PreDraw()
     {
+        // Dalamud 的每視窗不透明度是在 Window.PreDraw() 裡 push 的,不呼叫 base 會讓右鍵選單的「不透明度」滑桿靜默失效。
+        base.PreDraw();
         ImGui.PushStyleColor(ImGuiCol.WindowBg, ColorId.GatherWindowBackground.Value());
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, Vector2.One * 2 * ImGuiHelpers.GlobalScale);
         if (GatherBuddy.Config.LockGatherWindow)
@@ -285,6 +287,8 @@ public class GatherWindow : Window
         DeleteItem();
         ImGui.PopStyleVar();
         ImGui.PopStyleColor();
+        // 後進先出:本類別在 PreDraw 推的樣式先 pop 完,最後才讓 base 收掉它自己推的那一個。
+        base.PostDraw();
     }
 
     private void CheckAnchorPosition()
