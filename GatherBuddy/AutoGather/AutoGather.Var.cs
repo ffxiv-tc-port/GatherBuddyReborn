@@ -102,6 +102,34 @@ namespace GatherBuddy.AutoGather
              >= GatherBuddy.Config.AutoGatherConfig.MountUpDistance;
         }
 
+        /// <summary>
+        /// 給除錯分頁的手動導航按鈕用的 ShouldFly。
+        /// vnavmesh 收到 fly=true 但玩家沒騎坐騎時會直接停用移動並返回,表現是站著不動且
+        /// 完全沒有訊息;vnavmesh 也不會替呼叫端上坐騎。這裡在呼叫前先把飛行降級成地面移動。
+        /// 刻意不代替使用者上坐騎 —— 手動按鈕不引入自動化。
+        /// </summary>
+        public bool ShouldFlyManual(Vector3 destination)
+            => DowngradeFlyIfNotMounted(ShouldFly(destination));
+
+        /// <summary>
+        /// 未騎乘坐騎時把飛行需求降為地面移動,並留下 Information 級記錄。
+        /// 只給手動觸發的按鈕使用(離散事件,不需節流);自動採集主流程另有 EnqueueMountUp。
+        /// </summary>
+        public static bool DowngradeFlyIfNotMounted(bool shouldFly)
+        {
+            if (!shouldFly)
+                return false;
+
+            if (Dalamud.Conditions[ConditionFlag.Mounted]
+             || Dalamud.Conditions[ConditionFlag.InFlight]
+             || Dalamud.Conditions[ConditionFlag.Diving])
+                return true;
+
+            GatherBuddy.Log.Information(
+                "手動導航:目前沒有騎乘坐騎,已改用地面路徑移動。(vnavmesh 收到飛行指令但未騎乘時會直接停住不動,且不會自動上坐騎)");
+            return false;
+        }
+
         public unsafe Vector2? TimedNodePosition
         {
             get
