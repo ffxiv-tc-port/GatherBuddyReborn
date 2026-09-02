@@ -10,6 +10,8 @@ using ECommons.Automation;
 using ECommons.ExcelServices;
 using ECommons.GameHelpers;
 using ECommons.LanguageHelpers;
+using FFXIVClientStructs.FFXIV.Component.GUI;
+using GatherBuddy.AutoGather.Helpers;
 
 namespace GatherBuddy.AutoGather;
 
@@ -103,13 +105,15 @@ public unsafe partial class AutoGather
 
         TaskManager.Enqueue(() => RepairAddon != null, 1000, true, "Wait until repair menu is ready.");
         TaskManager.DelayNext(delay);
-        TaskManager.Enqueue(() => { if (RepairAddon is var addon && addon != null) new AddonMaster.Repair(addon).RepairAll(); }, 1000, "Repairing all.");
+        // 每一發都過 AddonPressGuard:同一扇窗(位址)同一按法在它走完生命週期前只送一次;關窗(-1)之後同位址任何按法都不准,
+        // 擋住「Repair 仍在關閉幀 → 跳過開窗直接 RepairAll」這條重進路徑。被擋下等同「窗還沒好」,鏈的控制流不變。
+        TaskManager.Enqueue(() => { if (RepairAddon is var addon && addon != null && AddonPressGuard.TryBeginPress("Repair", &addon->AtkUnitBase, "RepairAll")) new AddonMaster.Repair(addon).RepairAll(); }, 1000, "Repairing all.");
         TaskManager.Enqueue(() => SelectYesnoAddon != null, 1000, true, "Wait until YesnoAddon is ready.");
         TaskManager.DelayNext(delay);
-        TaskManager.Enqueue(() => { if (SelectYesnoAddon is var addon && addon != null) new AddonMaster.SelectYesno(addon).Yes(); }, 1000, "Confirm repairs.");
+        TaskManager.Enqueue(() => { if (SelectYesnoAddon is var addon && addon != null && AddonPressGuard.TryBeginPress("SelectYesno", (AtkUnitBase*)addon, "Yes")) new AddonMaster.SelectYesno(addon).Yes(); }, 1000, "Confirm repairs.");
         TaskManager.Enqueue(() => !Svc.Condition[ConditionFlag.Occupied39], 5000, "Wait for repairs.");
         TaskManager.DelayNext(delay);
-        TaskManager.Enqueue(() => { if (RepairAddon is var addon and not null) Callback.Fire(&addon->AtkUnitBase, true, -1); }, 1000, true, "Close repair menu.");
+        TaskManager.Enqueue(() => { if (RepairAddon is var addon and not null && AddonPressGuard.TryBeginPress("Repair", &addon->AtkUnitBase, AddonPressGuard.ClosePressKey)) Callback.Fire(&addon->AtkUnitBase, true, -1); }, 1000, true, "Close repair menu.");
         TaskManager.DelayNext(delay);
         TaskManager.Enqueue(YesAlready.Unlock);
 

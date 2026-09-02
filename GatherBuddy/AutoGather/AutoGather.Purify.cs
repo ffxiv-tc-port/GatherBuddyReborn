@@ -6,6 +6,7 @@ using ECommons.Automation;
 using ECommons.DalamudServices;
 using ECommons.EzSharedDataManager;
 using ECommons.LanguageHelpers;
+using GatherBuddy.AutoGather.Helpers;
 
 namespace GatherBuddy.AutoGather
 {
@@ -76,7 +77,8 @@ namespace GatherBuddy.AutoGather
             {
                 EnqueueActionWithDelay(() =>
                 {
-                    if (PurifyResultAddon is var addon and not null)
+                    if (PurifyResultAddon is var addon and not null
+                     && AddonPressGuard.TryBeginPress("PurifyResult", addon, AddonPressGuard.ClosePressKey))
                         Callback.Fire(addon, true, -1);
                 });
                 if (reduceAll && HasReducibleItems())
@@ -84,7 +86,8 @@ namespace GatherBuddy.AutoGather
                 else
                     EnqueueActionWithDelay(() =>
                     {
-                        if (PurifyItemSelectorAddon is var addon and not null)
+                        if (PurifyItemSelectorAddon is var addon and not null
+                         && AddonPressGuard.TryBeginPress("PurifyItemSelector", addon, AddonPressGuard.ClosePressKey))
                             Callback.Fire(addon, true, -1);
                     });
             });
@@ -97,6 +100,11 @@ namespace GatherBuddy.AutoGather
             if (addon == null)
                 return false;
 
+            // 同一扇 selector 每輪精選合法重送同一組參數(reduceAll 遞迴),用多次互動窗的 15 幀逃生口;關窗(-1)之後同位址不准。
+            // 被擋下回 false =「這一輪沒按到,下一 tick 再來」,與 addon 還沒出現走同一條路。🔴 不回 null(那是 Abort)。
+            if (!AddonPressGuard.TryBeginPress("PurifyItemSelector", addon, AddonPressGuard.BuildPressKey(true, 12, 0u), AddonPressGuard.RoutineRePressEscapeFrames))
+                return false;
+
             Callback.Fire(addon, true, 12, 0u);
             return true;
         }
@@ -105,6 +113,9 @@ namespace GatherBuddy.AutoGather
         {
             var addon = PurifyResultAddon;
             if (addon == null)
+                return false;
+
+            if (!AddonPressGuard.TryBeginPress("PurifyResult", addon, "Automatic"))
                 return false;
 
             new PurifyResult(addon).Automatic();

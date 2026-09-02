@@ -5,6 +5,7 @@ using ECommons.Automation;
 using ECommons.DalamudServices;
 using ECommons.LanguageHelpers;
 using FFXIVClientStructs.FFXIV.Client.Game;
+using GatherBuddy.AutoGather.Helpers;
 using GatherBuddy.Plugin;
 using static ECommons.UIHelpers.AddonMasterImplementations.AddonMaster;
 
@@ -56,15 +57,17 @@ public partial class AutoGather
         }
 
         TaskManager.Enqueue(YesAlready.Lock);
-        EnqueueActionWithDelay(() => { if (MaterializeAddon is var addon and not null) Callback.Fire(&addon->AtkUnitBase, true, 2, 0); });
+        // Materialize 每輪對同一扇窗重送 (2,0) 是合法的多次互動,用 15 幀逃生口;但關窗(-1)之後同位址任何按法都不准,
+        // 擋住「精製沒成功、窗仍在關閉幀 → 下一輪再送 (2,0)」那條路。
+        EnqueueActionWithDelay(() => { if (MaterializeAddon is var addon and not null && AddonPressGuard.TryBeginPress("Materialize", &addon->AtkUnitBase, AddonPressGuard.BuildPressKey(true, 2, 0), AddonPressGuard.RoutineRePressEscapeFrames)) Callback.Fire(&addon->AtkUnitBase, true, 2, 0); });
         TaskManager.Enqueue(() => MaterializeDialogAddon != null, 1000);
-        EnqueueActionWithDelay(() => { if (MaterializeDialogAddon is var addon and not null) new MaterializeDialog(addon).Materialize(); });
+        EnqueueActionWithDelay(() => { if (MaterializeDialogAddon is var addon and not null && AddonPressGuard.TryBeginPress("MaterializeDialog", &addon->AtkUnitBase, "Materialize")) new MaterializeDialog(addon).Materialize(); });
         TaskManager.Enqueue(() => !Svc.Condition[ConditionFlag.Occupied39]);
         TaskManager.DelayNext(_rng.Next(500, 2000));
 
         if (SpiritbondMax == 1) 
         {
-            EnqueueActionWithDelay(() => { if (MaterializeAddon is var addon and not null) Callback.Fire(&addon->AtkUnitBase, true, -1); });
+            EnqueueActionWithDelay(() => { if (MaterializeAddon is var addon and not null && AddonPressGuard.TryBeginPress("Materialize", &addon->AtkUnitBase, AddonPressGuard.ClosePressKey)) Callback.Fire(&addon->AtkUnitBase, true, -1); });
             TaskManager.Enqueue(YesAlready.Unlock);
         }
     }

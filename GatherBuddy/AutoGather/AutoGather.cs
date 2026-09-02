@@ -520,8 +520,9 @@ namespace GatherBuddy.AutoGather
                     {
                         case false when contentsFinderConfirmAddon > 0:
                         {
-                            var contents = new AddonMaster.ContentsFinderConfirm(contentsFinderConfirmAddon);
-                            TaskManager.Enqueue(contents.Commence);
+                            // 🔴 不在 enqueue 那一幀捕獲原生指標:任務跑到的時候才重查位址、過守衛、再按(見 PressAddonOnce)。
+                            TaskManager.Enqueue(() => PressAddonOnce("ContentsFinderConfirm", "Commence", AddonPressGuard.DefaultEscapeFrames,
+                                addon => new AddonMaster.ContentsFinderConfirm(addon).Commence()));
                             TaskManager.Enqueue(() => _diademQueuingInProgress = false);
                             TaskManager.Enqueue(() => Dalamud.Conditions[ConditionFlag.BoundByDuty]);
                             TaskManager.Enqueue(YesAlready.Unlock);
@@ -547,21 +548,22 @@ namespace GatherBuddy.AutoGather
                             }
                         case true when selectStringAddon > 0:
                         {
-                            var select = new AddonMaster.SelectString(selectStringAddon);
-                            TaskManager.Enqueue(() => select.Entries[0].Select());
+                            TaskManager.Enqueue(() => PressAddonOnce("SelectString", "Select|0", AddonPressGuard.DefaultEscapeFrames,
+                                addon => new AddonMaster.SelectString(addon).Entries[0].Select()));
                             return;
                         }
                         case true when selectYesNoAddon > 0:
                         {
-                            var yesNo = new AddonMaster.SelectYesno(selectYesNoAddon);
-                            TaskManager.Enqueue(yesNo.Yes);
+                            TaskManager.Enqueue(() => PressAddonOnce("SelectYesno", "Yes", AddonPressGuard.DefaultEscapeFrames,
+                                addon => new AddonMaster.SelectYesno(addon).Yes()));
                             TaskManager.DelayNext(5000);
                             return;
                         }
                         case true when talkAddon > 0:
                         {
-                            var talk = new AddonMaster.Talk(talkAddon);
-                            TaskManager.Enqueue(talk.Click);
+                            // Talk 按一次翻一頁、窗不消失:逃生口 15 幀(2026-09-02 艦隊政策),走逃生口是常態寫 Debug。
+                            TaskManager.Enqueue(() => PressAddonOnce("Talk", "Click", AddonPressGuard.RoutineRePressEscapeFrames,
+                                addon => new AddonMaster.Talk(addon).Click()));
                             return;
                         }
                     }
@@ -843,12 +845,41 @@ namespace GatherBuddy.AutoGather
         {
             if (GenericHelpers.TryGetAddonByName(addonName, out AtkUnitBase* addon))
             {
+                // 同一扇窗的同一組參數在它走完生命週期前只送一次(ContentsFinderMenu 的 (true,0) 與 (false,-2) 是不同參數組,
+                // 照常各送一次;SelectYesno 是單答終結窗,不管參數一律併成同一次)。被擋下就當這一輪沒送到,鏈照常往下走。
+                if (!AddonPressGuard.TryBeginPress(addonName, addon, AddonPressGuard.BuildPressKey(updateState, values)))
+                    return;
+
                 Callback.Fire(addon, updateState, values);
                 return;
             }
 
             GatherBuddy.Log.Information(
                 $"LeaveTheDiadem: 視窗 \"{addonName}\" 已經不在了，略過這次回呼（不送出，避免解參考空指標）。");
+        }
+
+        /// <summary>
+        /// Diadem 排隊分支用:enqueue 那一幀<b>只記名字</b>,任務跑到的時候才重查位址、過 <see cref="AddonPressGuard"/>、再按。
+        /// </summary>
+        /// <remarks>
+        /// 原本是在 enqueue 那一幀 <c>new AddonMaster.X(位址)</c> 再把方法群組排進 TaskManager:指標被閉包捕獲、
+        /// 1~2 個 tick 之後才用,而且那個分支每 2 個 tick 就對還在的窗再排一次 —— 對「按下即關、正在關閉中」的
+        /// SelectString/SelectYesno/ContentsFinderConfirm 與翻到最後一頁的 Talk 都是拿舊位址送第二發(攔不到的存取違規)。
+        /// 視窗跑到時已不在就跳過(正常結果,寫 Debug);被守衛擋下也跳過 —— 呼叫端本來就是每 2 tick 輪詢重排,控制流不變。
+        /// </remarks>
+        private static void PressAddonOnce(string addonName, string pressKey, int escapeFrames, Action<nint> press)
+        {
+            var addon = Dalamud.GameGui.GetAddonByName(addonName).Address;
+            if (addon == nint.Zero)
+            {
+                GatherBuddy.Log.Debug($"Diadem 排隊:視窗「{addonName}」跑到時已經不在了,略過這次按壓(不對已釋放的視窗送事件)。");
+                return;
+            }
+
+            if (!AddonPressGuard.TryBeginPress(addonName, addon, pressKey, escapeFrames))
+                return;
+
+            press(addon);
         }
 
         private void AbortAutoGather(string? status = null)
@@ -881,7 +912,8 @@ namespace GatherBuddy.AutoGather
             {
                 EnqueueActionWithDelay(() =>
                 {
-                    if (MasterpieceAddon is var addon and not null)
+                    if (MasterpieceAddon is var addon and not null
+                     && AddonPressGuard.TryBeginPress("GatheringMasterpiece", &addon->AtkUnitBase, AddonPressGuard.ClosePressKey))
                     {
                         Callback.Fire(&addon->AtkUnitBase, true, -1);
                     }
@@ -898,8 +930,15 @@ namespace GatherBuddy.AutoGather
                 {
                     if (GatheringAddon is var gathering and not null && gathering->IsReady)
                     {
-                        Callback.Fire(&gathering->AtkUnitBase, true, -1);
-                        TaskManager.DelayNextImmediate(100);
+                        // 🔴 刻意的重試迴圈也要罩:IsReady 擋不住「關閉中」的那幾幀 —— Fire(-1) 被接受後窗進入關閉幀,
+                        // 下一 tick 重跑仍見 IsReady 就會再送一發 = 攔不到的存取違規。同一扇窗(位址)在它走完生命週期前
+                        // 只送一次;真的沒生效(剛出現時 callback 被忽略)由守衛的逃生口(90 幀)放行補送,重試語意保留。
+                        if (AddonPressGuard.TryBeginPress("Gathering", &gathering->AtkUnitBase, AddonPressGuard.ClosePressKey))
+                        {
+                            Callback.Fire(&gathering->AtkUnitBase, true, -1);
+                            TaskManager.DelayNextImmediate(100);
+                        }
+
                         return false;
                     }
 
@@ -908,7 +947,8 @@ namespace GatherBuddy.AutoGather
                     {
                         EnqueueActionWithDelay(() =>
                         {
-                            if (SelectYesnoAddon is var addon and not null)
+                            if (SelectYesnoAddon is var addon and not null
+                             && AddonPressGuard.TryBeginPress("SelectYesno", (AtkUnitBase*)addon, "Yes"))
                             {
                                 var master = new AddonMaster.SelectYesno(addon);
                                 master.Yes();
@@ -1026,6 +1066,7 @@ namespace GatherBuddy.AutoGather
             _advancedUnstuck.Dispose();
             _activeItemList.Dispose();
             Svc.Chat.CheckMessageHandled -= OnMessageHandled;
+            AddonPressGuard.ForceTeardown();
             //Svc.AddonLifecycle.UnregisterListener(AddonEvent.PreFinalize, "Gathering", OnGatheringFinalize);
         }
     }
