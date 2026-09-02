@@ -521,8 +521,13 @@ namespace GatherBuddy.AutoGather
                         case false when contentsFinderConfirmAddon > 0:
                         {
                             // 🔴 不在 enqueue 那一幀捕獲原生指標:任務跑到的時候才重查位址、過守衛、再按(見 PressAddonOnce)。
-                            TaskManager.Enqueue(() => PressAddonOnce("ContentsFinderConfirm", "Commence", AddonPressGuard.DefaultEscapeFrames,
-                                addon => new AddonMaster.ContentsFinderConfirm(addon).Commence()));
+                            // 🔴 Func<bool?> 多載(區塊 lambda 有回傳值):被守衛擋下回 false＝下一個 tick 再試,
+                            // 不是 Enqueue(Action, …) 那種把 false 吞掉、這一輪整個跳過。
+                            TaskManager.Enqueue(() =>
+                            {
+                                return PressAddonOnce("ContentsFinderConfirm", "Commence", AddonPressGuard.DefaultEscapeFrames,
+                                    addon => new AddonMaster.ContentsFinderConfirm(addon).Commence());
+                            }, "雲冠群島排隊:按下 ContentsFinderConfirm 的參加鈕");
                             TaskManager.Enqueue(() => _diademQueuingInProgress = false);
                             TaskManager.Enqueue(() => Dalamud.Conditions[ConditionFlag.BoundByDuty]);
                             TaskManager.Enqueue(YesAlready.Unlock);
@@ -548,22 +553,33 @@ namespace GatherBuddy.AutoGather
                             }
                         case true when selectStringAddon > 0:
                         {
-                            TaskManager.Enqueue(() => PressAddonOnce("SelectString", "Select|0", AddonPressGuard.DefaultEscapeFrames,
-                                addon => new AddonMaster.SelectString(addon).Entries[0].Select()));
+                            TaskManager.Enqueue(() =>
+                            {
+                                return PressAddonOnce("SelectString", "Select|0", AddonPressGuard.DefaultEscapeFrames,
+                                    addon => new AddonMaster.SelectString(addon).Entries[0].Select());
+                            }, "雲冠群島排隊:選 SelectString 的第一項");
                             return;
                         }
                         case true when selectYesNoAddon > 0:
                         {
-                            TaskManager.Enqueue(() => PressAddonOnce("SelectYesno", "Yes", AddonPressGuard.DefaultEscapeFrames,
-                                addon => new AddonMaster.SelectYesno(addon).Yes()));
+                            // 🔴 這一顆非改 Func<bool?> 不可:後面緊接著 DelayNext(5000),用 Action 多載的話
+                            // 「被守衛擋下」會被吞成成功,那五秒就是對著根本沒按下去的確認框白等。
+                            TaskManager.Enqueue(() =>
+                            {
+                                return PressAddonOnce("SelectYesno", "Yes", AddonPressGuard.DefaultEscapeFrames,
+                                    addon => new AddonMaster.SelectYesno(addon).Yes());
+                            }, "雲冠群島排隊:對 SelectYesno 按是");
                             TaskManager.DelayNext(5000);
                             return;
                         }
                         case true when talkAddon > 0:
                         {
                             // Talk 按一次翻一頁、窗不消失:逃生口 15 幀(2026-09-02 艦隊政策),走逃生口是常態寫 Debug。
-                            TaskManager.Enqueue(() => PressAddonOnce("Talk", "Click", AddonPressGuard.RoutineRePressEscapeFrames,
-                                addon => new AddonMaster.Talk(addon).Click()));
+                            TaskManager.Enqueue(() =>
+                            {
+                                return PressAddonOnce("Talk", "Click", AddonPressGuard.RoutineRePressEscapeFrames,
+                                    addon => new AddonMaster.Talk(addon).Click());
+                            }, "雲冠群島排隊:點 Talk 翻頁");
                             return;
                         }
                     }
@@ -812,10 +828,21 @@ namespace GatherBuddy.AutoGather
             if (GenericHelpers.TryGetAddonByName<AtkUnitBase>("ContentsFinderMenu", out _))
             {
                 TaskManager.Enqueue(YesAlready.Lock);
-                TaskManager.Enqueue(() => FireOnAddon("ContentsFinderMenu", true,  0));
-                TaskManager.Enqueue(() => FireOnAddon("ContentsFinderMenu", false, -2));
+                // 🔴 這三顆一律走 Func<bool?> 多載(區塊 lambda 有回傳值)而不是 Action:ECommons LegacyTaskManager 把
+                // Enqueue(Action, …) 四個多載全部包成 () => { task(); return true; }(TaskManager@Enqueue.cs:63/75/87/100),
+                // task 內部回傳的 false 會被吞掉 —— 用 Action 的話「被守衛擋下」等於這一輪整個跳過,而後面的
+                // DelayNext(1000) 與 SelectYesno 那一顆照樣往下跑(對著根本沒被按過的選單去等確認框)。
+                // 語意:送出了、或視窗根本不在 → true;被守衛擋下 → false(這一輪沒按到,下一個 tick 再試,
+                // 守衛的 90 幀逃生口一到必放行,而任務的逾時預算是 LegacyTaskManager 預設的 10 秒 > 90 個 framework tick)。
+                // 🔴 絕不回 null —— LegacyTaskManager 的 bool? 三態裡 null 是 Abort(),那會清掉整條佇列。
+                // (與 AutoGather.Repair.cs 那三顆、AutoGather.Purify.cs 的「開始自動精選」同一個修法。)
+                TaskManager.Enqueue(() => { return FireOnAddon("ContentsFinderMenu", true, 0); },
+                    "離開雲冠群島:對 ContentsFinderMenu 送出 (true,0)");
+                TaskManager.Enqueue(() => { return FireOnAddon("ContentsFinderMenu", false, -2); },
+                    "離開雲冠群島:對 ContentsFinderMenu 送出 (false,-2)");
                 TaskManager.DelayNext(1000);
-                TaskManager.Enqueue(() => FireOnAddon("SelectYesno", true, 0));
+                TaskManager.Enqueue(() => { return FireOnAddon("SelectYesno", true, 0); },
+                    "離開雲冠群島:對 SelectYesno 送出 (true,0)");
                 TaskManager.Enqueue(YesAlready.Unlock);
                 return;
             }
@@ -841,21 +868,31 @@ namespace GatherBuddy.AutoGather
         /// 記一行 <c>Information</c>（使用者跑 LogLevel 2，Debug/Verbose 收不到）再跳過。
         /// 行為不變：視窗在的時候送出的回呼與參數逐字相同。
         /// </remarks>
-        private static unsafe void FireOnAddon(string addonName, bool updateState, params object[] values)
+        /// <returns>
+        /// <see langword="true"/> ＝這一步已經處理完（送出去了，或視窗根本不在），鏈可以往下走；
+        /// <see langword="false"/> ＝被 <see cref="AddonPressGuard"/> 擋下，<b>下一個 tick 再試</b>。
+        /// 🔴 呼叫端必須用 <c>Func&lt;bool?&gt;</c> 多載（區塊 lambda 有回傳值）接這個回傳值：
+        /// <c>Enqueue(Action, …)</c> 會把它包成 <c>() =&gt; { task(); return true; }</c> 而<b>吞掉 false</b>，
+        /// 那樣「被守衛擋下」就變成「這一輪整個跳過」而不是「下一個 tick 再來」。
+        /// </returns>
+        private static unsafe bool FireOnAddon(string addonName, bool updateState, params object[] values)
         {
             if (GenericHelpers.TryGetAddonByName(addonName, out AtkUnitBase* addon))
             {
                 // 同一扇窗的同一組參數在它走完生命週期前只送一次(ContentsFinderMenu 的 (true,0) 與 (false,-2) 是不同參數組,
-                // 照常各送一次;SelectYesno 是單答終結窗,不管參數一律併成同一次)。被擋下就當這一輪沒送到,鏈照常往下走。
+                // 照常各送一次;SelectYesno 是單答終結窗,不管參數一律併成同一次)。
+                // 🔴 被擋下回 false（不是吞掉）:呼叫端是 Func<bool?> 任務,下一個 tick 會再進來一次,
+                // 直到守衛的 90 幀逃生口放行為止 —— 這一發沒送出去,後面的 DelayNext 與確認框那一顆就不該先跑。
                 if (!AddonPressGuard.TryBeginPress(addonName, addon, AddonPressGuard.BuildPressKey(updateState, values)))
-                    return;
+                    return false;
 
                 Callback.Fire(addon, updateState, values);
-                return;
+                return true;
             }
 
             GatherBuddy.Log.Information(
-                $"LeaveTheDiadem: 視窗 \"{addonName}\" 已經不在了，略過這次回呼（不送出，避免解參考空指標）。");
+                $"LeaveTheDiadem: 視窗 \"{addonName}\" 已經不在了，這一步當作完成往下走（不送出，避免解參考空指標）。");
+            return true;
         }
 
         /// <summary>
@@ -865,21 +902,32 @@ namespace GatherBuddy.AutoGather
         /// 原本是在 enqueue 那一幀 <c>new AddonMaster.X(位址)</c> 再把方法群組排進 TaskManager:指標被閉包捕獲、
         /// 1~2 個 tick 之後才用,而且那個分支每 2 個 tick 就對還在的窗再排一次 —— 對「按下即關、正在關閉中」的
         /// SelectString/SelectYesno/ContentsFinderConfirm 與翻到最後一頁的 Talk 都是拿舊位址送第二發(攔不到的存取違規)。
-        /// 視窗跑到時已不在就跳過(正常結果,寫 Debug);被守衛擋下也跳過 —— 呼叫端本來就是每 2 tick 輪詢重排,控制流不變。
+        /// 視窗跑到時已不在就跳過(正常結果,寫 Debug,回 true 讓鏈往下走)。
         /// </remarks>
-        private static void PressAddonOnce(string addonName, string pressKey, int escapeFrames, Action<nint> press)
+        /// <returns>
+        /// <see langword="true"/> ＝這一步已經處理完（按下去了，或視窗根本不在）；
+        /// <see langword="false"/> ＝被 <see cref="AddonPressGuard"/> 擋下，<b>下一個 tick 再試</b>。
+        /// 🔴 四個呼叫端一律用 <c>Func&lt;bool?&gt;</c> 多載（區塊 lambda 有回傳值）:<c>Enqueue(Action, …)</c>
+        /// 會把 false 吞掉，那樣被擋下就變成「這一輪永久跳過」—— 最明顯的是 SelectYesno 那顆，
+        /// 後面接著 <c>DelayNext(5000)</c>，等於對著<b>根本沒按下去</b>的確認框白等五秒。
+        /// 原本這裡寫「呼叫端本來就是每 2 tick 輪詢重排,控制流不變」—— 輪詢重排確實存在（DoAutoGather 每個閒置 tick 都會再進來），
+        /// 但那要先跑完整條佇列（含 DelayNext）才回得來，而且回來時守衛多半還在逃生口內，等於白繞一圈。
+        /// </returns>
+        private static bool PressAddonOnce(string addonName, string pressKey, int escapeFrames, Action<nint> press)
         {
             var addon = Dalamud.GameGui.GetAddonByName(addonName).Address;
             if (addon == nint.Zero)
             {
                 GatherBuddy.Log.Debug($"Diadem 排隊:視窗「{addonName}」跑到時已經不在了,略過這次按壓(不對已釋放的視窗送事件)。");
-                return;
+                return true;
             }
 
+            // 🔴 絕不回 null —— LegacyTaskManager 的 bool? 三態裡 null 是 Abort(),那會清掉整條佇列。
             if (!AddonPressGuard.TryBeginPress(addonName, addon, pressKey, escapeFrames))
-                return;
+                return false;
 
             press(addon);
+            return true;
         }
 
         private void AbortAutoGather(string? status = null)
