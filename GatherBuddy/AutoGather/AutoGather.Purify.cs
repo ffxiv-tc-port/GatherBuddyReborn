@@ -70,7 +70,12 @@ namespace GatherBuddy.AutoGather
             TaskManager.Enqueue(ReduceFirstItem,                                3000, true, "Reduce first item");
             TaskManager.Enqueue(() => !Svc.Condition[ConditionFlag.Occupied39], 5000, true, "Wait until first item reduction is complete");
             TaskManager.DelayNext(delay);
-            TaskManager.Enqueue(StartAutoReduction,                             1000, true, "Start auto reduction");
+            // ⚠️ 逾時預算要大於守衛的逃生口:StartAutoReduction 走 AddonPressGuard 的預設 90 幀逃生口,
+            // 而那個「幀」是 framework tick —— 60fps 下約 1.5 秒、30fps 下約 3 秒。原本的 1000ms 比它短,
+            // 逃生口根本走不到:守衛一擋就是擋到 abortOnTimeout 觸發,清掉整條精選佇列(含後面的 YesAlready.Unlock)。
+            // 改成和上面「Reduce first item」同樣的 3000ms,讓逃生口有機會先放行再談逾時。
+            // (佇列被清不會死鎖 —— DoAutoGather 在 TaskManager 閒置時會無條件 YesAlready.Unlock —— 但那是自癒,不是設計。)
+            TaskManager.Enqueue(StartAutoReduction,                             3000, true, "Start auto reduction");
             TaskManager.Enqueue(() => !Svc.Condition[ConditionFlag.Occupied39], 180000, true, "Wait until all items have been reduced");
             TaskManager.DelayNext(delay);
             TaskManager.Enqueue(() =>
