@@ -81,7 +81,10 @@ internal static unsafe class AddonPressGuard
     /// </summary>
     /// <remarks>
     /// 🔑 這不是節流 —— 真正的防護是「同一扇窗的同一個按法只按一次」,這個值只是防死鎖的逃生口。
-    /// 90 幀(60fps 下約 1.5 秒)遠遠大於「關閉中的那幾幀」,補按永遠不會落在危險窗口內。
+    /// 90 幀(這裡的「幀」是 <b>framework tick</b>:60fps 下約 1.5 秒、30fps 下約 3 秒)遠遠大於「關閉中的那幾幀」,
+    /// 補按永遠不會落在危險窗口內。
+    /// ⚠️ <b>呼叫端如果是有毫秒逾時的任務,逾時預算要比這個值換算出來的時間長</b> ——
+    /// 否則逃生口還沒放行,呼叫端就先逾時(<c>abortOnTimeout</c> 會清掉整條佇列)。
     /// 走到這個逃生口代表「按了卻沒生效」,寫 <c>Information</c>(使用者跑 LogLevel 2,Debug 收不到)。
     /// </remarks>
     internal const int DefaultEscapeFrames = 90;
@@ -130,7 +133,7 @@ internal static unsafe class AddonPressGuard
     };
 
     /// <param name="Address">被按的那個實例的位址,<b>只做等值比較</b>。</param>
-    /// <param name="Frame">按下時的繪製幀號。</param>
+    /// <param name="Frame">按下時的幀號(<see cref="frameCount"/>,每個 framework tick +1;<b>不是</b>繪製幀)。</param>
     /// <param name="EscapeFrames">登記當時呼叫端給的逃生口;判「這筆還熱著」用它。</param>
     private readonly record struct PressRecord(nint Address, long Frame, int EscapeFrames);
 
@@ -139,8 +142,44 @@ internal static unsafe class AddonPressGuard
 
     private static readonly Dictionary<string, IAddonLifecycle.AddonEventDelegate> Watchers = new(StringComparer.Ordinal);
 
+    /// <summary>守衛自己的幀計數器:每一個 framework tick +1。</summary>
+    /// <remarks>
+    /// 🔴🔴 <b>刻意不用 <c>UiBuilder.FrameCount</c></b>:那個計數器在<b>外掛 UI 被隱藏時完全停止前進</b> ——
+    /// 本 pin 的 <c>UiBuilder.OnDraw()</c> 在①使用者隱藏 UI(<c>ToggleUiHide</c>)②<b>過場動畫</b>
+    /// (<c>ToggleUiHideDuringCutscenes</c>,<b>預設開</b>)③GPose 這三種情形下<b>直接 return</b>,
+    /// 而 <c>FrameCount++</c> 寫在那個 return <b>之後</b>。
+    /// 拿它當時鐘的話,過場或隱藏 UI 期間 <see cref="DefaultEscapeFrames"/> 與 <see cref="RoutineRePressEscapeFrames"/>
+    /// 兩個逃生口<b>永遠不會到期</b>,呼叫端會一路被擋到自己的逾時(方向是 fail-closed:不會崩,但會停擺)。
+    /// <para>
+    /// <c>Framework.Update</c> 掛在遊戲的 update hook 上,和繪製、UI 隱藏都無關,過場中照樣前進 ——
+    /// 所以計數器改由它來推。⚠️ 呼叫端如果用<b>毫秒</b>逾時,預算必須大於逃生口換算出來的時間
+    /// (90 tick:60fps 約 1.5 秒、30fps 約 3 秒),否則逃生口還沒放行、呼叫端就先逾時了。
+    /// </para>
+    /// </remarks>
+    private static long frameCount;
+
+    /// <summary>是否已經掛上 <see cref="OnFrameworkUpdate"/>(<see cref="frameCount"/> 的唯一來源)。</summary>
+    private static bool watchingFramework;
+
     private static long CurrentFrame
-        => (long)Dalamud.PluginInterface.UiBuilder.FrameCount;
+        => frameCount;
+
+    /// <summary>掛上幀計數器(重複呼叫是 no-op)。</summary>
+    /// <remarks>
+    /// 🔴 這支<b>不能</b>併進 <see cref="EnsureWatching"/>:那支開頭就有「這個名字已經看過就 return」,
+    /// 併進去等於計數器只在第一次遇到新 addon 名稱時才推得動(＝又停住了)。
+    /// </remarks>
+    private static void EnsureFrameClock()
+    {
+        if (watchingFramework)
+            return;
+
+        watchingFramework        =  true;
+        Dalamud.Framework.Update += OnFrameworkUpdate;
+    }
+
+    private static void OnFrameworkUpdate(IFramework framework)
+        => frameCount++;
 
     /// <inheritdoc cref="TryBeginPress(string, nint, string, int)"/>
     internal static bool TryBeginPress(string addonName, AtkUnitBase* addon, string pressKey = "", int escapeFrames = DefaultEscapeFrames)
@@ -163,6 +202,9 @@ internal static unsafe class AddonPressGuard
     /// </remarks>
     internal static bool TryBeginPress(string addonName, nint address, string pressKey = "", int escapeFrames = DefaultEscapeFrames)
     {
+        // 🔴 放在所有 early return 之前:時鐘停住的話兩個逃生口都永遠不會到期。
+        EnsureFrameClock();
+
         if (address == nint.Zero || string.IsNullOrEmpty(addonName))
             return false;
 
@@ -284,6 +326,12 @@ internal static unsafe class AddonPressGuard
 
         Watchers.Clear();
         PressedByAddon.Clear();
+
+        if (watchingFramework)
+        {
+            Dalamud.Framework.Update -= OnFrameworkUpdate;
+            watchingFramework        =  false;
+        }
     }
 
     /// <summary>同位址的 <see cref="ClosePressKey"/> 紀錄還在它的逃生口內。</summary>
