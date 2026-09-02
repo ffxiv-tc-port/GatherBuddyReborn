@@ -528,7 +528,18 @@ namespace GatherBuddy.AutoGather
                                 return PressAddonOnce("ContentsFinderConfirm", "Commence", AddonPressGuard.DefaultEscapeFrames,
                                     addon => new AddonMaster.ContentsFinderConfirm(addon).Commence());
                             }, "雲冠群島排隊:按下 ContentsFinderConfirm 的參加鈕");
-                            TaskManager.Enqueue(() => _diademQueuingInProgress = false);
+                            // 🔴 賦值運算式**有值**,值就是被指派的 false ⇒ 這個 lambda 的推導回傳型別是 bool,
+                            // 於是綁到 Enqueue(Func<bool?>) 而不是 Enqueue(Action)(多載 tie-breaker:有回傳型別的委派勝過 void 委派)。
+                            // TaskManager 把 false 讀成「這一步還沒完成」,每個 framework tick 重跑一次,
+                            // 直到 LegacyTaskManager 預設的 TimeLimitMS(10 秒)到期才丟掉這顆任務。
+                            // 賦值本身冪等所以不會壞資料,但 TaskManager.IsBusy 會把整個 DoAutoGather 卡住十秒,
+                            // 後面的「等 BoundByDuty」與「解開 YesAlready」也一起被往後推。
+                            // 正解 = 區塊 lambda 明確 return true(區塊帶回傳值時 Action 多載在適用性階段就被排除,編得過即證明綁到 Func)。
+                            TaskManager.Enqueue(() =>
+                            {
+                                _diademQueuingInProgress = false;
+                                return true;
+                            }, "雲冠群島排隊:清除排隊中旗標");
                             TaskManager.Enqueue(() => Dalamud.Conditions[ConditionFlag.BoundByDuty]);
                             TaskManager.Enqueue(YesAlready.Unlock);
                             return;
@@ -548,7 +559,13 @@ namespace GatherBuddy.AutoGather
                                     => targetSystem->OpenObjectInteraction(
                                         (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)dutyNpc.Address));
                                 TaskManager.Enqueue(() => Dalamud.Conditions[ConditionFlag.OccupiedInQuestEvent]);
-                                TaskManager.Enqueue(() => _diademQueuingInProgress = true);
+                                // 📌 這一顆的賦值值剛好是 true,所以同樣綁到 Func<bool?> 卻能立刻完成 —— 那是巧合不是設計。
+                                // 一併寫成明確 return true,免得日後有人把常數翻成 false 就變成上面那種十秒空轉。
+                                TaskManager.Enqueue(() =>
+                                {
+                                    _diademQueuingInProgress = true;
+                                    return true;
+                                }, "雲冠群島排隊:標記排隊中旗標");
                                 return;
                             }
                         case true when selectStringAddon > 0:
