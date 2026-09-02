@@ -415,18 +415,44 @@ internal static unsafe class AddonPressGuard
     }
 
     /// <summary>
-    /// 第一次守護某個 addon 名稱時掛上解除封鎖用的監聽器。
+    /// 第一次守護某個 addon 名稱時掛上解除封鎖用的監聽器:只清<b>事件帶來的那個位址</b>的紀錄。
     /// </summary>
     /// <remarks>
     /// 掛上去之後就不再拆(只在 <see cref="ForceTeardown"/> 拆):這兩條監聽器只做一次字典移除,
     /// 成本可忽略,而動態掛/拆比較容易留下懸空的監聽器。
+    /// <para>
+    /// 🔴🔴 <b>只清該位址,不是把整個名字底下的紀錄一起清掉。</b>
+    /// 同名視窗可以同時開好幾扇(SelectYesno 是代表):A 被按過、正在關閉中的那幾幀,
+    /// 第二扇 B 被建立起來會發 <see cref="AddonEvent.PostSetup"/> ——
+    /// 按名字整包清的話 A 的紀錄會一起不見,下一幀任何按下點解到 A 就查無紀錄而放行,
+    /// 對關閉中的 A 送出第二發 = 攔不到的原生存取違規。這與本類宣稱的「粒度=(窗,位址)」也直接矛盾。
+    /// </para>
+    /// <para>
+    /// ⚙️ 不需要「這一幀才登記的不清」那種豁免(某些 repo 有):本 repo <b>沒有任何在 PostSetup 處理常式裡按下</b>
+    /// 的路徑 —— 所有按下點都由 <c>Framework.Update → DoAutoGather → LegacyTaskManager</c> 驅動,
+    /// 而唯一另一個 <c>Gathering</c> 的 PostSetup/PostRefresh 監聽器(<c>GatheringTracker</c>)只讀 AtkValue、不按任何東西。
+    /// 同一幀內也不可能「舊的還在、新的已經建在同一個位址」:位址要被重用得先 finalize,
+    /// 而 <see cref="AddonEvent.PreFinalize"/> 早就把紀錄清掉了。
+    /// </para>
     /// </remarks>
     private static void EnsureWatching(string addonName)
     {
         if (Watchers.ContainsKey(addonName))
             return;
 
-        IAddonLifecycle.AddonEventDelegate handler = (_, _) => PressedByAddon.Remove(addonName);
+        IAddonLifecycle.AddonEventDelegate handler = (_, args) =>
+        {
+            // 🔴 位址只做等值比較,永遠不解參。
+            var address = (nint)args.Addon.Address;
+            if (address == nint.Zero || !PressedByAddon.TryGetValue(addonName, out var presses))
+                return;
+
+            foreach (var key in presses.Where(kv => kv.Value.Address == address).Select(kv => kv.Key).ToArray())
+                presses.Remove(key);
+
+            if (presses.Count == 0)
+                PressedByAddon.Remove(addonName);
+        };
 
         Watchers[addonName] = handler;
         Svc.AddonLifecycle.RegisterListener(AddonEvent.PostSetup,   addonName, handler);
