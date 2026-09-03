@@ -130,7 +130,7 @@ namespace GatherBuddy.AutoGather
                         if (DiscipleOfLand.Perception < targetItem.GatheringData.PerceptionReq)
                         {
                             Communicator.PrintError($"Insufficient Perception to gather this item. Required: {targetItem.GatheringData.PerceptionReq}, current: {DiscipleOfLand.Perception}");
-                            AbortAutoGather();
+                            AbortAutoGather(reason: "Not enough Perception for this item.");
                             return;
                         }
 
@@ -139,7 +139,7 @@ namespace GatherBuddy.AutoGather
                                 if (ChangeGearSet(targetItem.GatheringType.ToGroup(), 0)){
                                     EnqueueNodeInteraction(gameObject, targetItem);
                                 } else {
-                                    AbortAutoGather();
+                                    AbortAutoGather(reason: "Could not change to the required gear set.");
                                 }
                             }
                             else {

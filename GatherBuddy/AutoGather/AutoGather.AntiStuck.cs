@@ -35,6 +35,9 @@ public partial class AutoGather
             {
                 GatherBuddy.Log.Information("AntiStuck: 區域停滯逾時且近端復原無效，停止自動採集。");
                 _antiStuckManager.MarkDrasticActionExecuted();
+                // 這一條不經過 AbortAutoGather,所以 honk 與停止通知都得自己標記。
+                // 卡住停下來正是最需要讓人知道的情境。
+                MarkSelfStop("Stuck in the same area for too long.");
                 Enabled = false;
                 return true;
             }

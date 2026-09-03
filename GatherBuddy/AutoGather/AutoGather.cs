@@ -19,6 +19,7 @@ using FFXIVClientStructs.FFXIV.Client.Game;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Game.Text;
+using Dalamud.Interface.ImGuiNotification;
 using Dalamud.Utility;
 using ECommons;
 using ECommons.ExcelServices;
@@ -95,6 +96,16 @@ namespace GatherBuddy.AutoGather
 
         private readonly GatherBuddy     _plugin;
         private readonly SoundHelper     _soundHelper;
+
+        /// <summary>
+        /// 下一次 Enabled 被設成 false 時的「自己停下來」原因(英文原文,顯示時才 .Loc())。
+        /// null = 那次是使用者主動關的(勾選框 / 採集視窗 / /gather auto / IPC),不通知。
+        /// 這是白名單:只有 MarkSelfStop 會填。新增停止點忘了呼叫的預設結果是「不通知」。
+        /// </summary>
+        private string? _pendingStopReason;
+
+        /// <summary>那次停止的 honk 是不是已經由 AbortAutoGather 播過了,用來避免響兩次。</summary>
+        private bool _pendingStopSoundPlayed;
         private readonly AdvancedUnstuck  _advancedUnstuck;
         private readonly AntiStuckManager _antiStuckManager;
         private readonly ActiveItemList   _activeItemList;
@@ -128,6 +139,13 @@ namespace GatherBuddy.AutoGather
             get => _enabled;
             set
             {
+                // 先無條件取走「自己停下來」旗標(取走即消耗)。包含「已經是 false 又被設一次
+                // false」這種沒有狀態邊緣的情況 —— 那次不該通知,但旗標也絕不能留到下一次。
+                string? selfStopReason = _pendingStopReason;
+                bool    soundPlayed    = _pendingStopSoundPlayed;
+                _pendingStopReason      = null;
+                _pendingStopSoundPlayed = false;
+
                 if (_enabled == value)
                     return;
 
@@ -167,6 +185,9 @@ namespace GatherBuddy.AutoGather
                 _enabled = value;
                 _antiStuckManager.OnEnabledChanged(value);
                 _plugin.Ipc.AutoGatherEnabledChanged(value);
+
+                if (!value && selfStopReason != null)
+                    NotifyStoppedItself(selfStopReason, soundPlayed);
             }
         }
 
@@ -321,7 +342,7 @@ namespace GatherBuddy.AutoGather
             {
                 Communicator.PrintError(
                     "You have fish on your auto-gather list but you have not opted in to fishing data collection. Auto-gather cannot continue. Please enable fishing data collection in your configuration options or remove fish from your auto-gather lists.".Loc());
-                AbortAutoGather();
+                AbortAutoGather(reason: "Fish are on the list but fishing data collection is off.");
                 return;
             }
 
@@ -371,7 +392,7 @@ namespace GatherBuddy.AutoGather
                 {
                     Communicator.PrintError(
                         "Unable to pick a collectability increasing action to use. Make sure that at least one of the collectable actions is enabled.".Loc());
-                    AbortAutoGather();
+                    AbortAutoGather(reason: "No collectability action is enabled.");
                 }
 
 
@@ -437,7 +458,7 @@ namespace GatherBuddy.AutoGather
             {
                 if (!_activeItemList.HasItemsToGather)
                 {
-                    AbortAutoGather();
+                    AbortAutoGather(reason: "Nothing left to gather.");
                     return;
                 }
 
@@ -466,7 +487,7 @@ namespace GatherBuddy.AutoGather
             if (next.Any(n => n.Item.ItemData.IsCollectable
                  && !CheckCollectablesUnlocked(n.Fish != null ? GatheringType.Fisher : n.Gatherable!.GatheringType.ToGroup())))
             {
-                AbortAutoGather();
+                AbortAutoGather(reason: "Collectables are not unlocked for this job.");
                 return;
             }
 
@@ -656,7 +677,7 @@ namespace GatherBuddy.AutoGather
                 StopNavigation();
 
                 if (!MoveToTerritory(next.First().Location))
-                    AbortAutoGather();
+                    AbortAutoGather(reason: "Could not travel to the next gathering location.");
 
                 // Reset target to pick up closest item after teleport
                 next = default;
@@ -672,7 +693,7 @@ namespace GatherBuddy.AutoGather
             if (!LocationMatchesJob(next.First().Location))
             {
                 if (!ChangeGearSet(next.First().Location.GatheringType.ToGroup(), 2400))
-                    AbortAutoGather();
+                    AbortAutoGather(reason: "Could not change to the required gear set.");
             }
 
             if (next.First().Fish != null)
@@ -704,7 +725,7 @@ namespace GatherBuddy.AutoGather
                 {
                     Communicator.PrintError(
                         $"No position data for fishing spot {fish.FishingSpot.Name}. Auto-Fishing cannot continue. Please, manually fish at least once at {fish.FishingSpot.Name} so GBR can know its location.");
-                    AbortAutoGather();
+                    AbortAutoGather(reason: "No recorded position for that fishing spot.");
                     return;
                 }
 
@@ -967,7 +988,7 @@ namespace GatherBuddy.AutoGather
             return true;
         }
 
-        private void AbortAutoGather(string? status = null)
+        private void AbortAutoGather(string? status = null, string? reason = null)
         {
             if (Functions.InTheDiadem())
             {
@@ -984,9 +1005,59 @@ namespace GatherBuddy.AutoGather
                 EnqueueActionWithDelay(() => { GoHome(); });
             TaskManager.Enqueue(() =>
             {
+                // 必須在 Enabled = false 之前:setter 的停用分支第一件事就是把 AutoStatus
+                // 蓋成 "Idle...",所以通知端絕對不能等到那裡再去讀 AutoStatus。
+                // AbortAutoGather 走到這裡時 honk 已經播過(若 HonkMode 開著),記下來避免重複。
+                MarkSelfStop(reason ?? status ?? "Auto-gather could not continue.",
+                             GatherBuddy.Config.AutoGatherConfig.HonkMode);
                 Enabled    = false;
                 AutoStatus = status ?? AutoStatus;
             });
+        }
+
+        /// <summary>
+        /// 標記「接下來這一次 Enabled = false 是自動採集自己停的」並附上原因。
+        /// 使用者勾掉勾選框、點採集視窗、下 /gather auto(off)、或別的外掛叫 IPC 端點
+        /// SetAutoGatherEnabled 都不可以呼叫 —— 那些不算「自己停了」。
+        /// </summary>
+        private void MarkSelfStop(string reason, bool soundAlreadyPlayed = false)
+        {
+            _pendingStopReason      = reason;
+            _pendingStopSoundPlayed = soundAlreadyPlayed;
+        }
+
+        /// <summary>
+        /// 發出「自動化不是被你停掉、是自己停了」的通知。純顯示,不做任何遊戲動作。
+        /// </summary>
+        private void NotifyStoppedItself(string reason, bool soundAlreadyPlayed)
+        {
+            if (!GatherBuddy.Config.AutoGatherConfig.NotifyWhenStoppedItself)
+                return;
+
+            // 刻意用 Information:使用者跑 LogLevel 1,這一級一定收得到。
+            GatherBuddy.Log.Information($"[StopNotify] 自動採集自己停了:{reason}");
+
+            var headline = "Auto-gather stopped on its own.".Loc();
+            var body     = reason.Loc();
+            // 幾乎總是已經在主執行緒上(TaskManager 與 AntiStuck 都是),那時這個呼叫是同步的。
+            // 包起來是為了 IPC 端點 SetAutoGatherEnabled:別的外掛可以從背景執行緒叫它,
+            // 那條路會搶先消耗掉旗標,於是通知會在非主執行緒上發出去。
+            _ = Svc.Framework.RunOnFrameworkThread(() =>
+            {
+                Svc.NotificationManager.AddNotification(new Notification
+                {
+                    Title           = "GatherBuddy Reborn",
+                    Content         = headline + "\n" + body,
+                    MinimizedText   = headline,
+                    Type            = NotificationType.Warning,
+                    InitialDuration = TimeSpan.FromSeconds(30),
+                    Minimized       = false,
+                });
+            });
+
+            // 沿用既有的 honk,不另外做播放層。AbortAutoGather 已經播過就不重複。
+            if (GatherBuddy.Config.AutoGatherConfig.HonkMode && !soundAlreadyPlayed)
+                Task.Run(() => _soundHelper.StartHonkSoundTask(3));
         }
 
         private unsafe void CloseGatheringAddons(bool closeGathering = true)

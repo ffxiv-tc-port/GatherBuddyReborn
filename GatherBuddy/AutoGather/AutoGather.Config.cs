@@ -67,6 +67,12 @@ namespace GatherBuddy.AutoGather
         public bool DoRepair { get; set; } = false;
         public int RepairThreshold { get; set; } = 50;
         public bool HonkMode { get; set; } = true;
+
+        /// <summary>
+        /// 自動採集「不是被你關掉、是自己停了」時要不要跳一則 Dalamud 通知。
+        /// 預設關:既有使用者的設定檔升級後行為完全不變,要開必須自己去勾。
+        /// </summary>
+        public bool NotifyWhenStoppedItself { get; set; } = false;
         public SortingType SortingMethod { get; set; } = SortingType.Location;
         public bool GoHomeWhenIdle { get; set; } = true;
         public bool GoHomeWhenDone { get; set; } = true;

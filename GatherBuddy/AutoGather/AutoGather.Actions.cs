@@ -182,7 +182,7 @@ namespace GatherBuddy.AutoGather
             if (bait == 0)
             {
                 Communicator.Print($"No bait found in inventory. Auto-fishing cannot continue.");
-                AbortAutoGather();
+                AbortAutoGather(reason: "No bait found in inventory.");
             }
 
             if (bait != GatherBuddy.CurrentBait.Current)
@@ -192,19 +192,19 @@ namespace GatherBuddy.AutoGather
                 {
                     case CurrentBait.ChangeBaitReturn.InvalidBait:
                         Svc.Log.Error("Invalid bait selected: " + bait);
-                        AbortAutoGather();
+                        AbortAutoGather(reason: "The selected bait is invalid.");
                         break;
                     case CurrentBait.ChangeBaitReturn.NotInInventory:
                         Communicator.Print(
                             $"Bait '{target.Fish!.InitialBait.Name}' for fish '{target.Fish!.Name[GatherBuddy.Language]}' not in inventory. Auto-fishing cannot continue.");
-                        AbortAutoGather();
+                        AbortAutoGather(reason: "The required bait is not in your inventory.");
                         break;
                     case CurrentBait.ChangeBaitReturn.Success:
                     case CurrentBait.ChangeBaitReturn.AlreadyEquipped:
                         break;
                     case CurrentBait.ChangeBaitReturn.UnknownError:
                         Svc.Log.Error("Unknown error when switching bait. Auto-gather cannot continue.");
-                        AbortAutoGather();
+                        AbortAutoGather(reason: "Could not switch bait.");
                         break;
                 }
 

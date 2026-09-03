@@ -120,6 +120,12 @@ public partial class Interface
             => DrawCheckbox("Play a sound when done gathering".Loc(), "Play a sound when auto-gathering shuts down because your list is complete".Loc(),
                 GatherBuddy.Config.AutoGatherConfig.HonkMode,   b => GatherBuddy.Config.AutoGatherConfig.HonkMode = b);
 
+        public static void DrawStopNotifyBox()
+            => DrawCheckbox("Notify when auto-gather stops on its own".Loc(),
+                "Show a notification when auto-gathering stops because it finished or ran into a problem. Turning it off yourself never notifies.".Loc(),
+                GatherBuddy.Config.AutoGatherConfig.NotifyWhenStoppedItself,
+                b => GatherBuddy.Config.AutoGatherConfig.NotifyWhenStoppedItself = b);
+
         public static void DrawRepairBox()
             => DrawCheckbox("Repair gear when needed".Loc(),        "Repair gear when it is almost broken".Loc(),
                 GatherBuddy.Config.AutoGatherConfig.DoRepair, b => GatherBuddy.Config.AutoGatherConfig.DoRepair = b);
@@ -948,6 +954,7 @@ public partial class Interface
             {
                 ConfigFunctions.DrawHonkModeBox();
                 ConfigFunctions.DrawHonkVolumeSlider();
+                ConfigFunctions.DrawStopNotifyBox();
                 AutoGatherUI.DrawMountSelector();
                 ConfigFunctions.DrawMountUpDistance();
                 ConfigFunctions.DrawMoveWhileMounting();
