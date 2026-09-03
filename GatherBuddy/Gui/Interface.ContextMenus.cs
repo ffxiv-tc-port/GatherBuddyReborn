@@ -103,6 +103,16 @@ public partial class Interface
             ClientLanguage.German   => "de",
             ClientLanguage.French   => "fr",
             ClientLanguage.Japanese => "ja",
+            // TC(台服)客戶端在 Dalamud 13.0.0.16 之後回報 ClientLanguage 7(TraditionalChinese),
+            // 舊版回報 4(ChineseSimplified)。用數值比較才能同時相容 CI 釘的 13.0.0.6(列舉沒有 7 這個名字)與執行期新版。
+            // TeamCraft 的繁中代碼是 tw,不是 zh(zh 是國服簡中)。查證來源(2026-09-03,staging 分支):
+            //   apps/client/src/app/core/data/language.ts     Language = 'fr'|'en'|'de'|'ja'|'ko'|'zh'|'ru'|'tw'
+            //   apps/client/src/app/modules/settings/settings.service.ts
+            //       availableLocales = ['en','de','fr','ja','pt','br','es','ko','zh','tw','ru'];availableRegions 含 Region.Taiwan
+            //   apps/data-extraction/src/abstract-extractor.ts  另有 assets/data/tw/*.json 的 tw 名稱資料管線
+            // ⚠️ 代碼若不在 availableLocales 內,db.component.ts 會靜默退回 en(不報錯);
+            //    tw 沒有的名稱由 i18n-tools.service.ts 的 getName() 退回 .en,所以最壞情況與原本的 en 相同。
+            (ClientLanguage)4 or (ClientLanguage)5 or (ClientLanguage)7 => "tw",
             _                       => "en",
         };
 
