@@ -289,14 +289,22 @@ namespace GatherBuddy.Plugin
         [EzIPC] internal static readonly Action<Action> EnqueueHET;
         [EzIPC("AutoRetainer.GC.EnqueueInitiation", applyPrefix: false)] internal static readonly Action EnqueueGCInitiation;
 
-        // ── 具名壓制租約 ───────────────────────────────────────────────────────────
+        // ── 具名壓制租約（憑證形狀，與 YesAlready 的租約端點逐字相同的簽章）──────────
         // 🔴 舊的 AutoRetainer.SetSuppressed 是一個**無主的單一布林**:Artisan(僱員補貨時會壓制)
         //    與 ICE(宇宙任務)也在用同一個旗標,誰先結束誰就把別人的壓制一起解除。
-        //    租約端點有名字、可計數:全部租用者都還完,壓制才真的解除。
-        // 🔴 租約會逾時(提供端 5 分鐘),所以要週期性重新 Acquire 續租 —— 見 AutoRetainerSuppression。
-        // ⚠️ 這個 class 帶的是 SafeWrapper.IPCException:AutoRetainer 沒安裝、或舊版沒有這兩個端點時,
-        //    呼叫會被吞掉並回傳 default(false) —— 那正好就是我們要的 fail-safe 語意「沒拿到租約」。
-        [EzIPC("AutoRetainer.AcquireSuppression", applyPrefix: false)] internal static readonly Func<string, bool> AcquireSuppression;
-        [EzIPC("AutoRetainer.ReleaseSuppression", applyPrefix: false)] internal static readonly Func<string, bool> ReleaseSuppression;
+        //    租約端點有憑證、可計數:全部租用者都還完,壓制才真的解除。
+        // 🔑 形狀＝Guid 憑證(2026-09-03 起兩套統一)。改動前這裡宣告的是 Func<string, bool>
+        //    (用租用者名字當鍵),與 YesAlready 那套的 Func<string, int, Guid> 形狀不一致 ——
+        //    而 Dalamud 的 CallGate 在型別對不上時**不報錯**,會走 JSON 來回轉換
+        //    (CallGateChannel.ConvertObject),Guid 轉 string 這個方向**轉得過去**,
+        //    於是「歸還租約」會變成一個回傳 true 的空操作。統一形狀就是為了讓這種寫錯不可能發生。
+        // 🔴 租約會逾時(提供端 5 分鐘),所以要拿著憑證週期性 RenewSuppression 續約,
+        //    而且**要把續約的回傳值當真**:回 false 代表那把已經不在了,要重新取得 —— 見 AutoRetainerSuppression。
+        // ⚠️ 這個 class 帶的是 SafeWrapper.IPCException:AutoRetainer 沒安裝、或舊版沒有這幾個端點時,
+        //    呼叫會丟 IpcNotReadyError 被吞掉並回傳 default(Guid.Empty / false)——
+        //    那正好就是我們要的 fail-safe 語意「沒拿到租約」。
+        [EzIPC("AutoRetainer.AcquireSuppressionFor", applyPrefix: false)] internal static readonly Func<string, int, Guid> AcquireSuppressionFor;
+        [EzIPC("AutoRetainer.RenewSuppression", applyPrefix: false)] internal static readonly Func<Guid, bool> RenewSuppression;
+        [EzIPC("AutoRetainer.ReleaseSuppression", applyPrefix: false)] internal static readonly Func<Guid, bool> ReleaseSuppression;
     }
 }
