@@ -266,6 +266,18 @@ internal static unsafe class AddonPressGuard
         }
 
         presses[pressKey] = new PressRecord(address, frame, escapeFrames);
+
+        // ─── 按窗診斷(全艦隊統一格式,用來回答「跨外掛重按是不是真的在發生」)───
+        // 🔴 格式逐字統一,15 份各自獨立的 AddonPressGuard 才能互相比對:
+        //    [按窗診斷] plugin=<外掛名> addon=<addon名> addr=0x<位址16進位大寫> key=<參數鍵>
+        // 🔴 只在「這一幀真的要送出按壓」時寫一行(每幀的檢查與被擋下的那些都不寫);
+        //    🔴 不節流(節流會讓「兩個外掛在同一毫秒按同一個位址」這件事看不見);
+        //    🔴 只印位址數值,絕不解參。
+        // ⚠️ plugin= 用的是**發版鍵名**的小寫 b 拼法(GatherbuddyReborn),與 feed 的 InternalName 一致
+        //    —— 不要「修正」成大寫 B,那會讓這份 log 對不上其他工具。
+        // 📌 Information 級:使用者跑 LogLevel 2,Debug/Verbose 收不到。
+        GatherBuddy.Log.Information($"[按窗診斷] plugin=GatherbuddyReborn addon={addonName} addr=0x{address:X} key={pressKey}");
+
         return true;
     }
 
