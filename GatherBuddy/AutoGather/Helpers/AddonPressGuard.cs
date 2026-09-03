@@ -85,7 +85,7 @@ internal static unsafe class AddonPressGuard
     /// 補按永遠不會落在危險窗口內。
     /// ⚠️ <b>呼叫端如果是有毫秒逾時的任務,逾時預算要比這個值換算出來的時間長</b> ——
     /// 否則逃生口還沒放行,呼叫端就先逾時(<c>abortOnTimeout</c> 會清掉整條佇列)。
-    /// 走到這個逃生口代表「按了卻沒生效」,寫 <c>Information</c>(使用者跑 LogLevel 2,Debug 收不到)。
+    /// 走到這個逃生口代表「按了卻沒生效」,寫 <c>Information</c>(使用者跑 LogLevel 1,Debug 收得到但單檔數十萬行會淹沒)。
     /// </remarks>
     internal const int DefaultEscapeFrames = 90;
 
@@ -275,7 +275,7 @@ internal static unsafe class AddonPressGuard
         //    🔴 只印位址數值,絕不解參。
         // ⚠️ plugin= 用的是**發版鍵名**的小寫 b 拼法(GatherbuddyReborn),與 feed 的 InternalName 一致
         //    —— 不要「修正」成大寫 B,那會讓這份 log 對不上其他工具。
-        // 📌 Information 級:使用者跑 LogLevel 2,Debug/Verbose 收不到。
+        // 📌 Information 級:使用者跑 LogLevel 1,盲區只有 Verbose,Debug 收得到但單檔數十萬行會淹沒。
         GatherBuddy.Log.Information($"[按窗診斷] plugin=GatherbuddyReborn addon={addonName} addr=0x{address:X} key={pressKey}");
 
         return true;
@@ -353,7 +353,7 @@ internal static unsafe class AddonPressGuard
          && frame - closed.Frame < closed.EscapeFrames;
 
     /// <summary>
-    /// 被擋那一幀的診斷:單答終結窗寫 Information(使用者跑 LogLevel 2),多次互動窗被擋是常態寫 Debug;每扇窗 1 秒節流免得洗版。
+    /// 被擋那一幀的診斷:單答終結窗寫 Information(使用者跑 LogLevel 1),多次互動窗被擋是常態寫 Debug;每扇窗 1 秒節流免得洗版。
     /// </summary>
     private static void LogHold(string addonName, nint address, string pressKey, bool routine)
     {

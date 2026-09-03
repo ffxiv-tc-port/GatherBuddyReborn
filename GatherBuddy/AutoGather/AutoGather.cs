@@ -902,7 +902,7 @@ namespace GatherBuddy.AutoGather
         /// 兩者的正解相同：**存名字、跑到的時候重新查**（艦隊硬規則：絕不跨幀保存原生指標）。
         /// </para>
         /// 這是使用者觸發的動作型路徑（自動採集離開雲冠群島），不是每幀路徑，所以取不到時
-        /// 記一行 <c>Information</c>（使用者跑 LogLevel 2，Debug/Verbose 收不到）再跳過。
+        /// 記一行 <c>Information</c>（使用者跑 LogLevel 1，盲區只有 Verbose,Debug 收得到但單檔數十萬行會淹沒）再跳過。
         /// 行為不變：視窗在的時候送出的回呼與參數逐字相同。
         /// </remarks>
         /// <returns>

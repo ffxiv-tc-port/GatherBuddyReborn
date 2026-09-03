@@ -67,7 +67,7 @@ public partial class FishingParser : IDisposable
         if (now - _lastDetourErrorLog < TimeSpan.FromSeconds(30))
             return;
         _lastDetourErrorLog = now;
-        // Information, not Debug: users who report problems run at LogLevel 2.
+        // Information, not Debug: reporters run at LogLevel 1 - Debug is captured too, but drowned by 100k+ Debug lines per log file.
         GatherBuddy.Log.Information($"[FishingParser] {site} threw and was swallowed so it could not escape into native code (total {_detourErrors}); the game's own call went through unchanged: {ex}");
     }
 
