@@ -109,9 +109,17 @@ namespace GatherBuddy.AutoGather
             get;
             private set
             {
-                if (GatherBuddy.Config.AutoGatherConfig.AutoRetainerMultiMode)
-                    GatherBuddy.AutoRetainerApi.Suppressed = !value;
-                field                                  = value;
+                // 這裡原本有一行「if (AutoRetainerMultiMode) AutoRetainerApi.Suppressed = !value;」,已移除。
+                // 它寫的是 AutoRetainer 的無主布林(IPC 端點 AutoRetainer.SetSuppressed,對應 AutoRetainer
+                // 內部的 ManualSuppressed),而且是邊緣觸發:只在賦值那一刻寫一次,之後沒有任何地方會再把它對齊回來。
+                // 🔴 Enabled 的停用分支會執行「Waiting = false」,於是 Suppressed = !false = true ——
+                //    使用者一關掉自動採集,反而把 AutoRetainer 壓死。ManualSuppressed 沒有逾時,只有別人再寫一次
+                //    false、或使用者自己到 AutoRetainer 主視窗按「取消」才解得掉,而且全程零訊息。
+                // 🔴 同一個無主布林 Artisan 與 ICE 也在寫,誰最後寫誰算數,彼此互相解除。
+                // 正解是具名租約 AutoRetainerSuppression:由 DoAutoGather 每個 tick 依「Enabled && !Waiting」對齊
+                // (比舊寫法多了 Enabled 這一項,正是漏掉的那一項),冪等、可計數、會逾時,
+                // 停用(Enabled setter)與卸載(Dispose)都有明確的歸還點。
+                field = value;
             }
         } = false;
 
