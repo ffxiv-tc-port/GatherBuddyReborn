@@ -288,5 +288,15 @@ namespace GatherBuddy.Plugin
         //    例外會被吞掉、變成完全靜默的空操作。目前全 repo 沒有呼叫點，所以還沒被踩到。
         [EzIPC] internal static readonly Action<Action> EnqueueHET;
         [EzIPC("AutoRetainer.GC.EnqueueInitiation", applyPrefix: false)] internal static readonly Action EnqueueGCInitiation;
+
+        // ── 具名壓制租約 ───────────────────────────────────────────────────────────
+        // 🔴 舊的 AutoRetainer.SetSuppressed 是一個**無主的單一布林**:Artisan(僱員補貨時會壓制)
+        //    與 ICE(宇宙任務)也在用同一個旗標,誰先結束誰就把別人的壓制一起解除。
+        //    租約端點有名字、可計數:全部租用者都還完,壓制才真的解除。
+        // 🔴 租約會逾時(提供端 5 分鐘),所以要週期性重新 Acquire 續租 —— 見 AutoRetainerSuppression。
+        // ⚠️ 這個 class 帶的是 SafeWrapper.IPCException:AutoRetainer 沒安裝、或舊版沒有這兩個端點時,
+        //    呼叫會被吞掉並回傳 default(false) —— 那正好就是我們要的 fail-safe 語意「沒拿到租約」。
+        [EzIPC("AutoRetainer.AcquireSuppression", applyPrefix: false)] internal static readonly Func<string, bool> AcquireSuppression;
+        [EzIPC("AutoRetainer.ReleaseSuppression", applyPrefix: false)] internal static readonly Func<string, bool> ReleaseSuppression;
     }
 }

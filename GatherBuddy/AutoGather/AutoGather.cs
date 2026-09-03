@@ -128,6 +128,8 @@ namespace GatherBuddy.AutoGather
                     AutoStatus = "Idle...".Loc();
                     TaskManager.Abort();
                     YesAlready.Unlock();
+                    // 具名壓制租約:停用就立刻還回去,不要讓 AutoRetainer 等到租約逾時(5 分鐘)才恢復。
+                    AutoRetainerSuppression.ReleaseNow("自動採集已停用");
 
                     _activeItemList.Reset();
                     Waiting                    = false;
@@ -148,6 +150,10 @@ namespace GatherBuddy.AutoGather
                     WentHome = true; //Prevents going home right after enabling auto-gather
                     if (AutoHook.Enabled)
                         AutoHook.SetPluginState(false); //Make sure AutoHook doesn't interfere with us
+                    // 具名壓制租約:請 AutoRetainer 在自動採集期間不要去跑僱員/換角色。
+                    // 🔴 fail-safe:拿不到(沒安裝/舊版沒有這個端點)就照現況跑,絕不卡住這裡。
+                    // 續租與「狀態被別的路徑改掉」的對齊由 DoAutoGather 每個 tick 的 Sync 負責。
+                    AutoRetainerSuppression.Sync(true);
                 }
 
                 _enabled = value;
@@ -195,6 +201,12 @@ namespace GatherBuddy.AutoGather
 
         public void DoAutoGather()
         {
+            // 具名壓制租約的續租/歸還。
+            // 🔴 放在 !Enabled 的 early return **之前**:停用之後也要走到這裡才還得掉租約
+            //    (Enabled 的 setter 已經先還過一次,這裡是「狀態被別的路徑改掉」時的補網)。
+            // 📌 Waiting 代表 AutoGather 自己也沒事做(沒有可採的東西,或正在把場子讓給
+            //    AutoRetainer 的 MultiMode),那時候擋著 AutoRetainer 沒有道理。
+            AutoRetainerSuppression.Sync(Enabled && !Waiting);
 
             // Always check these first
             if (!IsGathering)
@@ -1127,6 +1139,8 @@ namespace GatherBuddy.AutoGather
 
         public void Dispose()
         {
+            // 🔴 最先做:卸載時一定要把壓制租約還回去,否則 AutoRetainer 要等到逾時(5 分鐘)才會恢復。
+            AutoRetainerSuppression.ReleaseNow("GatherBuddyReborn 正在卸載");
             _antiStuckManager.Dispose();
             _advancedUnstuck.Dispose();
             _activeItemList.Dispose();
