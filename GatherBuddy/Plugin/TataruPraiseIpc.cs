@@ -28,8 +28,9 @@ namespace GatherBuddy.Plugin;
 /// </remarks>
 internal static class TataruPraiseIpc
 {
-    /// <summary><c>Func&lt;bool&gt;</c>：總開關開著而且池裡真的有已合成的語音。</summary>
-    internal const string TagIsAvailable = "TataruPraise.IsAvailable";
+    /// <summary><c>Func&lt;string, bool&gt;</c>：<b>這一個情境</b>現在出不出得了聲（總開關＋這個情境的開關＋這個情境有已合成的語音）。</summary>
+    /// <remarks>📌 刻意<b>不</b>看冷卻：冷卻是「這一次剛好不出聲」，不是「不能出聲」。</remarks>
+    internal const string TagIsAvailableFor = "TataruPraise.IsAvailableFor";
 
     /// <summary><c>Func&lt;string, bool&gt;</c>：從指定情境的誇獎池挑一句來念。</summary>
     internal const string TagPraise = "TataruPraise.Praise";
@@ -57,9 +58,13 @@ internal static class TataruPraiseIpc
     {
         try
         {
-            // 先問 IsAvailable：對方的總開關關著、或池裡一句已合成的都沒有，就不要浪費它的冷卻。
+            // 先問 IsAvailableFor(情境)：問的是「這一個情境」出不出得了聲——總開關關著、
+            // 使用者把這個情境關掉、或這個情境一句已合成的都沒有，都在這裡擋掉。
+            // 🔴 不要退回去問 IsAvailable：那個問的是「整池」，於是「別的情境有句子、
+            //    我這個情境一句都沒有」時它照樣回 true，這道閘門等於白做。
             // 這一步同時兼作「對方在不在」的探測——沒註冊就會在這裡擲 IpcNotReadyError。
-            if (!Dalamud.PluginInterface.GetIpcSubscriber<bool>(TagIsAvailable).InvokeFunc())
+            if (!Dalamud.PluginInterface.GetIpcSubscriber<string, bool>(TagIsAvailableFor)
+                        .InvokeFunc(CategoryGatherStopped))
                 return;
 
             var accepted = Dalamud.PluginInterface.GetIpcSubscriber<string, bool>(TagPraise)
