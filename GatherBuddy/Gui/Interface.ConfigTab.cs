@@ -126,6 +126,13 @@ public partial class Interface
                 GatherBuddy.Config.AutoGatherConfig.NotifyWhenStoppedItself,
                 b => GatherBuddy.Config.AutoGatherConfig.NotifyWhenStoppedItself = b);
 
+        // 與 DrawStopNotifyBox / DrawHonkModeBox 刻意分開：桌面通知、喇叭聲、語音是三件事。
+        public static void DrawTataruPraiseBox()
+            => DrawCheckbox("Ask Tataru to speak when auto-gather stops on its own (requires TataruPraise)".Loc(),
+                "Needs the TataruPraise plugin installed and its own master switch turned on. Without it this option does nothing at all - no error, no sound. Turning auto-gather off yourself never speaks.".Loc(),
+                GatherBuddy.Config.AutoGatherConfig.TataruPraiseOnStoppedItself,
+                b => GatherBuddy.Config.AutoGatherConfig.TataruPraiseOnStoppedItself = b);
+
         public static void DrawRepairBox()
             => DrawCheckbox("Repair gear when needed".Loc(),        "Repair gear when it is almost broken".Loc(),
                 GatherBuddy.Config.AutoGatherConfig.DoRepair, b => GatherBuddy.Config.AutoGatherConfig.DoRepair = b);
@@ -955,6 +962,7 @@ public partial class Interface
                 ConfigFunctions.DrawHonkModeBox();
                 ConfigFunctions.DrawHonkVolumeSlider();
                 ConfigFunctions.DrawStopNotifyBox();
+                ConfigFunctions.DrawTataruPraiseBox();
                 AutoGatherUI.DrawMountSelector();
                 ConfigFunctions.DrawMountUpDistance();
                 ConfigFunctions.DrawMoveWhileMounting();

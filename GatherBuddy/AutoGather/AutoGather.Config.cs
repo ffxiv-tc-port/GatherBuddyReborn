@@ -73,6 +73,18 @@ namespace GatherBuddy.AutoGather
         /// 預設關:既有使用者的設定檔升級後行為完全不變,要開必須自己去勾。
         /// </summary>
         public bool NotifyWhenStoppedItself { get; set; } = false;
+
+        /// <summary>
+        /// 自動採集「不是被你關掉、是自己停了」時，透過 IPC 請 TataruPraise（塔塔露誇獎）念一句。
+        /// </summary>
+        /// <remarks>
+        /// 📌 預設 <c>true</c>：TataruPraise 沒安裝時整條路是靜默 no-op（IPC 擲
+        /// <c>IpcNotReadyError</c> 被吃掉），而 TataruPraise 自己的總開關（預設關）與冷卻也還在，
+        /// 所以預設開<b>不會</b>讓任何人多聽到聲音。
+        /// ⚠️ 與 <see cref="NotifyWhenStoppedItself"/>、<see cref="HonkMode"/> 刻意分成三個旗標：
+        /// 桌面通知、喇叭聲、語音是三件事，想只留其中一種的人不必被綁在一起。
+        /// </remarks>
+        public bool TataruPraiseOnStoppedItself { get; set; } = true;
         public SortingType SortingMethod { get; set; } = SortingType.Location;
         public bool GoHomeWhenIdle { get; set; } = true;
         public bool GoHomeWhenDone { get; set; } = true;

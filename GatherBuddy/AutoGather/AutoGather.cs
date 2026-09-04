@@ -1031,6 +1031,16 @@ namespace GatherBuddy.AutoGather
         /// </summary>
         private void NotifyStoppedItself(string reason, bool soundAlreadyPlayed)
         {
+            // 🔴 刻意放在 NotifyWhenStoppedItself 的閘門「之前」：那個旗標是「Dalamud 桌面通知」
+            //    的開關而且預設關；語音通知是另一件事、有自己的開關，兩者不該互相牽連。
+            // 🔴 IPC 的實作跑在呼叫端的執行緒上，而這個方法可能在背景執行緒上被叫到
+            //    （IPC 端點 SetAutoGatherEnabled 會搶先消耗掉旗標）⇒ 一律丟回主執行緒再叫。
+            // 🔴 fail-safe：TataruPraise 沒裝／關著／池裡沒句子都只是安靜的 no-op，
+            //    絕不影響採集流程本身。卡住停下來（AntiStuck 那條）也走得到這裡：
+            //    它有自己的 MarkSelfStop，一樣收斂到 Enabled setter 的這條邊上。
+            if (GatherBuddy.Config.AutoGatherConfig.TataruPraiseOnStoppedItself)
+                _ = Svc.Framework.RunOnFrameworkThread(() => TataruPraiseIpc.TryPraise(reason));
+
             if (!GatherBuddy.Config.AutoGatherConfig.NotifyWhenStoppedItself)
                 return;
 
