@@ -86,11 +86,17 @@ namespace GatherBuddy.Plugin
                     Debug.Assert(PointOnFloor != null);
                 }
 
+                // 🔴 回傳型別必須是 Vector3?:提供端是 navmeshManager.Query?.FindNearestPointOnMesh(...),
+                //    網格沒載入或該點不在網格上時回 null。
+                //    宣告成非可空的 Vector3 時,Dalamud 的 CallGateChannel 在「有值」那條路徑會靠 JSON
+                //    來回轉換**靜默轉成功**,只有「回 null」那次會在 (TRet)result 那步擲
+                //    NullReferenceException —— 失敗形式是罕見的例外,不是型別不合,所以一直沒被發現。
                 [EzIPC("vnavmesh.Query.Mesh.NearestPoint", applyPrefix: false)]
-                internal static readonly Func<Vector3, float, float, Vector3> NearestPoint;
+                internal static readonly Func<Vector3, float, float, Vector3?> NearestPoint;
 
+                // 🔴 同 NearestPoint:提供端是 navmeshManager.Query?.FindPointOnFloor(...) ⇒ Vector3?。
                 [EzIPC("vnavmesh.Query.Mesh.PointOnFloor", applyPrefix: false)]
-                internal static readonly Func<Vector3, bool, float, Vector3> PointOnFloor;
+                internal static readonly Func<Vector3, bool, float, Vector3?> PointOnFloor;
             }
         }
 
@@ -260,6 +266,13 @@ namespace GatherBuddy.Plugin
         }
 
         internal static bool Enabled => IPCSubscriber.IsReady("AutoHook");
+
+        // 🔑 GetPluginState 是 AutoHookSuppression 拍快照用的 —— 沒有 getter 就只能單向關掉、永不還原。
+        //    提供端 AutoHook/IPC/AutoHookIPC.cs 的 GetPluginState() 與 SetPluginState() 讀寫同一個
+        //    欄位(Configuration.PluginEnabled)。舊版 AutoHook 沒有這個端點,呼叫會擲 IpcNotReadyError,
+        //    所以 AutoHookSuppression 那邊一定要 try/catch(這個類別沒有帶 SafeWrapper)。
+        [EzIPC("AutoHook.GetPluginState", applyPrefix: false)]
+        internal static readonly Func<bool> GetPluginState;
 
         [EzIPC("AutoHook.SetPluginState", applyPrefix: false)]
         internal static readonly Action<bool> SetPluginState;

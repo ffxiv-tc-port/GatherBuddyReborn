@@ -156,6 +156,8 @@ namespace GatherBuddy.AutoGather
                     YesAlready.Unlock();
                     // 具名壓制租約:停用就立刻還回去,不要讓 AutoRetainer 等到租約逾時(5 分鐘)才恢復。
                     AutoRetainerSuppression.ReleaseNow("自動採集已停用");
+                    // 借走 AutoHook 的啟用開關就要還 —— 這一行是上面那個 setter 裡本來唯一漏掉的對稱點。
+                    AutoHookSuppression.RestoreNow("自動採集已停用");
 
                     _activeItemList.Reset();
                     Waiting                    = false;
@@ -174,8 +176,10 @@ namespace GatherBuddy.AutoGather
                 else
                 {
                     WentHome = true; //Prevents going home right after enabling auto-gather
-                    if (AutoHook.Enabled)
-                        AutoHook.SetPluginState(false); //Make sure AutoHook doesn't interfere with us
+                    // 🔑 對稱借還:先記下 AutoHook 目前的啟用狀態再關掉它,停用自動採集時還原。
+                    //    改動前這裡是單向的 SetPluginState(false) 且全 repo 沒有任何 (true),
+                    //    而提供端會 Service.Save() 寫進設定檔 ⇒ 使用者的 AutoHook 從此永遠是關的。
+                    AutoHookSuppression.SuppressNow(); //Make sure AutoHook doesn't interfere with us
                     // 具名壓制租約:請 AutoRetainer 在自動採集期間不要去跑僱員/換角色。
                     // 🔴 fail-safe:拿不到(沒安裝/舊版沒有這個端點)就照現況跑,絕不卡住這裡。
                     // 續租與「狀態被別的路徑改掉」的對齊由 DoAutoGather 每個 tick 的 Sync 負責。
@@ -552,8 +556,17 @@ namespace GatherBuddy.AutoGather
                 Svc.Log.Verbose($"Addons: {selectStringAddon}, {talkAddon}, {selectYesNoAddon}, {contentsFinderConfirmAddon}");
                 if (dutyNpc != null && dutyNpc.Position.DistanceToPlayer() > 3)
                 {
+                    // 🔴 提供端回的是 Vector3?:網格沒載入或該點不在網格上時回 null。
+                    //    改動前這裡宣告成 Vector3,那一次會擲 NullReferenceException,
+                    //    而這條路徑外面**沒有** try/catch。取不到就這一輪不動,下一個 tick 再試。
                     var point = VNavmesh.Query.Mesh.NearestPoint(dutyNpc.Position, 10, 10000);
-                    VNavmesh.SimpleMove.PathfindAndMoveTo(point, false);
+                    if (!point.HasValue)
+                    {
+                        GatherBuddy.Log.Debug("Query.Mesh.NearestPoint() returned null for the duty NPC position; retrying next tick.");
+                        return;
+                    }
+
+                    VNavmesh.SimpleMove.PathfindAndMoveTo(point.Value, false);
                     return;
                 }
                 else
@@ -848,7 +861,18 @@ namespace GatherBuddy.AutoGather
                     .OrderBy(o => Vector2.Distance(pos.Value, new Vector2(o.X, o.Z)))
                     .FirstOrDefault();
                 if (selectedFarNode == default)
-                    selectedFarNode = VNavmesh.Query.Mesh.NearestPoint(new Vector3(pos.Value.X, 0, pos.Value.Y), 10, 10000);
+                {
+                    // 🔴 提供端回 Vector3?。取不到就這一輪不動 —— 這裡**絕不能**寫 ?? default,
+                    //    那會讓 MoveToFarNode 拿到 Vector3.Zero 然後真的往地圖原點跑。
+                    var meshNode = VNavmesh.Query.Mesh.NearestPoint(new Vector3(pos.Value.X, 0, pos.Value.Y), 10, 10000);
+                    if (!meshNode.HasValue)
+                    {
+                        GatherBuddy.Log.Debug("Query.Mesh.NearestPoint() returned null for the flag position; retrying next tick.");
+                        return;
+                    }
+
+                    selectedFarNode = meshNode.Value;
+                }
             }
             else
             {
@@ -1230,6 +1254,7 @@ namespace GatherBuddy.AutoGather
         {
             // 🔴 最先做:卸載時一定要把壓制租約還回去,否則 AutoRetainer 要等到逾時(5 分鐘)才會恢復。
             AutoRetainerSuppression.ReleaseNow("GatherBuddyReborn 正在卸載");
+            AutoHookSuppression.RestoreNow("GatherBuddyReborn 正在卸載");
             _antiStuckManager.Dispose();
             _advancedUnstuck.Dispose();
             _activeItemList.Dispose();

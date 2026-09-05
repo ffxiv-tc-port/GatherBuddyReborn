@@ -96,12 +96,19 @@ namespace GatherBuddy.AutoGather
                         {
                             try
                             {
+                                // 🔴 提供端回的是 Vector3?(navmeshManager.Query?.FindPointOnFloor):取不到落點時是 null。
+                                //    改動前宣告成 Vector3,那一次會擲 NullReferenceException,剛好被下面的
+                                //    catch { } 吞掉 —— 結果碰巧正確,但靠的是例外。現在明確判斷:
+                                //    取不到就整段跳過(與例外被吞掉時完全相同),留給後面的進階脫困處理。
                                 var floor = VNavmesh.Query.Mesh.PointOnFloor(Player.Position, false, 3);
-                                Navigate(floor, true);
-                                TaskManager.Enqueue(() => !IsPathGenerating);
-                                TaskManager.DelayNext(50);
-                                TaskManager.Enqueue(() => !IsPathing, 1000);
-                                EnqueueDismount();
+                                if (floor.HasValue)
+                                {
+                                    Navigate(floor.Value, true);
+                                    TaskManager.Enqueue(() => !IsPathGenerating);
+                                    TaskManager.DelayNext(50);
+                                    TaskManager.Enqueue(() => !IsPathing, 1000);
+                                    EnqueueDismount();
+                                }
                             }
                             catch { }
                             //If even that fails, do advanced unstuck
@@ -220,7 +227,13 @@ namespace GatherBuddy.AutoGather
                 float separation;
                 if (WorldData.NodeOffsets.TryGetValue(destination, out var offset))
                 {
-                    offset = VNavmesh.Query.Mesh.NearestPoint(offset, MaxHorizontalSeparation, MaxVerticalSeparation);
+                    // 🔴 提供端回 Vector3?。改動前 null 會擲 NullReferenceException,被本方法底下的
+                    //    catch (Exception) 吞掉 ⇒ return destination。這裡明確走同一條路,行為不變。
+                    var meshOffset = VNavmesh.Query.Mesh.NearestPoint(offset, MaxHorizontalSeparation, MaxVerticalSeparation);
+                    if (!meshOffset.HasValue)
+                        return destination;
+
+                    offset = meshOffset.Value;
                     if ((separation = Vector2.Distance(offset.ToVector2(), destination.ToVector2())) > MaxHorizontalSeparation)
                         GatherBuddy.Log.Warning($"Offset is ignored because the horizontal separation {separation} is too large after correcting for mesh. Maximum allowed is {MaxHorizontalSeparation}.");
                     else if ((separation = Math.Abs(offset.Y - destination.Y)) > MaxVerticalSeparation)
@@ -229,7 +242,12 @@ namespace GatherBuddy.AutoGather
                         return offset;
                 }
 
-                var correctedDestination = VNavmesh.Query.Mesh.NearestPoint(destination, MaxHorizontalSeparation, MaxVerticalSeparation);
+                // 🔴 同上:null ⇒ 維持改動前「例外被吞掉」的結果,直接回未修正的 destination。
+                var meshDestination = VNavmesh.Query.Mesh.NearestPoint(destination, MaxHorizontalSeparation, MaxVerticalSeparation);
+                if (!meshDestination.HasValue)
+                    return destination;
+
+                var correctedDestination = meshDestination.Value;
                 if ((separation = Vector2.Distance(correctedDestination.ToVector2(), destination.ToVector2())) > MaxHorizontalSeparation)
                     GatherBuddy.Log.Warning($"Query.Mesh.NearestPoint() returned a point with too large horizontal separation {separation}. Maximum allowed is {MaxHorizontalSeparation}.");
                 else if ((separation = Math.Abs(correctedDestination.Y - destination.Y)) > MaxVerticalSeparation)
