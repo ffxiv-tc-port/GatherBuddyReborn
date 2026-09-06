@@ -74,6 +74,16 @@ internal static class AutoRetainerSuppression
             return;
         }
 
+        // 🔴 順序刻意是「先看時鐘,再問 AutoRetainer 在不在」—— 與 AutoHookSuppression 同一個形狀。
+        //    IPCSubscriber.IsReady 帶的是 ignoreCache: true,每一次呼叫都把 Dalamud 的
+        //    InstalledPlugins 整表反射掃一遍。改動前這個問句在時間閘門**之前**,
+        //    於是自動採集只要開著,它就是每幀一次全表反射掃描(使用者裝幾個外掛就掃幾個)。
+        //    ⚠️ 這裡刻意用不節流的 IsReady:過了閘門才問,拿到的一定是當下的真值,
+        //    下面那些訊息的內容因此與改動前逐字相同。
+        var now = Environment.TickCount64;
+        if (now < _nextAttemptAt)
+            return;
+
         if (!IPCSubscriber.IsReady("AutoRetainer"))
         {
             // AutoRetainer 不在(或被卸載了)。它的租約表跟著它一起消失,這裡只要把自己的狀態歸零。
@@ -83,13 +93,14 @@ internal static class AutoRetainerSuppression
                 GatherBuddy.Log.Information("[AutoRetainer 壓制] AutoRetainer 已經不在了,本機的壓制租約狀態一併歸零(AutoRetainer 卸載時租約表本來就跟著消失)。");
             }
 
-            _nextAttemptAt = 0;
+            // 🔴 改動前這裡寫的是 _nextAttemptAt = 0(下一幀立刻再問一次)。時間閘門移到上面之後,
+            //    再寫 0 就等於閘門不存在,會退回每幀全表反射掃描。改成退避一個重試間隔:
+            //    AutoRetainer 之後才裝上/載入完的話,最多晚 RetryIntervalMs 就會被發現,
+            //    「載入之後永遠沒發現」不可能發生。而使用者自己把自動採集關掉再打開時,
+            //    ReleaseNow 仍然會把它歸零 —— 那一下依舊是立即重試。
+            _nextAttemptAt = now + RetryIntervalMs;
             return;
         }
-
-        var now = Environment.TickCount64;
-        if (now < _nextAttemptAt)
-            return;
 
         // 🔴 已經有憑證就先續約。續約回 false＝那把已經不在了(逾時/AutoRetainer 重載/
         //    使用者按了「取消」),這時候**不能**當成還壓著,要掉頭重新取得。

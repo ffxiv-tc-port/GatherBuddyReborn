@@ -14,14 +14,80 @@ namespace GatherBuddy.Plugin
 {
     internal static class IPCSubscriber
     {
+        /// <summary>
+        /// 某個外掛在不在(有沒有裝、載入完了沒有)。<b>每一次呼叫都把 Dalamud 的
+        /// <c>InstalledPlugins</c> 整表反射掃一遍</b>(逐個外掛 <c>GetProperty("InternalName").GetValue</c>)。
+        /// </summary>
+        /// <remarks>
+        /// 🔴 <b>每幀路徑不要用這一支,用 <see cref="IsReadyThrottled"/>。</b><br/>
+        /// ⚠️ <b>為什麼不乾脆改成 <c>ignoreCache: false</c></b>:ECommons 的那個快取
+        /// <b>只存得下正面結果</b> —— <c>DalamudReflector.TryGetDalamudPlugin</c> 只在
+        /// 「找到了」那條路徑寫 <c>pluginCache[internalName]</c>,「沒裝」從來不進快取,
+        /// 於是對缺席的外掛<b>一點都沒省到</b>(照樣每次全表掃描)。
+        /// 而且開快取會順便把 <c>MonitorPlugins</c> 掛上 <c>Framework.Update</c>,
+        /// 變成<b>不管自動採集開沒開</b>都每幀走訪一次 <c>InstalledPlugins</c> 比對快照。
+        /// ⇒ 換快取治不了這個問題,節流才治得了。
+        /// </remarks>
         public static bool IsReady(string pluginName)
             => DalamudReflector.TryGetDalamudPlugin(pluginName, out _, false, true);
+
+        /// <summary>同一個外掛名在這段時間內沿用上一次的答案。</summary>
+        private const long PresenceProbeIntervalMs = 5_000;
+
+        /// <summary>保護 <see cref="PresenceResults"/>。<b>鎖內不做反射、不打 IPC、不寫 log。</b></summary>
+        private static readonly object PresenceGate = new();
+
+        /// <summary>外掛名 → (這個答案到期的時刻, 上一次的答案)。</summary>
+        private static readonly Dictionary<string, (long ExpiresAt, bool Present)> PresenceResults
+            = new(StringComparer.Ordinal);
+
+        /// <summary>
+        /// <see cref="IsReady"/> 的節流版:每個外掛名最多每 <see cref="PresenceProbeIntervalMs"/>
+        /// 毫秒真的去掃一次,其餘時間沿用上一次的答案。<b>每幀路徑一律用這一支。</b>
+        /// </summary>
+        /// <remarks>
+        /// 🔴 <b>絕不用 <c>ECommons.Throttlers.EzThrottler</c></b>:那是整個外掛共用的靜態
+        /// <c>Dictionary</c> 而且零同步,從繪製執行緒與 framework 執行緒同時進來會把字典本身弄壞,
+        /// 連帶弄壞這個外掛裡所有模組的節流。這裡自帶一個字典＋自己的鎖。<br/>
+        /// 🔴 <b>延遲有上限</b>:每一筆都會到期並重新查 ⇒「對端載入之後永遠沒發現」不可能發生,
+        /// 最多晚 <see cref="PresenceProbeIntervalMs"/> 毫秒。<br/>
+        /// 🔑 真正的查詢<b>一定在鎖外</b>(它會做反射,而且可能寫 log)。代價是偶爾兩條執行緒同時
+        /// 查同一個名字 —— 那是冪等的(答案一樣),而且比今天「每幀都查」少了好幾個數量級。
+        /// </remarks>
+        public static bool IsReadyThrottled(string pluginName)
+        {
+            var  now = Environment.TickCount64;
+            bool hadPrevious;
+            bool previous;
+            lock (PresenceGate)
+            {
+                hadPrevious = PresenceResults.TryGetValue(pluginName, out var cached);
+                previous    = hadPrevious && cached.Present;
+                if (hadPrevious && now < cached.ExpiresAt)
+                    return cached.Present;
+            }
+
+            var present = IsReady(pluginName);
+
+            lock (PresenceGate)
+                PresenceResults[pluginName] = (now + PresenceProbeIntervalMs, present);
+
+            // 🔴 log 一定在鎖外。只在「答案跟上一次不一樣」時寫一行 —— 那只有外掛真的被載入或
+            //    卸載時才會發生,不會洗版;而使用者回報「GatherBuddy 沒發現某某外掛」時,
+            //    這一行是唯一的線索。一律 Information:使用者的記錄等級只濾掉 Verbose。
+            if (hadPrevious && previous != present)
+                GatherBuddy.Log.Information(present
+                    ? $"[外掛偵測] 偵測到 {pluginName} 已載入,相關整合恢復。"
+                    : $"[外掛偵測] {pluginName} 已經不在了(卸載或重載中),相關整合暫停。");
+
+            return present;
+        }
     }
 
     internal static class VNavmesh
     {
         internal static bool Enabled
-            => IPCSubscriber.IsReady("vnavmesh");
+            => IPCSubscriber.IsReadyThrottled("vnavmesh");
 
         internal static class Nav
         {
@@ -209,7 +275,7 @@ namespace GatherBuddy.Plugin
         }
 
         internal static bool Enabled
-            => IPCSubscriber.IsReady("Lifestream");
+            => IPCSubscriber.IsReadyThrottled("Lifestream");
 
         [EzIPC("Lifestream.ExecuteCommand", applyPrefix: false)]
         internal static readonly Action<string> ExecuteCommand;
@@ -252,7 +318,7 @@ namespace GatherBuddy.Plugin
             EzIPC.Init(typeof(AllaganTools), "AllaganTools");
         }
 
-        internal static bool Enabled => IPCSubscriber.IsReady("InventoryTools");
+        internal static bool Enabled => IPCSubscriber.IsReadyThrottled("InventoryTools");
 
         [EzIPC("AllaganTools.ItemCountOwned", applyPrefix: false)]
         internal static readonly Func<uint, bool, uint[], uint> ItemCountOwned;
@@ -317,7 +383,7 @@ namespace GatherBuddy.Plugin
     {
         private static EzIPCDisposalToken[] _disposalTokens = EzIPC.Init(typeof(AutoRetainer), "AutoRetainer.PluginState", SafeWrapper.IPCException);
 
-        internal static bool IsEnabled => IPCSubscriber.IsReady("AutoRetainer");
+        internal static bool IsEnabled => IPCSubscriber.IsReadyThrottled("AutoRetainer");
 
         [EzIPC] internal static readonly Func<bool> IsBusy;
         [EzIPC] internal static readonly Func<Dictionary<ulong, HashSet<string>>> GetEnabledRetainers;
