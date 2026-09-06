@@ -241,6 +241,14 @@ namespace GatherBuddy.AutoGather
             //    AutoRetainer 的 MultiMode),那時候擋著 AutoRetainer 沒有道理。
             AutoRetainerSuppression.Sync(Enabled && !Waiting);
 
+            // AutoHook 的暫停租約續約/歸還(與上面那把是兩回事:AutoHook 的租約是 refcount 語意,
+            // 拿到就開始壓制;vnavmesh 那種「拿到還要再押一次」的形狀不適用)。
+            // 🔴 條件刻意只有 Enabled,沒有 !Waiting:等待期間仍然可能走到釣魚點,
+            //    那正是要擋 AutoHook 搶竿的時候 —— 壓制窗口與改動前完全相同。
+            // 📌 使用者手上的 AutoHook 若還沒有租約端點,Sync 走的是退回軌(舊的 SetPluginState
+            //    對稱借還),那條路沒有續約這回事,只會週期性確認 AutoHook 還在不在。
+            AutoHookSuppression.Sync(Enabled);
+
             // Always check these first
             if (!IsGathering)
                 LuckUsed = false; //Reset the flag even if auto-gather was disabled mid-gathering

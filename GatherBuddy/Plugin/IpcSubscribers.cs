@@ -279,6 +279,38 @@ namespace GatherBuddy.Plugin
 
         [EzIPC("AutoHook.CreateAndSelectAnonymousPreset", applyPrefix: false)]
         internal static readonly Action<string> CreateAndSelectAnonymousPreset;
+
+        // ── 具名暫停租約(憑證形狀,與 AutoRetainer 那一組逐字相同的簽章)────────────
+        // 🔴 舊的 AutoHook.SetPluginState 是對**使用者的** Configuration.PluginEnabled 單向寫入,
+        //    三個借用端(Questionable／GBR／ICE)各自拍快照各自還原 ⇒ **執行期是最後寫入者獲勝**,
+        //    而且沒有逾時:持有者當掉在 false 上時使用者看到的是「AutoHook 突然不會自動上鉤了」,
+        //    log 一個字都沒有,唯一自癒是重載外掛。
+        //    ⚠️ **磁碟那半邊已經不是問題了**:提供端的 IpcConfigOverrides 讓借來的值不進設定檔
+        //    (2026-09-07 對使用者實際安裝的 7.20.0.38 驗過:IpcConfigOverrides／PluginEnabledKey 都在,
+        //    而租約端點一個都沒有)。殘留只剩執行期那半邊 —— 但它照樣沒有主人、照樣不會自己還原。
+        //    租約端點押的是 EffectivePluginEnabled(疊加值),使用者自己的欄位一個位元都不會被動到,
+        //    而且有 5 分鐘硬性逾時 —— 沒人記得還也會自己還原。
+        // 🔴🔴 AutoHook 的租約是 **refcount** 語意:**Acquire 本身就開始壓制**,不必再呼叫
+        //    SetLeasedPluginState。這與 vnavmesh 的 MovementLeases(拿到租約是惰性的)刻意不同,
+        //    照 vnavmesh 那套三步驟寫過來會多押一次、反過來則是完全靜默地什麼都沒發生。
+        // 🔴 提供端簽章(AutoHook/IPC/AutoHookIPC.cs):
+        //      Guid AcquireSuppressionFor(string owner, int milliseconds)
+        //      bool RenewSuppression(Guid lease) / bool ReleaseSuppression(Guid lease)
+        //    全部是**不可為 null 的值型別**,失敗回 Guid.Empty / false,永不回 null ——
+        //    所以這裡宣告成非可空的 Guid/bool 是對的(宣告成 T 而提供端會回 null 時,
+        //    CallGateChannel 會在 (TRet)result 那步擲一個看起來與 IPC 完全無關的 NullReferenceException)。
+        // ⚠️ 這個 class **沒有帶 SafeWrapper**:舊版 AutoHook 沒有這幾個端點時呼叫會擲
+        //    IpcNotReadyError 而**不會**被吞掉 —— AutoHookSuppression 就是靠這個例外分辨要不要
+        //    退回舊的 SetPluginState 對稱借還。**不要**在這裡加 SafeWrapper,那會把例外吞成
+        //    default(Guid)＝Guid.Empty,與「端點在、但提供端拒絕」變得分不出來。
+        [EzIPC("AutoHook.AcquireSuppressionFor", applyPrefix: false)]
+        internal static readonly Func<string, int, Guid> AcquireSuppressionFor;
+
+        [EzIPC("AutoHook.RenewSuppression", applyPrefix: false)]
+        internal static readonly Func<Guid, bool> RenewSuppression;
+
+        [EzIPC("AutoHook.ReleaseSuppression", applyPrefix: false)]
+        internal static readonly Func<Guid, bool> ReleaseSuppression;
     }
 
     internal static class AutoRetainer
