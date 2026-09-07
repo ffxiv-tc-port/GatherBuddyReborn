@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
@@ -64,6 +65,36 @@ public static class Communicator
 {
     public delegate SeStringBuilder ReplacePlaceholder(SeStringBuilder builder, string placeholder);
 
+    /// <summary>還沒送出的聊天訊息。<b>順序就是呼叫順序。</b></summary>
+    /// <remarks>
+    /// 🔴🔴 <b>為什麼要排到 framework 執行緒才送出。</b>本 pin 的 Dalamud
+    /// <c>ChatGui.Print(XivChatEntry)</c> 只是把項目 <c>Enqueue</c> 進一個<b>沒有任何同步</b>的
+    /// <c>Queue&lt;XivChatEntry&gt;</c>(<c>Dalamud/Game/Gui/ChatGui.cs:43</c>),而 <c>UpdateQueue</c>
+    /// 在 framework 執行緒上 <c>TryDequeue</c>。從別的執行緒呼叫 ⇒ 與 framework 執行緒並行改同一個
+    /// <c>Queue</c>,<b>失敗形式不是「訊息晚一點出現」而是那個佇列本身壞掉</b>。
+    /// <para>
+    /// 🔴 這個外掛確實有在非 framework 執行緒上印聊天的路徑(逐一開檔確認過):
+    /// <c>GatherBuddy.CheckForOGGB</c>(偵測到舊版 GatherBuddy 時的那則警告)與
+    /// <c>AutoGatherListsManager.Load</c>(清單載入失敗那則)都在<b>外掛建構子</b>裡,
+    /// 而外掛建構子跑在 Dalamud 的 LongRunning 專用執行緒上;
+    /// <c>Reflection.ImportArtisanList</c> 的「匯入成功」在 <c>Task.Run</c> 起的執行緒池工作上;
+    /// IPC 端點 <c>GatherBuddyReborn.SetAutoGatherEnabled</c> 跑在<b>呼叫端</b>的執行緒上,
+    /// 它會走進 <c>AutoGather.Enabled</c> 的 setter,那條路上的每一則訊息也一樣。
+    /// </para>
+    /// <para>
+    /// 📌 <c>IFramework.RunOnFrameworkThread(Action)</c> 在<b>已經是</b> framework 執行緒時就地同步
+    /// 執行(<c>Dalamud/Game/Framework.cs</c>),所以聊天指令、ImGui 回呼與 <c>DoAutoGather</c> 這些
+    /// 路徑一個位元都沒變 —— 訊息仍然在同一格、依同一個順序出現。
+    /// </para>
+    /// <para>
+    /// 🔑 <b>為什麼還要自己排一個佇列</b>:Dalamud 的 <c>ThreadBoundTaskScheduler</c> 用
+    /// <c>ConcurrentDictionary</c> 存待跑的工作、<c>Run()</c> 走訪它的 <c>Keys</c>
+    /// ⇒ <b>不保證先進先出</b>。把每一次 <c>Print</c> 各自包成一個排程工作的話,同一格內送出的兩則
+    /// 訊息順序會變成隨機的;自己排隊、到了 framework 執行緒一次排乾,順序就與呼叫順序逐字相同。
+    /// </para>
+    /// </remarks>
+    private static readonly ConcurrentQueue<XivChatEntry> PendingChat = new();
+
     public static void Print(SeString message)
     {
         var entry = new XivChatEntry()
@@ -72,7 +103,7 @@ public static class Communicator
             Name    = SeString.Empty,
             Type    = GatherBuddy.Config.ChatTypeMessage,
         };
-        Dalamud.Chat.Print(entry);
+        QueueForFramework(entry);
     }
 
     public static void PrintError(SeString message)
@@ -83,7 +114,24 @@ public static class Communicator
             Name    = SeString.Empty,
             Type    = GatherBuddy.Config.ChatTypeError,
         };
-        Dalamud.Chat.Print(entry);
+        QueueForFramework(entry);
+    }
+
+    /// <summary>把一則<b>已經組好</b>的訊息排進佇列,並要求在 framework 執行緒上排乾。</summary>
+    /// <remarks>
+    /// 📌 訊息內容與聊天頻道(<c>GatherBuddy.Config.ChatTypeMessage</c> / <c>ChatTypeError</c>)
+    /// <b>在呼叫端的執行緒上就組好了</b>,排隊的只是「送出」這個動作 ⇒ 使用者看到的字一個都沒變。<br/>
+    /// 🔴 <b>刻意不等它跑完</b>:全部呼叫點都是「印一行就繼續做事」,沒有任何一處需要印完才能往下走;
+    /// 同步等待只會在 framework 執行緒以外的地方多一個阻塞點。
+    /// </remarks>
+    private static void QueueForFramework(XivChatEntry entry)
+    {
+        PendingChat.Enqueue(entry);
+        _ = Dalamud.Framework.RunOnFrameworkThread(static () =>
+        {
+            while (PendingChat.TryDequeue(out var pending))
+                Dalamud.Chat.Print(pending);
+        });
     }
 
     public static void Print(string message)
