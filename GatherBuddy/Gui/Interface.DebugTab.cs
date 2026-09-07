@@ -745,7 +745,8 @@ public partial class Interface
                 ImGui.SameLine();
                 if (ImGui.SmallButton("NavTo".Loc()))
                 {
-                    VNavmesh.SimpleMove.PathfindAndMoveTo(obj.Position, AutoGather.AutoGather.DowngradeFlyIfNotMounted(true));
+                    // 🔴 ImGui 按鈕回呼:例外會變成 Dalamud 的視窗錯誤面板。改走安全版。
+                    VNavmesh.SimpleMove.PathfindAndMoveToSafe(obj.Position, AutoGather.AutoGather.DowngradeFlyIfNotMounted(true));
                 }
                 ImGui.SameLine();
                 ImGui.PopID();

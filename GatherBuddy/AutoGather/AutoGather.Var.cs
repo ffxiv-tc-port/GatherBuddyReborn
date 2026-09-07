@@ -24,14 +24,20 @@ namespace GatherBuddy.AutoGather
 {
     public partial class AutoGather
     {
+        // 🔴 這三支由 DoAutoGather 每幀讀,也由偵錯分頁每幀畫出來,而且 TaskManager 的延後
+        //    步驟(MoveToCloseNode 的下馬序列)也會在別的幀讀它們 —— 沒有任何一處在
+        //    「vnavmesh 在不在」的閘門後面。改用安全版:對端不在時回安全值,
+        //    剛好在 5 秒節流窗裡被卸載時作廢存在性快取。
+        //    ⚠️ 安全值刻意都是 false:「沒在移動、沒在算路、網格還沒好」——
+        //    這正是 vnavmesh 真的在、但什麼都沒在做時的答案,呼叫端的既有判斷原樣適用。
         public bool IsPathing
-            => VNavmesh.Path.IsRunning();
+            => VNavmesh.Path.IsRunningSafe();
 
         public bool IsPathGenerating
-            => VNavmesh.Nav.PathfindInProgress();
+            => VNavmesh.Nav.PathfindInProgressSafe();
 
         public bool NavReady
-            => VNavmesh.Nav.IsReady();
+            => VNavmesh.Nav.IsReadySafe();
 
         private bool IsBlacklisted(Vector3 g)
         {

@@ -137,6 +137,62 @@ namespace GatherBuddy.Plugin
                 Debug.Assert(SetAutoLoad != null);
             }
 
+        /// <summary>網格載入好了沒。對端不在時回 <see langword="false"/>(＝還沒好)。</summary>
+        /// <remarks>
+        /// 🔴 <b>GBR 對 vnavmesh 的每一個呼叫都應該走安全版。</b>裸的 <c>[EzIPC]</c> 欄位在對端不在時
+        /// 會擲 <see cref="IpcNotReadyError"/>,而呼叫點分佈在<b>每幀的 DoAutoGather</b>、
+        /// <b>ImGui 按鈕回呼</b>(採集點清單的「導航」、偵錯分頁的 NavTo)與 <c>TaskManager</c> 的
+        /// 延後步驟三種地方 —— 在繪製回呼上那會變成 Dalamud 的視窗錯誤面板。<br/>
+        /// 🔑 兩層保護:①先看節流過的 <c>VNavmesh.Enabled</c>,沒裝的人連 IPC 都不打;
+        /// ②真的擲了(卸載剛好落在 5 秒節流窗裡)就作廢存在性快取,下一次查詢立刻重查。
+        /// 只攔 <see cref="IpcNotReadyError"/>,參數個數/型別寫錯擲的其餘 <c>IpcError</c> 照樣往上冒。
+        /// </remarks>
+            internal static bool IsReadySafe()
+            {
+                if (!Enabled)
+                    return false;
+                try
+                {
+                    return IsReady();
+                }
+                catch (IpcNotReadyError)
+                {
+                    IPCSubscriber.InvalidatePresence(InternalName);
+                    return false;
+                }
+            }
+
+        /// <summary>vnavmesh 正在算路徑嗎。對端不在時回 <see langword="false"/>(＝沒在算)。</summary>
+            internal static bool PathfindInProgressSafe()
+            {
+                if (!Enabled)
+                    return false;
+                try
+                {
+                    return PathfindInProgress();
+                }
+                catch (IpcNotReadyError)
+                {
+                    IPCSubscriber.InvalidatePresence(InternalName);
+                    return false;
+                }
+            }
+
+        /// <summary>取消全部路徑計算。對端不在＝本來就沒有東西要取消,什麼都不做。</summary>
+            internal static void PathfindCancelAllSafe()
+            {
+                if (!Enabled)
+                    return;
+                try
+                {
+                    PathfindCancelAll();
+                }
+                catch (IpcNotReadyError)
+                {
+                    IPCSubscriber.InvalidatePresence(InternalName);
+                }
+            }
+
             [EzIPC("vnavmesh.Nav.IsReady", applyPrefix: false)]
             internal static readonly Func<bool> IsReady;
 
@@ -187,6 +243,40 @@ namespace GatherBuddy.Plugin
                 //    宣告成非可空的 Vector3 時,Dalamud 的 CallGateChannel 在「有值」那條路徑會靠 JSON
                 //    來回轉換**靜默轉成功**,只有「回 null」那次會在 (TRet)result 那步擲
                 //    NullReferenceException —— 失敗形式是罕見的例外,不是型別不合,所以一直沒被發現。
+                /// <summary>網格上離指定點最近的可行走點。對端不在時回 <see langword="null"/>,
+                /// 與提供端「網格沒載入或該點不在網格上」的回答完全相同 ⇒ 呼叫端既有的
+                /// <c>HasValue</c> 判斷原樣適用,不必改。</summary>
+                internal static Vector3? NearestPointSafe(Vector3 point, float halfExtentXZ, float halfExtentY)
+                {
+                    if (!Enabled)
+                        return null;
+                    try
+                    {
+                        return NearestPoint(point, halfExtentXZ, halfExtentY);
+                    }
+                    catch (IpcNotReadyError)
+                    {
+                        IPCSubscriber.InvalidatePresence(InternalName);
+                        return null;
+                    }
+                }
+
+                /// <summary>指定點正下方的地板點。對端不在時回 <see langword="null"/>(同上)。</summary>
+                internal static Vector3? PointOnFloorSafe(Vector3 point, bool allowUnlandable, float halfExtentXZ)
+                {
+                    if (!Enabled)
+                        return null;
+                    try
+                    {
+                        return PointOnFloor(point, allowUnlandable, halfExtentXZ);
+                    }
+                    catch (IpcNotReadyError)
+                    {
+                        IPCSubscriber.InvalidatePresence(InternalName);
+                        return null;
+                    }
+                }
+
                 [EzIPC("vnavmesh.Query.Mesh.NearestPoint", applyPrefix: false)]
                 internal static readonly Func<Vector3, float, float, Vector3?> NearestPoint;
 
@@ -211,6 +301,37 @@ namespace GatherBuddy.Plugin
                 Debug.Assert(SetAlignCamera != null);
                 Debug.Assert(GetTolerance != null);
                 Debug.Assert(SetTolerance != null);
+            }
+
+            /// <summary>正在沿路徑移動嗎。對端不在時回 <see langword="false"/>(＝沒在動)。</summary>
+            internal static bool IsRunningSafe()
+            {
+                if (!Enabled)
+                    return false;
+                try
+                {
+                    return IsRunning();
+                }
+                catch (IpcNotReadyError)
+                {
+                    IPCSubscriber.InvalidatePresence(InternalName);
+                    return false;
+                }
+            }
+
+            /// <summary>停止移動。對端不在＝已經沒有路徑在跑,什麼都不做。</summary>
+            internal static void StopSafe()
+            {
+                if (!Enabled)
+                    return;
+                try
+                {
+                    Stop();
+                }
+                catch (IpcNotReadyError)
+                {
+                    IPCSubscriber.InvalidatePresence(InternalName);
+                }
             }
 
             [EzIPC("vnavmesh.Path.MoveTo", applyPrefix: false)]
@@ -251,6 +372,24 @@ namespace GatherBuddy.Plugin
                 EzIPC.Init(typeof(SimpleMove), "vnavmesh");
                 Debug.Assert(PathfindAndMoveTo != null);
                 Debug.Assert(PathfindInProgress != null);
+            }
+
+            /// <summary>算路徑並開始移動。對端不在時回 <see langword="false"/>(＝這次導航失敗),
+            /// 與 vnavmesh 自己「算不出路徑」的回答相同 ⇒ 呼叫端的 <c>LastNavigationResult</c>
+            /// 與各處的失敗處理原樣適用。</summary>
+            internal static bool PathfindAndMoveToSafe(Vector3 destination, bool fly)
+            {
+                if (!Enabled)
+                    return false;
+                try
+                {
+                    return PathfindAndMoveTo(destination, fly);
+                }
+                catch (IpcNotReadyError)
+                {
+                    IPCSubscriber.InvalidatePresence(InternalName);
+                    return false;
+                }
             }
 
             [EzIPC("vnavmesh.SimpleMove.PathfindAndMoveTo", applyPrefix: false)]

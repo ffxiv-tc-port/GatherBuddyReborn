@@ -1,5 +1,4 @@
 ﻿using Dalamud.Game.ClientState.Conditions;
-using Dalamud.Plugin.Ipc.Exceptions;
 using ECommons.GameHelpers;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using GatherBuddy.Classes;
@@ -101,7 +100,7 @@ namespace GatherBuddy.AutoGather
                                 //    改動前宣告成 Vector3,那一次會擲 NullReferenceException,剛好被下面的
                                 //    catch { } 吞掉 —— 結果碰巧正確,但靠的是例外。現在明確判斷:
                                 //    取不到就整段跳過(與例外被吞掉時完全相同),留給後面的進階脫困處理。
-                                var floor = VNavmesh.Query.Mesh.PointOnFloor(Player.Position, false, 3);
+                                var floor = VNavmesh.Query.Mesh.PointOnFloorSafe(Player.Position, false, 3);
                                 if (floor.HasValue)
                                 {
                                     Navigate(floor.Value, true);
@@ -189,20 +188,9 @@ namespace GatherBuddy.AutoGather
             // For example, reinitiate navigation to the destination
             CurrentDestination = default;
             CurrentRotation    = default;
-            if (VNavmesh.Enabled)
-            {
-                // 🔴 Enabled 是節流過的答案(最多 5 秒舊)。vnavmesh 剛好在那個窗裡被卸載時
-                //    Path.Stop() 會擲 IpcNotReadyError,而這條路徑從每幀的 DoAutoGather 走得到。
-                //    對端不在＝已經沒有路徑在跑,安全值就是什麼都不做;順手作廢存在性快取。
-                try
-                {
-                    VNavmesh.Path.Stop();
-                }
-                catch (IpcNotReadyError)
-                {
-                    IPCSubscriber.InvalidatePresence(VNavmesh.InternalName);
-                }
-            }
+            // 🔴 安全版自己含了 Enabled 前置檢查、只攔 IpcNotReadyError、作廢存在性快取,
+            //    保護與先前那段就地 try/catch 完全相同,只是移進了 VNavmesh 那一層。
+            VNavmesh.Path.StopSafe();
         }
 
         private unsafe void SetRotation(Angle angle)
@@ -225,7 +213,7 @@ namespace GatherBuddy.AutoGather
             var correctedDestination = GetCorrectedDestination(CurrentDestination);
             GatherBuddy.Log.Debug($"Navigating to {destination} (corrected to {correctedDestination})");
 
-            LastNavigationResult = VNavmesh.SimpleMove.PathfindAndMoveTo(correctedDestination, shouldFly);
+            LastNavigationResult = VNavmesh.SimpleMove.PathfindAndMoveToSafe(correctedDestination, shouldFly);
         }
 
         private static Vector3 GetCorrectedDestination(Vector3 destination)
@@ -240,7 +228,7 @@ namespace GatherBuddy.AutoGather
                 {
                     // 🔴 提供端回 Vector3?。改動前 null 會擲 NullReferenceException,被本方法底下的
                     //    catch (Exception) 吞掉 ⇒ return destination。這裡明確走同一條路,行為不變。
-                    var meshOffset = VNavmesh.Query.Mesh.NearestPoint(offset, MaxHorizontalSeparation, MaxVerticalSeparation);
+                    var meshOffset = VNavmesh.Query.Mesh.NearestPointSafe(offset, MaxHorizontalSeparation, MaxVerticalSeparation);
                     if (!meshOffset.HasValue)
                         return destination;
 
@@ -254,7 +242,7 @@ namespace GatherBuddy.AutoGather
                 }
 
                 // 🔴 同上:null ⇒ 維持改動前「例外被吞掉」的結果,直接回未修正的 destination。
-                var meshDestination = VNavmesh.Query.Mesh.NearestPoint(destination, MaxHorizontalSeparation, MaxVerticalSeparation);
+                var meshDestination = VNavmesh.Query.Mesh.NearestPointSafe(destination, MaxHorizontalSeparation, MaxVerticalSeparation);
                 if (!meshDestination.HasValue)
                     return destination;
 

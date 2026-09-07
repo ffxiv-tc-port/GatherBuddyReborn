@@ -138,8 +138,11 @@ namespace GatherBuddy.AutoGather
                             return;
                         }
                         //VNavmesh_IPCSubscriber.Nav_PathfindCancelAll();
-                        VNavmesh.Path.Stop();
-                        VNavmesh.SimpleMove.PathfindAndMoveTo(node.Position, GatherBuddy.AutoGather.ShouldFlyManual(node.Position));
+                        // 🔴 這裡是 ImGui 按鈕回呼:例外會冒到 WindowSystem.Draw,變成 Dalamud 的
+                        //    視窗錯誤面板。沒裝 vnavmesh 的人按下「導航」就會踩到。改走安全版,
+                        //    對端不在時什麼都不做(按鈕沒反應),不會把整個視窗弄成錯誤面板。
+                        VNavmesh.Path.StopSafe();
+                        VNavmesh.SimpleMove.PathfindAndMoveToSafe(node.Position, GatherBuddy.AutoGather.ShouldFlyManual(node.Position));
                     }
 
                     if (WorldData.NodeOffsets.TryGetValue(node.Position, out var offset))
@@ -158,8 +161,9 @@ namespace GatherBuddy.AutoGather
                                 return;
                             }
                             //VNavmesh_IPCSubscriber.Nav_PathfindCancelAll();
-                            VNavmesh.Path.Stop();
-                            VNavmesh.SimpleMove.PathfindAndMoveTo(offset, GatherBuddy.AutoGather.ShouldFlyManual(offset));
+                            // 🔴 同上:ImGui 按鈕回呼,改走安全版。
+                            VNavmesh.Path.StopSafe();
+                            VNavmesh.SimpleMove.PathfindAndMoveToSafe(offset, GatherBuddy.AutoGather.ShouldFlyManual(offset));
                         }
                     }
                     else

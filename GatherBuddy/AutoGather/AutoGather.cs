@@ -165,21 +165,12 @@ namespace GatherBuddy.AutoGather
                     ActionSequence             = null;
                     CurrentCollectableRotation = null;
 
-                    // 🔴 IsPathGenerating 與 PathfindCancelAll 都是 vnavmesh 的 IPC 呼叫,而
-                    //    VNavmesh.Enabled 是節流過的答案(最多 5 秒舊)。vnavmesh 剛好在那個窗裡被
-                    //    卸載的話,這兩個呼叫會擲 IpcNotReadyError,而這裡是 Enabled 的 setter ——
-                    //    例外會一路冒到「按下勾選框」的那個 ImGui 回呼上去。
-                    //    對端不在＝本來就沒有路徑要取消,安全值就是什麼都不做;順手作廢存在性快取,
-                    //    下一次查詢就會重查成「不在」而不用等節流到期。只攔 IpcNotReadyError。
-                    try
-                    {
-                        if (VNavmesh.Enabled && IsPathGenerating)
-                            VNavmesh.Nav.PathfindCancelAll();
-                    }
-                    catch (IpcNotReadyError)
-                    {
-                        IPCSubscriber.InvalidatePresence(VNavmesh.InternalName);
-                    }
+                    // 🔴 這裡是 Enabled 的 setter,例外會一路冒到「按下勾選框」的 ImGui 回呼上。
+                    //    兩個呼叫都改走 vnavmesh 的安全版(Enabled 前置檢查＋只攔 IpcNotReadyError
+                    //    ＋作廢存在性快取),保護與先前那段就地 try/catch 完全相同,只是移進了
+                    //    VNavmesh 那一層,讓全 repo 對 vnavmesh 的呼叫只有一種寫法。
+                    if (IsPathGenerating)
+                        VNavmesh.Nav.PathfindCancelAllSafe();
                     StopNavigation();
                     CurrentFarNodeLocation   = null;
                     _homeWorldWarning        = false;
@@ -313,6 +304,17 @@ namespace GatherBuddy.AutoGather
             }
 
 
+            // 🔴 NavReady 改成安全版之後,沒裝 vnavmesh 時它回 false 而不是擲例外 ——
+            //    少了這個前置檢查的話,使用者看到的會是「等待 Navmesh…」而不是「你有安裝它嗎」,
+            //    等於把既有那則正確的診斷訊息弄丟。所以先問在不在,沿用同一則已在地化的字串。
+            if (!VNavmesh.Enabled)
+            {
+                AutoStatus = "vnavmesh communication failed. Do you have it installed??".Loc();
+                return;
+            }
+
+            // ⚠️ 下面這個 catch 刻意留著:安全版只攔 IpcNotReadyError,
+            //    vnavmesh 在場但用別的方式壞掉時仍然要收斂到同一則訊息(既有行為不動)。
             try
             {
                 if (!NavReady)
@@ -610,14 +612,14 @@ namespace GatherBuddy.AutoGather
                     // 🔴 提供端回的是 Vector3?:網格沒載入或該點不在網格上時回 null。
                     //    改動前這裡宣告成 Vector3,那一次會擲 NullReferenceException,
                     //    而這條路徑外面**沒有** try/catch。取不到就這一輪不動,下一個 tick 再試。
-                    var point = VNavmesh.Query.Mesh.NearestPoint(dutyNpc.Position, 10, 10000);
+                    var point = VNavmesh.Query.Mesh.NearestPointSafe(dutyNpc.Position, 10, 10000);
                     if (!point.HasValue)
                     {
                         GatherBuddy.Log.Debug("Query.Mesh.NearestPoint() returned null for the duty NPC position; retrying next tick.");
                         return;
                     }
 
-                    VNavmesh.SimpleMove.PathfindAndMoveTo(point.Value, false);
+                    VNavmesh.SimpleMove.PathfindAndMoveToSafe(point.Value, false);
                     return;
                 }
                 else
@@ -917,7 +919,7 @@ namespace GatherBuddy.AutoGather
                 {
                     // 🔴 提供端回 Vector3?。取不到就這一輪不動 —— 這裡**絕不能**寫 ?? default,
                     //    那會讓 MoveToFarNode 拿到 Vector3.Zero 然後真的往地圖原點跑。
-                    var meshNode = VNavmesh.Query.Mesh.NearestPoint(new Vector3(pos.Value.X, 0, pos.Value.Y), 10, 10000);
+                    var meshNode = VNavmesh.Query.Mesh.NearestPointSafe(new Vector3(pos.Value.X, 0, pos.Value.Y), 10, 10000);
                     if (!meshNode.HasValue)
                     {
                         GatherBuddy.Log.Debug("Query.Mesh.NearestPoint() returned null for the flag position; retrying next tick.");
