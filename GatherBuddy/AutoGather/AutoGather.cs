@@ -411,7 +411,15 @@ namespace GatherBuddy.AutoGather
                 return;
             }
 
-            if (AutoRetainer.IsEnabled && GatherBuddy.Config.AutoGatherConfig.AutoRetainerMultiMode && AutoRetainer.AreAnyRetainersAvailableForCurrentChara())
+            // 🔴 運算元順序刻意是「先看設定,再問 AutoRetainer 在不在」。
+            //    AutoRetainer.IsEnabled 走的是 IPCSubscriber.IsReadyThrottled:節流到期的那一次
+            //    仍然要把 Dalamud 的 InstalledPlugins 整表反射掃一遍(逐個外掛反射讀 InternalName),
+            //    而 AutoRetainerMultiMode 只是讀一個設定欄位。多重模式的預設是關的
+            //    ⇒ 沒開的人從此完全不會走到那個查詢,DoAutoGather 每 5 秒一次的那筆掃描直接消失。
+            //    ⚠️ 三個運算元都只回值、不改狀態,而且「IsEnabled 排在 AreAnyRetainers... 之前」這個
+            //    先後關係一個字沒動 —— AutoRetainer 不在時照樣在它那裡短路,不會去打不存在的端點。
+            //    ⇒ 布林結果與改動前逐字相同,變的只有「有沒有去問」。
+            if (GatherBuddy.Config.AutoGatherConfig.AutoRetainerMultiMode && AutoRetainer.IsEnabled && AutoRetainer.AreAnyRetainersAvailableForCurrentChara())
             {
                 Waiting = true;
                 _plugin.Ipc.AutoGatherWaiting();
