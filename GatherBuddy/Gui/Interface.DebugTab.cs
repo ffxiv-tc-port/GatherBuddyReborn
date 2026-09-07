@@ -790,6 +790,28 @@ public partial class Interface
         ImGui.Text($"{label}: {text} {visible}");
     }
 
+    /// <summary>
+    /// 畫一行 vnavmesh 狀態。<b>沒裝 vnavmesh 時不畫 <c>False</c></b> —— 那是「不知道」不是「沒有」,
+    /// 改成灰字的「未安裝」,把「為什麼不知道」留在 tooltip 裡。
+    /// </summary>
+    /// <param name="present">節流過的 vnavmesh 存在性(呼叫端一幀取一次,三行共用)。</param>
+    /// <param name="valueGetter">只在 vnavmesh 真的在時才會被呼叫 —— 沒裝時連 IPC 都不打。</param>
+    private static void DrawVNavmeshStateRow(string label, bool present, Func<bool> valueGetter)
+    {
+        if (present)
+        {
+            ImGui.Text($"{label}: {valueGetter()}");
+            return;
+        }
+
+        ImGui.Text($"{label}:");
+        ImGui.SameLine();
+        ImGui.TextDisabled("not installed".Loc());
+        ImGuiUtil.HoverTooltip(
+            "vnavmesh is not installed, so this value is unknown - it is not false.\nThe safe IPC wrappers return false whenever vnavmesh is absent, which looks exactly like vnavmesh being loaded and simply idle."
+                .Loc());
+    }
+
     private void DrawAutoGatherDebug()
     {
         if (!ImGui.CollapsingHeader("AutoGather".Loc()))
@@ -806,9 +828,16 @@ public partial class Interface
         ImGui.Text($"Navigation: {GatherBuddy.AutoGather.LastNavigationResult}");
         ImGui.Text($"Current Destination: {GatherBuddy.AutoGather.CurrentDestination}");
         ImGui.Text($"IsGathering: {GatherBuddy.AutoGather.IsGathering}");
-        ImGui.Text($"IsPathing: {GatherBuddy.AutoGather.IsPathing}");
-        ImGui.Text($"IsPathGenerating: {GatherBuddy.AutoGather.IsPathGenerating}");
-        ImGui.Text($"NavReady: {GatherBuddy.AutoGather.NavReady}");
+        // 🔴 這三行的值全部來自 vnavmesh IPC 的安全版(AutoGather.Var.cs 的 IsPathing／
+        //    IsPathGenerating／NavReady):對端不在時它們一律回 false。
+        //    ⇒ 畫面上的「False」同時代表「vnavmesh 在、只是閒著」與「根本沒裝 vnavmesh」,
+        //    把「不知道」畫成「沒有」會直接把人帶去查錯方向。沒裝時改在列上畫灰字「未安裝」,
+        //    「為什麼不知道」留在 tooltip 裡(列上看得見有問題,tooltip 才解釋原因)。
+        //    ⚠️ VNavmesh.Enabled 走的是節流過的存在性查詢(5 秒窗),不是每幀反射掃全表。
+        var navmeshPresent = VNavmesh.Enabled;
+        DrawVNavmeshStateRow("IsPathing",        navmeshPresent, static () => GatherBuddy.AutoGather.IsPathing);
+        DrawVNavmeshStateRow("IsPathGenerating", navmeshPresent, static () => GatherBuddy.AutoGather.IsPathGenerating);
+        DrawVNavmeshStateRow("NavReady",         navmeshPresent, static () => GatherBuddy.AutoGather.NavReady);
         ImGui.Text($"CanAct: {GatherBuddy.AutoGather.CanAct}");
         ImGui.Text($"BlacklistedNodes: {GatherBuddy.Config.AutoGatherConfig.BlacklistedNodesByTerritoryId.Count}");
         ImGui.Text($"ItemsToGatherInZone: {GatherBuddy.AutoGather.ItemsToGatherInZone.Count()}");
