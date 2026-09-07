@@ -1,4 +1,5 @@
 ﻿using Dalamud.Game.ClientState.Conditions;
+using Dalamud.Plugin.Ipc.Exceptions;
 using ECommons.GameHelpers;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using GatherBuddy.Classes;
@@ -190,7 +191,17 @@ namespace GatherBuddy.AutoGather
             CurrentRotation    = default;
             if (VNavmesh.Enabled)
             {
-                VNavmesh.Path.Stop();
+                // 🔴 Enabled 是節流過的答案(最多 5 秒舊)。vnavmesh 剛好在那個窗裡被卸載時
+                //    Path.Stop() 會擲 IpcNotReadyError,而這條路徑從每幀的 DoAutoGather 走得到。
+                //    對端不在＝已經沒有路徑在跑,安全值就是什麼都不做;順手作廢存在性快取。
+                try
+                {
+                    VNavmesh.Path.Stop();
+                }
+                catch (IpcNotReadyError)
+                {
+                    IPCSubscriber.InvalidatePresence(VNavmesh.InternalName);
+                }
             }
         }
 

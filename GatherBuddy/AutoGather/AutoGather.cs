@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Game.ClientState.Conditions;
+using Dalamud.Plugin.Ipc.Exceptions;
 using ECommons.DalamudServices;
 using ECommons.GameHelpers;
 using GatherBuddy.AutoGather.Helpers;
@@ -164,8 +165,21 @@ namespace GatherBuddy.AutoGather
                     ActionSequence             = null;
                     CurrentCollectableRotation = null;
 
-                    if (VNavmesh.Enabled && IsPathGenerating)
-                        VNavmesh.Nav.PathfindCancelAll();
+                    // 🔴 IsPathGenerating 與 PathfindCancelAll 都是 vnavmesh 的 IPC 呼叫,而
+                    //    VNavmesh.Enabled 是節流過的答案(最多 5 秒舊)。vnavmesh 剛好在那個窗裡被
+                    //    卸載的話,這兩個呼叫會擲 IpcNotReadyError,而這裡是 Enabled 的 setter ——
+                    //    例外會一路冒到「按下勾選框」的那個 ImGui 回呼上去。
+                    //    對端不在＝本來就沒有路徑要取消,安全值就是什麼都不做;順手作廢存在性快取,
+                    //    下一次查詢就會重查成「不在」而不用等節流到期。只攔 IpcNotReadyError。
+                    try
+                    {
+                        if (VNavmesh.Enabled && IsPathGenerating)
+                            VNavmesh.Nav.PathfindCancelAll();
+                    }
+                    catch (IpcNotReadyError)
+                    {
+                        IPCSubscriber.InvalidatePresence(VNavmesh.InternalName);
+                    }
                     StopNavigation();
                     CurrentFarNodeLocation   = null;
                     _homeWorldWarning        = false;
@@ -207,18 +221,33 @@ namespace GatherBuddy.AutoGather
             if (Dalamud.Conditions[ConditionFlag.BoundByDuty])
                 return false;
 
-            if (Lifestream.Enabled && !Lifestream.IsBusy())
+            // 🔴 Lifestream.Enabled 是節流過的答案(最多 5 秒舊)。它剛好在那個窗裡被卸載的話,
+            //    下面三個 IPC 呼叫會擲 IpcNotReadyError。安全值＝與「找不到 Lifestream」同一條路:
+            //    GoHome 回 false,自動採集不回家、照常繼續。只攔 IpcNotReadyError,
+            //    參數/型別寫錯擲的其他 IpcError 照樣往上冒。
+            try
             {
-                var command = GatherBuddy.Config.AutoGatherConfig.LifestreamCommand;
-                if (command.Contains("/li "))
-                    command = command.Replace("/li ", "");
-                Lifestream.ExecuteCommand(command);
-                TaskManager.EnqueueImmediate(() => !Lifestream.IsBusy(), 120000, "Wait until Lifestream is done");
-                return true;
+                if (Lifestream.Enabled && !Lifestream.IsBusy())
+                {
+                    var command = GatherBuddy.Config.AutoGatherConfig.LifestreamCommand;
+                    if (command.Contains("/li "))
+                        command = command.Replace("/li ", "");
+                    Lifestream.ExecuteCommand(command);
+                    // 🔴 這個 lambda 是之後才在 TaskManager 裡跑的,不在上面那個 try 的保護範圍內,
+                    //    所以換成自帶保護的 IsBusySafe():對端不在時回 false(＝沒在忙),
+                    //    這個等待步驟直接視為完成,不會卡到 120 秒逾時。
+                    TaskManager.EnqueueImmediate(() => !Lifestream.IsBusySafe(), 120000, "Wait until Lifestream is done");
+                    return true;
+                }
+                else
+                {
+                    GatherBuddy.Log.Warning("Lifestream not found or not ready");
+                    return false;
+                }
             }
-            else
+            catch (IpcNotReadyError)
             {
-                GatherBuddy.Log.Warning("Lifestream not found or not ready");
+                IPCSubscriber.InvalidatePresence(Lifestream.InternalName);
                 return false;
             }
         }
@@ -535,7 +564,12 @@ namespace GatherBuddy.AutoGather
                         if (!isPathing && !isPathGenerating)
                             Navigate(aetheryte.Position, false);
                     }
-                    else if (!Lifestream.IsBusy())
+                    // 🔴 Lifestream 可能在存在性快取的 5 秒窗內被卸載。TryIsBusy 回 false 代表
+                    //    「問不到」(對端已經不在),它自己會作廢快取;那一幀就明講需要手動傳送,
+                    //    不要掉進下面那個會呼叫 AethernetTeleport 的分支。
+                    else if (!Lifestream.TryIsBusy(out var lifestreamBusy))
+                        AutoStatus = "Manual teleporting required".Loc();
+                    else if (!lifestreamBusy)
                     {
                         AutoStatus = "Teleporting...".Loc();
                         StopNavigation();
@@ -553,7 +587,8 @@ namespace GatherBuddy.AutoGather
                                 break;
                         }
 
-                        TaskManager.Enqueue(() => Lifestream.AethernetTeleport(name));
+                        // 🔴 這個 lambda 之後才在 TaskManager 裡跑,不受任何 try 保護 ⇒ 用自帶保護的版本。
+                        TaskManager.Enqueue(() => Lifestream.AethernetTeleportSafe(name));
                         TaskManager.DelayNext(1000);
                         TaskManager.Enqueue(() => GenericHelpers.IsScreenReady());
                     }
@@ -685,8 +720,10 @@ namespace GatherBuddy.AutoGather
             }
 
             //At this point, we are definitely going to gather something, so we may go home after that.
+            // 🔴 Enabled 是節流過的答案;Lifestream 剛被卸載時 Abort() 會擲 IpcNotReadyError,
+            //    而對端不在＝本來就沒有東西要中止。AbortSafe 會吞掉那一種、作廢快取,其餘照樣往上冒。
             if (Lifestream.Enabled)
-                Lifestream.Abort();
+                Lifestream.AbortSafe();
             WentHome = false;
 
             if (next.First().Location.Territory.Id != territoryId)

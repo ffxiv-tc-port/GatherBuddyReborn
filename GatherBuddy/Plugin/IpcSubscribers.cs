@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
+using Dalamud.Plugin.Ipc.Exceptions;
 using ECommons.DalamudServices;
 using ECommons.EzSharedDataManager;
 
@@ -82,12 +83,41 @@ namespace GatherBuddy.Plugin
 
             return present;
         }
+
+        /// <summary>
+        /// 作廢某個外掛的存在性快取,讓<b>下一次</b> <see cref="IsReadyThrottled"/> 立刻重查。
+        /// </summary>
+        /// <remarks>
+        /// 🔴 <b>用途只有一個</b>:呼叫對方的 IPC 端點時吃到 <see cref="IpcNotReadyError"/>,
+        /// 代表對方在節流窗(<see cref="PresenceProbeIntervalMs"/> 毫秒)內被卸載了,而我們手上
+        /// 那筆「它在」的答案已經是錯的。作廢之後下一次查詢就會重查成「不在」,不必等節流到期。<br/>
+        /// 🔴 <b>只攔 <see cref="IpcNotReadyError"/>,不要攔 <c>Exception</c></b>:參數個數/型別寫錯
+        /// 擲的是別的 <c>IpcError</c>,那些必須繼續往上冒,吞掉會讓寫錯的呼叫從此無聲無息。<br/>
+        /// 🔑 這支從<b>繪製執行緒</b>(採集視窗逐項畫背包數量)與 <b>framework 執行緒</b>
+        /// (DoAutoGather)兩邊都可達,所以動字典一律在 <see cref="PresenceGate"/> 裡面;
+        /// <b>log 一定在鎖外</b>,而且只在「本來真的快取著一筆」時才寫 —— 對端根本沒安裝時
+        /// 字典裡本來就沒有那個鍵,這裡不會寫任何東西,不會洗版。
+        /// </remarks>
+        public static void InvalidatePresence(string pluginName)
+        {
+            bool removed;
+            lock (PresenceGate)
+                removed = PresenceResults.Remove(pluginName);
+
+            if (removed)
+                GatherBuddy.Log.Information(
+                    $"[外掛偵測] 呼叫 {pluginName} 的 IPC 端點時對方已經不在了(卸載或重載中),存在性快取立刻作廢,下一次查詢會重新確認。");
+        }
     }
 
     internal static class VNavmesh
     {
+        /// <summary>這個外掛在 Dalamud 裡的內部名稱。存在性查詢與作廢<b>一定要用同一個常數</b>,
+        /// 兩邊各自寫字面值的話,打錯字的失敗形式是「作廢永遠打不中」而且完全無聲。</summary>
+        internal const string InternalName = "vnavmesh";
+
         internal static bool Enabled
-            => IPCSubscriber.IsReadyThrottled("vnavmesh");
+            => IPCSubscriber.IsReadyThrottled(InternalName);
 
         internal static class Nav
         {
@@ -274,8 +304,81 @@ namespace GatherBuddy.Plugin
             Debug.Assert(AethernetTeleport != null);
         }
 
+        /// <summary>這個外掛在 Dalamud 裡的內部名稱(存在性查詢與作廢共用)。</summary>
+        internal const string InternalName = "Lifestream";
+
         internal static bool Enabled
-            => IPCSubscriber.IsReadyThrottled("Lifestream");
+            => IPCSubscriber.IsReadyThrottled(InternalName);
+
+        /// <summary>
+        /// <see cref="IsBusy"/> 的安全版:對端在節流窗內被卸載時,作廢存在性快取並回
+        /// <see langword="false"/>(＝<b>沒在忙</b>),讓等它做完的工作視為完成而不是卡到逾時。
+        /// </summary>
+        /// <remarks>🔴 只攔 <see cref="IpcNotReadyError"/>;其餘 <c>IpcError</c> 照樣往上冒。</remarks>
+        internal static bool IsBusySafe()
+        {
+            try
+            {
+                return IsBusy();
+            }
+            catch (IpcNotReadyError)
+            {
+                IPCSubscriber.InvalidatePresence(InternalName);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// <see cref="IsBusy"/> 的可分辨版:回 <see langword="false"/> 代表<b>問不到</b>
+        /// (對端已經不在),此時 <paramref name="busy"/> 沒有意義。呼叫端要對「沒在忙」與
+        /// 「問不到」做出不同反應時用這一支。
+        /// </summary>
+        internal static bool TryIsBusy(out bool busy)
+        {
+            try
+            {
+                busy = IsBusy();
+                return true;
+            }
+            catch (IpcNotReadyError)
+            {
+                IPCSubscriber.InvalidatePresence(InternalName);
+                busy = false;
+                return false;
+            }
+        }
+
+        /// <summary><see cref="Abort"/> 的安全版:對端不在＝本來就沒有東西要中止,作廢快取後當作做完。</summary>
+        internal static void AbortSafe()
+        {
+            try
+            {
+                Abort();
+            }
+            catch (IpcNotReadyError)
+            {
+                IPCSubscriber.InvalidatePresence(InternalName);
+            }
+        }
+
+        /// <summary>
+        /// <see cref="AethernetTeleport"/> 的安全版。<b>對端不在時回 <see langword="true"/></b>
+        /// —— 它是丟進 <c>TaskManager</c> 的步驟,回 <see langword="true"/> 代表「這一步結束了」,
+        /// 讓工作鏈往下走而不是原地重試到逾時(120 秒)。傳送本身沒發生,下一輪 DoAutoGather
+        /// 會因為 Lifestream 已經不在而走別的分支。
+        /// </summary>
+        internal static bool AethernetTeleportSafe(string name)
+        {
+            try
+            {
+                return AethernetTeleport(name);
+            }
+            catch (IpcNotReadyError)
+            {
+                IPCSubscriber.InvalidatePresence(InternalName);
+                return true;
+            }
+        }
 
         [EzIPC("Lifestream.ExecuteCommand", applyPrefix: false)]
         internal static readonly Action<string> ExecuteCommand;
@@ -318,7 +421,14 @@ namespace GatherBuddy.Plugin
             EzIPC.Init(typeof(AllaganTools), "AllaganTools");
         }
 
-        internal static bool Enabled => IPCSubscriber.IsReadyThrottled("InventoryTools");
+        /// <summary>
+        /// 這個外掛在 Dalamud 裡的內部名稱。⚠️ <b>是 <c>InventoryTools</c>,不是 <c>AllaganTools</c></b>
+        /// —— 類別名與 IPC 前綴都叫 AllaganTools,只有存在性查詢用的內部名不一樣。
+        /// 作廢快取時寫成 AllaganTools 的話,失敗形式是<b>永遠打不中那個鍵</b>而且完全無聲。
+        /// </summary>
+        internal const string InternalName = "InventoryTools";
+
+        internal static bool Enabled => IPCSubscriber.IsReadyThrottled(InternalName);
 
         [EzIPC("AllaganTools.ItemCountOwned", applyPrefix: false)]
         internal static readonly Func<uint, bool, uint[], uint> ItemCountOwned;
@@ -383,6 +493,18 @@ namespace GatherBuddy.Plugin
     {
         private static EzIPCDisposalToken[] _disposalTokens = EzIPC.Init(typeof(AutoRetainer), "AutoRetainer.PluginState", SafeWrapper.IPCException);
 
+        /// <summary>
+        /// ⚠️ <b>這一支掛不上 <see cref="IPCSubscriber.InvalidatePresence"/>,而且不需要。</b>
+        /// 這個類別的 <c>EzIPC.Init</c> 帶了 <c>SafeWrapper.IPCException</c>,
+        /// <see cref="IpcNotReadyError"/> 在進到呼叫端之前就被吞掉、改回型別預設值
+        /// ⇒ <b>這裡永遠不會擲例外,也就沒有東西可以觸發作廢</b>。
+        /// 但後果是安全的:唯一的使用點是 DoAutoGather 的
+        /// <c>MultiMode &amp;&amp; IsEnabled &amp;&amp; AreAnyRetainersAvailableForCurrentChara()</c>,
+        /// AutoRetainer 不在時第三個運算元回 <see langword="false"/>(SafeWrapper 的預設值),
+        /// 整條判斷式為假 ⇒ 不會做出錯的動作,最多就是白問一次。
+        /// 另外 <c>AutoRetainerSuppression</c> 走的是<b>不節流</b>的 <see cref="IPCSubscriber.IsReady"/>,
+        /// 租約的取得與歸還永遠看的是當下的真值。
+        /// </summary>
         internal static bool IsEnabled => IPCSubscriber.IsReadyThrottled("AutoRetainer");
 
         [EzIPC] internal static readonly Func<bool> IsBusy;
