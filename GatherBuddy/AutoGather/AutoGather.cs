@@ -553,8 +553,20 @@ namespace GatherBuddy.AutoGather
 
             var territoryId = Svc.ClientState.TerritoryType;
             //Idyllshire to The Dravanian Hinterlands
-            if ((territoryId == 478 && next.First().Node.Territory.Id == 399)
-             || (territoryId == 418 && next.First().Node.Territory.Id is 901 or 929 or 939) && Lifestream.Enabled)
+            // 🔴 這裡本來少一層括號。C# 的 && 綁得比 || 緊,所以
+            //    (478 && 目的地==399) || (418 && 目的地是雲冠群島) && Lifestream.Enabled
+            //    實際被解讀成 (478 && …) || ((418 && …) && Lifestream.Enabled)
+            //    —— 田園郡(478)那一支根本沒檢查 Lifestream 在不在。
+            //    上游 af649f07(NostraThomas99,2025-04-11)引入時就是這樣,不是台服移植改壞的。
+            // 🔑 判定它是缺陷而不是刻意的證據:本方法下面那個 forcedAetheryte 分支寫著
+            //    if (territoryId == 478 && !Lifestream.Enabled)
+            //        AutoStatus = $"Install Lifestream or teleport to {…} manually";
+            //    而 399(德拉瓦尼亞河谷地)確實在 ForcedAetherytes.ZonesWithoutAetherytes 裡
+            //    (399 -> 乙太之光 75 田園郡)⇒ 那則訊息就是為這個情境寫的,
+            //    卻因為上面這個優先權問題永遠走不到。作者的意圖寫在給使用者看的文案裡。
+            //    補上括號之後,沒裝 Lifestream 的人會落到那則訊息,而不是走到乙太網傳送點前面卡住。
+            if (((territoryId == 478 && next.First().Node.Territory.Id == 399)
+              || (territoryId == 418 && next.First().Node.Territory.Id is 901 or 929 or 939)) && Lifestream.Enabled)
             {
                 var aetheryte = Svc.Objects.Where(x => x.ObjectKind == ObjectKind.Aetheryte && x.IsTargetable)
                     .OrderBy(x => x.Position.DistanceToPlayer()).FirstOrDefault();
@@ -714,8 +726,11 @@ namespace GatherBuddy.AutoGather
             if (forcedAetheryte.ZoneId != 0
              && GatherBuddy.GameData.Aetherytes[forcedAetheryte.AetheryteId].Territory.Id == territoryId)
             {
+                // 🔴 這則訊息因為上面那個運算子優先權問題,對 478 -> 399 一直是走不到的死碼;
+                //    補上括號之後它才真的會顯示給使用者看,所以順手把硬編的英文改成走在地化。
+                //    ECommons 的 Loc(params) 會依序把 ?? 換成傳入的值(LocalizationExtensions.cs)。
                 if (territoryId == 478 && !Lifestream.Enabled)
-                    AutoStatus = $"Install Lifestream or teleport to {next.First().Location.Territory.Name} manually";
+                    AutoStatus = "Install Lifestream or teleport to ?? manually".Loc(next.First().Location.Territory.Name);
                 else
                     AutoStatus = "Manual teleporting required".Loc();
                 return;
