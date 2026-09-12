@@ -126,6 +126,10 @@ public static class Communicator
     /// </remarks>
     private static void QueueForFramework(XivChatEntry entry)
     {
+        // 卸載窗內轉派會就地在呼叫端執行緒跑，那等於直接動 Dalamud 的裸聊天佇列。
+        if (FrameworkUnloadGuard.ShouldSkip("聊天輸出"))
+            return;
+
         PendingChat.Enqueue(entry);
         _ = Dalamud.Framework.RunOnFrameworkThread(static () =>
         {

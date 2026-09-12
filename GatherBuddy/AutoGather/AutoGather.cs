@@ -1125,6 +1125,10 @@ namespace GatherBuddy.AutoGather
         /// </summary>
         private void NotifyStoppedItself(string reason, bool soundAlreadyPlayed)
         {
+            // 純顯示的方法：卸載窗內轉派會就地在背景執行緒跑，通知與 IPC 都不該在那裡發。
+            if (FrameworkUnloadGuard.ShouldSkip("自動採集停止通知"))
+                return;
+
             // 🔴 刻意放在 NotifyWhenStoppedItself 的閘門「之前」：那個旗標是「Dalamud 桌面通知」
             //    的開關而且預設關；語音通知是另一件事、有自己的開關，兩者不該互相牽連。
             // 🔴 IPC 的實作跑在呼叫端的執行緒上，而這個方法可能在背景執行緒上被叫到
