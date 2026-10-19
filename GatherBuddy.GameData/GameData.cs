@@ -144,14 +144,14 @@ public class GameData
                 throw new Exception("Could not fetch any gathering nodes, this is certainly an error, terminating.");
 
             CosmicFishingMissions = DataManager.GetExcelSheet<WKSMissionUnit>()
-                .Where(m => m.Item.ByteLength > 0 && m.Unknown1 is 19)
+                .Where(m => m.Name.ByteLength > 0 && (m.ClassJobCategory[0].RowId is 19 || m.ClassJobCategory[1].RowId is 19))
                 .ToFrozenDictionary(m => (ushort)m.RowId, m => new CosmicMission(m));
             Log.Verbose("Collected {NumCosmicMissions} different cosmic fishing missions.", CosmicFishingMissions.Count);
 
             Bait = DataManager.GetExcelSheet<Item>()
                 .Where(i => i.ItemSearchCategory.RowId == Structs.Bait.FishingTackleRow)
-                .Concat(DataManager.GetExcelSheet<WKSItemInfo>().Where(i => i.WKSItemSubCategory is 5)
-                    .Select(i => DataManager.GetExcelSheet<Item>().GetRow(i.Item)))
+                .Concat(DataManager.GetExcelSheet<WKSItemInfo>().Where(i => i.WKSItemSubCategory.RowId is 5)
+                    .Select(i => i.Item.Value))
                 .ToFrozenDictionary(b => b.RowId, b => new Bait(b));
             Log.Verbose("Collected {NumBaits} different types of bait.", Bait.Count);
             if (Bait.Count is 0)
@@ -217,6 +217,24 @@ public class GameData
         {
             Log.Error($"Error while setting up data:\n{e}");
         }
+    }
+
+    private Dictionary<uint, MapMarker>? _aetheryteMarkers;
+
+    /// <summary> 整張 MapMarker 裡第一筆 DataType 3、DataKey 為此以太之光的標記（照表的列／子列順序）；沒有回 null。 </summary>
+    /// <remarks> 掃表一次建索引：每個以太之光各自線性掃整張表（逐列裝箱）是載入時最大的配置來源。 </remarks>
+    internal MapMarker? FindAetheryteMarker(uint aetheryteId)
+    {
+        if (_aetheryteMarkers == null)
+        {
+            _aetheryteMarkers = new Dictionary<uint, MapMarker>();
+            foreach (var row in DataManager.GetSubrowExcelSheet<MapMarker>())
+                foreach (var marker in row)
+                    if (marker.DataType == 3)
+                        _aetheryteMarkers.TryAdd(marker.DataKey.RowId, marker);
+        }
+
+        return _aetheryteMarkers.TryGetValue(aetheryteId, out var found) ? found : null;
     }
 
     public Territory? FindOrAddTerritory(TerritoryType? t)

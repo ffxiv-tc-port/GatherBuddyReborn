@@ -1,41 +1,39 @@
-# [![](https://raw.githubusercontent.com/FFXIV-CombatReborn/RebornAssets/main/IconAssets/GBR_Icon.png)](https://github.com/FFXIV-CombatReborn/GatherBuddyReborn)
+# GatherBuddyReborn
 
-**GatherBuddyReborn**
+[GatherBuddyReborn](https://github.com/FFXIV-CombatReborn/GatherBuddyReborn) 的台服移植版，協助玩家進行採集、挖礦與釣魚。搭配 [vnavmesh](https://github.com/awgil/ffxiv_navmesh) 插件可實現全自動採集路徑導航。
 
-![Github Latest Releases](https://img.shields.io/github/downloads/FFXIV-CombatReborn/GatherBuddyReborn/latest/total.svg?style=for-the-badge)
-![Github All Releases](https://img.shields.io/github/downloads/FFXIV-CombatReborn/GatherBuddyReborn/total.svg?style=for-the-badge)
-![Github License](https://img.shields.io/github/license/FFXIV-CombatReborn/GatherBuddyReborn.svg?label=License&style=for-the-badge)
+## 功能
 
-GatherBuddyReborn is a community-made fork of the original GatherBuddy plugin for Final Fantasy XIV. This tool is designed to enhance your gameplay experience by assisting with all things gathering, now with automated routes via vnavmesh.
+- **自動採集**：自動導航至採集點進行採集／挖礦／釣魚並收滿指定物品，過程中可自動換裝、精選、精製魔晶石、修理裝備、使用強心劑與食物，並具備防卡住機制（需要 vnavmesh）
+- **自動採集清單**：排入多項目標物品依序自動採集，可從 TeamCraft 匯入、複製到剪貼簿分享，也可從採集群組直接建立
+- **採集視窗**：自訂多組採集清單預設，快速切換目標
+- **提醒**：依採集點出現時間與天氣條件提醒
+- **釣魚計時器**：顯示咬鉤時機與魚類判定，支援手動編輯模式
+- **刺魚輔助工具**：輔助刺魚時的判定
+- **天氣**：查詢各地天氣時段
+- **採集群組**：依時間輪替的採集清單
+- **地點**：可查詢的採集點與釣點資料
+- **釣魚紀錄與統計**：記錄每次釣獲細節，並提供依釣點、咬鉤時間、宇宙探索釣魚任務分類的統計頁
+- **右鍵選單整合**：直接將物品加入提醒、採集群組或自動採集清單，或在 TeamCraft 開啟
+- **指令**：`/gbr`、`/gatherbuddy`（開啟主視窗）、`/gather`、`/gatherbtn`、`/gathermin`、`/gatherfish`（標記最近節點並自動傳送、換裝）、`/gathergroup`、`/gbc`（快捷開關）
 
-## Features
+## 台服版的修改
 
-- **AutoGather**: Automated pathing for gathering up to 10 full stacks (999 each) of a resource.
-- **Resource Queueing**: Create a list of resources you want and GBR will gather up to 10 stacks of each!
-- **Full BTN/MIN Automation**: GBR can find any BTN/MIN item in the world and gather it for you fully automatically, no user input required beyond initial setup
+- 介面繁體中文化（依台服官方譯名），釣魚筆記訊息比對改用台服的繁中字串；TeamCraft 連結使用繁中語言代碼。
+- 修正台服用戶端採集視窗資料欄位位移與型別不同造成的自動採集不選物品、關窗不採、崩潰等問題。
+- 開放其他插件透過 IPC 把道具加進自動採集清單、設定目標數量、開關自動採集（Artisan 的「缺料交給 GatherBuddy」就是用這個），加進來的道具收在「來自其他插件」清單。
+- 自動採集期間暫停 AutoRetainer；借用 AutoHook 的開關時記下原狀態，停用時還原。
+- 自動採集自己停下時發出通知，並可請塔塔露喊一句（需要 TataruPraise）。
+- 沒裝或中途卸載 vnavmesh、Lifestream、Allagan Tools 時不再跳錯誤面板，缺 Lifestream 時會說明要手動傳送。
+- 修正按遊戲視窗時重按正在關閉的視窗、雲冠群島排隊空轉等問題。
+- 遊戲改版後有特徵碼對不上時，插件照常載入，只停用對應的釣魚相關功能。
+- 多處降低記憶體用量。
 
-**NOTE**: vnavmesh plugin is *required* for full automation. Please see the links section of this README for more information on vnavmesh.
-  
-## Installing
-- Enter `/xlsettings` in the chat window and go to the Experimental tab in the opening window.
-- **Skip below the DevPlugins section to the Custom Plugin Repositories section.**
-- Copy and paste the repo.json link into the first free text input field.
-```
-https://raw.githubusercontent.com/FFXIV-CombatReborn/CombatRebornRepo/main/pluginmaster.json
-```
-- Click on the + button and make sure the checkmark beside the new field is set afterwards.
-- **Click on the Save-icon in the bottom right.**
+## 需要搭配的插件
 
-Following these steps, you should be able to see all contained plugins in the Available Plugins tab in the Dalamud Plugin Installer.
-No Plugins will be installed, you have just made them available. You can now select which of these plugins you actually want to install.
+- 必要（自動採集）：vnavmesh
+- 選用：Lifestream（跨區移動）、AutoHook（釣魚）、AutoRetainer、Allagan Tools、TataruPraise
 
-## Want to contribute?
+## 授權
 
-- Create a fork
-- Make your changes
-- Test the changes
-- Create a PR and point it to main
-
-## Links
-
-[vnavmesh](https://github.com/awgil/ffxiv_navmesh) Required for automated navigation
+依照原專案授權條款發布，詳見 [LICENSE](LICENSE)。

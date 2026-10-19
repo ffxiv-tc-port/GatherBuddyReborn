@@ -9,6 +9,9 @@ using ECommons.UIHelpers.AddonMasterImplementations;
 using ECommons.Automation;
 using ECommons.ExcelServices;
 using ECommons.GameHelpers;
+using ECommons.LanguageHelpers;
+using FFXIVClientStructs.FFXIV.Component.GUI;
+using GatherBuddy.AutoGather.Helpers;
 
 namespace GatherBuddy.AutoGather;
 
@@ -76,7 +79,7 @@ public unsafe partial class AutoGather
 
         if (!GatherBuddy.Config.AutoGatherConfig.DoRepair)
         {
-            Communicator.PrintError("Your gear is almost broken. Repair it before enabling Auto-Gather.");
+            Communicator.PrintError("Your gear is almost broken. Repair it before enabling Auto-Gather.".Loc());
             AbortAutoGather("Repairs needed.");
             return true;
         }
@@ -92,7 +95,7 @@ public unsafe partial class AutoGather
             return true;
         }
 
-        AutoStatus = "Repairing...";
+        AutoStatus = "Repairing...".Loc();
         StopNavigation();
         YesAlready.Lock();
 
@@ -102,13 +105,51 @@ public unsafe partial class AutoGather
 
         TaskManager.Enqueue(() => RepairAddon != null, 1000, true, "Wait until repair menu is ready.");
         TaskManager.DelayNext(delay);
-        TaskManager.Enqueue(() => { if (RepairAddon is var addon && addon != null) new AddonMaster.Repair(addon).RepairAll(); }, 1000, "Repairing all.");
+        // 每一發都過 AddonPressGuard:同一扇窗(位址)同一按法在它走完生命週期前只送一次;關窗(-1)之後同位址任何按法都不准。
+        // 🔴 這三顆一律寫成 Func<bool?> 多載(有回傳值)而不是 Action:ECommons 的 LegacyTaskManager 把 Enqueue(Action, …) 包成
+        // () => { task(); return true; },被守衛擋下的 false 會被吞掉 —— 最後那顆關窗被吞就永遠不會再送,修理視窗就永遠開著。
+        // 語意:真的按下去了才回 true;視窗還沒好或被守衛擋下回 false(下一 tick 再試);🔴 絕不回 null(那是 Abort(),會清掉整條佇列)。
+        // ⚠️ 逾時 3000ms 要大於守衛的 90 tick 逃生口(60fps 約 1.5 秒、30fps 約 3 秒),否則一被擋就是擋到自己逾時。
+        TaskManager.Enqueue(() =>
+        {
+            var addon = RepairAddon;
+            if (addon == null)
+                return false;
+
+            if (!AddonPressGuard.TryBeginPress("Repair", &addon->AtkUnitBase, "RepairAll"))
+                return false;
+
+            new AddonMaster.Repair(addon).RepairAll();
+            return true;
+        }, 3000, "Repairing all.");
         TaskManager.Enqueue(() => SelectYesnoAddon != null, 1000, true, "Wait until YesnoAddon is ready.");
         TaskManager.DelayNext(delay);
-        TaskManager.Enqueue(() => { if (SelectYesnoAddon is var addon && addon != null) new AddonMaster.SelectYesno(addon).Yes(); }, 1000, "Confirm repairs.");
+        TaskManager.Enqueue(() =>
+        {
+            var addon = SelectYesnoAddon;
+            if (addon == null)
+                return false;
+
+            if (!AddonPressGuard.TryBeginPress("SelectYesno", (AtkUnitBase*)addon, "Yes"))
+                return false;
+
+            new AddonMaster.SelectYesno(addon).Yes();
+            return true;
+        }, 3000, "Confirm repairs.");
         TaskManager.Enqueue(() => !Svc.Condition[ConditionFlag.Occupied39], 5000, "Wait for repairs.");
         TaskManager.DelayNext(delay);
-        TaskManager.Enqueue(() => { if (RepairAddon is var addon and not null) Callback.Fire(&addon->AtkUnitBase, true, -1); }, 1000, true, "Close repair menu.");
+        TaskManager.Enqueue(() =>
+        {
+            var addon = RepairAddon;
+            if (addon == null)
+                return true; // 窗已經不在了:「關掉修理視窗」這件事已經達成,不要拖到逾時(這顆的 abortOnTimeout 是 true,佇列會被清掉)。
+
+            if (!AddonPressGuard.TryBeginPress("Repair", &addon->AtkUnitBase, AddonPressGuard.ClosePressKey))
+                return false;
+
+            Callback.Fire(&addon->AtkUnitBase, true, -1);
+            return true;
+        }, 3000, true, "Close repair menu.");
         TaskManager.DelayNext(delay);
         TaskManager.Enqueue(YesAlready.Unlock);
 

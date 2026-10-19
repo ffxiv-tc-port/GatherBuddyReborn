@@ -15,18 +15,24 @@ namespace GatherBuddy.AutoGather
 
         private unsafe partial class CollectableRotation
         {
-            public CollectableRotation(ConfigPreset config, Gatherable item, uint quantity)
+            public CollectableRotation(ConfigPreset config, Gatherable item, uint quantity, bool useUpNode)
             {
                 this.config = config;
                 shouldUseFullRotation = Player.Object.CurrentGp >= config.CollectableActionsMinGP;
                 this.item = item;
                 this.quantity = quantity;
+                this.useUpNode = useUpNode;
             }
 
             private readonly bool shouldUseFullRotation = false;
             private readonly ConfigPreset config;
             private readonly Gatherable item;
             private readonly uint quantity;
+
+            //Captured when the item was clicked: this rotation belongs to a timed node whose
+            //remaining attempts we want to spend, so a satisfied quantity must not end it.
+            //The node cannot change while its Masterpiece window is open.
+            private readonly bool useUpNode;
 
             [GeneratedRegex(@"\d+")]
             private static partial Regex NumberRegex();
@@ -35,7 +41,7 @@ namespace GatherBuddy.AutoGather
             {
                 var itemsLeft = (int)(quantity - item.GetInventoryCount());
 
-                if (itemsLeft <= 0 && GatherBuddy.Config.AutoGatherConfig.AbandonNodes)
+                if (itemsLeft <= 0 && GatherBuddy.Config.AutoGatherConfig.AbandonNodes && !useUpNode)
                     throw new NoGatherableItemsInNodeException();
 
                 var regex = NumberRegex();

@@ -22,7 +22,9 @@ public partial class FishingParser
                 ClientLanguage.German   => German.Value,
                 ClientLanguage.French   => French.Value,
                 ClientLanguage.Japanese => Japanese.Value,
-                _                       => throw new InvalidEnumArgumentException(),
+                // TC(台服)客戶端回報 ClientLanguage 7(TraditionalChinese),舊版 Dalamud 回報 4(ChineseSimplified);用數值比較兩種都接。
+                (ClientLanguage)4 or (ClientLanguage)5 or (ClientLanguage)7 => ChineseTraditional.Value,
+                _                       => English.Value,
             };
         }
 
@@ -59,6 +61,18 @@ public partial class FishingParser
             AreaDiscovered = new Regex(@"釣り手帳に新しい釣り場「(?<FishingSpot>.+)」の情報を記録した！", RegexOptions.Compiled | RegexOptions.NonBacktracking | RegexOptions.ExplicitCapture),
             Mooch          = new Regex(@"は釣り上げた.+を慎重に投げ込み、泳がせ釣りを試みた。",            RegexOptions.Compiled | RegexOptions.NonBacktracking | RegexOptions.ExplicitCapture),
             Undiscovered   = "未知の釣り場",
+        });
+
+        // TC(台服)客戶端回報 ClientLanguage 7(TraditionalChinese),舊版 Dalamud 回報 4(ChineseSimplified);用數值比較兩種都接。
+        // 聊天訊息本身是繁體中文:LogMessage 1110 (cast), 1115 (area discovered), 1121 (mooch), Addon 3811 (undiscovered)。
+        // ⚠️ 1115 的引號是「」直角引號(U+300C/U+300D),不是彎引號(U+201C/U+201D)——寫錯就永遠比對不到,
+        // 新釣場不會被記錄進 FishLog。
+        private static readonly Lazy<Regexes> ChineseTraditional = new(() => new Regexes
+        {
+            Cast           = new Regex(@"在(?<FishingSpot>.+)甩出了魚線開始釣魚。",             RegexOptions.Compiled | RegexOptions.NonBacktracking | RegexOptions.ExplicitCapture),
+            AreaDiscovered = new Regex(@"將新釣場「(?<FishingSpot>.+)」記錄到了釣魚筆記中！",       RegexOptions.Compiled | RegexOptions.NonBacktracking | RegexOptions.ExplicitCapture),
+            Mooch          = new Regex(@"開始利用上鉤的.+嘗試以小釣大。",                          RegexOptions.Compiled | RegexOptions.NonBacktracking | RegexOptions.ExplicitCapture),
+            Undiscovered   = "未發現的釣場",
         });
         // @formatter:on
     }

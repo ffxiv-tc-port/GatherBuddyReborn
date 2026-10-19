@@ -8,8 +8,14 @@ namespace GatherBuddy.SeFunctions;
 
 public class SeTime
 {
+    // 位址解不出時 GetServerTime()／Instance() 會擲例外（建構子裡就呼叫＝整個插件載入失敗）；改用本機時鐘代替伺服器時間。
+    private static readonly bool ServerTimeAvailable = Framework.Addresses.GetServerTime.Value != 0;
+    private static readonly bool FrameworkAvailable  = Framework.Addresses.Instance.Value != 0;
+
     private static TimeStamp GetServerTime()
-        => new(Framework.GetServerTime() * 1000);
+        => ServerTimeAvailable
+            ? new TimeStamp(Framework.GetServerTime() * 1000)
+            : new TimeStamp(DateTimeOffset.UtcNow.ToUnixTimeSeconds() * 1000);
 
     public TimeStamp ServerTime         { get; private set; }
     public TimeStamp EorzeaTime         { get; private set; }
@@ -25,6 +31,9 @@ public class SeTime
 
     public SeTime()
     {
+        if (!ServerTimeAvailable || !FrameworkAvailable)
+            GatherBuddy.Log.Warning(
+                $"遊戲改版後 Framework 的位址對不上（GetServerTime {(ServerTimeAvailable ? "有" : "無")}、Instance {(FrameworkAvailable ? "有" : "無")}）：艾奧傑亞時間改用本機時鐘推算，可能差幾秒；其餘功能照常。");
         Update(null!);
         Dalamud.Framework.Update += Update;
     }
@@ -34,7 +43,7 @@ public class SeTime
 
     private unsafe TimeStamp GetEorzeaTime()
     {
-        var framework = Framework.Instance();
+        var framework = FrameworkAvailable ? Framework.Instance() : null;
         if (framework == null)
             return ServerTime.ConvertToEorzea();
 

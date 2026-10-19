@@ -51,38 +51,57 @@ namespace GatherBuddy.CustomInfo
 
                 using (var reader = new StreamReader(stream))
                 {
-                    var defaultContent = reader.ReadToEnd();
-                    defaultObj = Newtonsoft.Json.JsonConvert.DeserializeObject<T>(defaultContent, settings);
+                    defaultObj = DeserializeStream<T>(reader, settings);
                 }
             }
 
             // Check if the file exists
             if (!File.Exists(path))
             {
-                File.WriteAllText(path, Newtonsoft.Json.JsonConvert.SerializeObject(defaultObj, Newtonsoft.Json.Formatting.Indented, settings));
+                SerializeToFile(path, defaultObj, settings);
             }
             else
             {
-                var fileContent = File.ReadAllText(path);
-                var existingObj = Newtonsoft.Json.JsonConvert.DeserializeObject<T>(fileContent, settings)
-                 ?? Activator.CreateInstance<T>();
+                T? existingFromFile;
+                using (var reader = File.OpenText(path))
+                    existingFromFile = DeserializeStream<T>(reader, settings);
+                var existingObj = existingFromFile ?? Activator.CreateInstance<T>();
 
                 // Depending on the type of T, you might need to perform different operations here
                 // In this case we assume T is a Dictionary<uint, List<Vector3>>, but for other types T you might need other merge operations 
                 if (defaultObj is Dictionary<uint, List<Vector3>> defaultDict1 && existingObj is Dictionary<uint, List<Vector3>> existingDict1)
                 {
-                    File.WriteAllText(path, Newtonsoft.Json.JsonConvert.SerializeObject(MergeData(defaultDict1, existingDict1), Newtonsoft.Json.Formatting.Indented, settings));
+                    SerializeToFile(path, MergeData(defaultDict1, existingDict1), settings);
                 }
                 else if (defaultObj is List<OffsetPair> defaultDict2 && existingObj is List<OffsetPair> existingDict2)
                 {
-                    File.WriteAllText(path, Newtonsoft.Json.JsonConvert.SerializeObject(MergeData(defaultDict2, existingDict2), Newtonsoft.Json.Formatting.Indented, settings));
+                    SerializeToFile(path, MergeData(defaultDict2, existingDict2), settings);
                 }
             }
 
             // Read the content of the file
-            var locJson = File.ReadAllText(path);
-            var obj     = Newtonsoft.Json.JsonConvert.DeserializeObject<T>(locJson, settings);
+            T? obj;
+            using (var reader = File.OpenText(path))
+                obj = DeserializeStream<T>(reader, settings);
             return obj ?? Activator.CreateInstance<T>();
+        }
+
+        // 與 JsonConvert.DeserializeObject／SerializeObject(Indented)＋File.WriteAllText 同設定、同輸出，只是直接讀寫串流，不先組出整份字串。
+        private static T? DeserializeStream<T>(TextReader reader, JsonSerializerSettings settings)
+        {
+            var serializer = JsonSerializer.CreateDefault(settings);
+            serializer.CheckAdditionalContent = true;
+            using var json = new JsonTextReader(reader);
+            return serializer.Deserialize<T>(json);
+        }
+
+        private static void SerializeToFile(string path, object? value, JsonSerializerSettings settings)
+        {
+            var serializer = JsonSerializer.CreateDefault(settings);
+            serializer.Formatting = Formatting.Indented;
+            using var writer = new StreamWriter(path, false);
+            using var json   = new JsonTextWriter(writer) { Formatting = serializer.Formatting };
+            serializer.Serialize(json, value);
         }
 
         private static Dictionary<uint,List<Vector3>> MergeData(Dictionary<uint, List<Vector3>> defaultData, Dictionary<uint, List<Vector3>> existingData)
@@ -148,7 +167,7 @@ namespace GatherBuddy.CustomInfo
                 lock (WorldLocationsByNodeId)
                     list.Add(location);
 
-                Task.Run(() => { lock (WorldLocationsByNodeId) SaveLocationsToFile(); });
+                Task.Run(SaveLocationsToFile);
                 GatherBuddy.Log.Debug($"Added location {location} to node {nodeId}");
                 WorldLocationsChanged?.Invoke();
             }
@@ -156,11 +175,27 @@ namespace GatherBuddy.CustomInfo
 
         public static event Action? WorldLocationsChanged;
 
+        /// <summary>
+        /// Serializes writers against each other. Deliberately not <see cref="WorldLocationsByNodeId"/>: that one is
+        /// also taken by the framework thread in <see cref="AddLocation"/>, and it must never have to wait on file I/O.
+        /// </summary>
+        private static readonly object SaveLocationsLock = new();
+
         public static void SaveLocationsToFile()
         {
-            var locJson = Newtonsoft.Json.JsonConvert.SerializeObject(WorldLocationsByNodeId, Newtonsoft.Json.Formatting.Indented);
+            // Only the snapshot is taken under the data lock; serializing and writing happen outside it. Previously the
+            // caller held the data lock for the entire serialize + WriteAllText, so the framework thread stalled inside
+            // AddLocation until the write completed - which it hit repeatedly while discovering new nodes in a fresh zone.
+            lock (SaveLocationsLock)
+            {
+                Dictionary<uint, List<Vector3>> snapshot;
+                lock (WorldLocationsByNodeId)
+                    snapshot = WorldLocationsByNodeId.ToDictionary(kvp => kvp.Key, kvp => new List<Vector3>(kvp.Value));
 
-            File.WriteAllText(WorldLocationsPath, locJson);
+                var locJson = Newtonsoft.Json.JsonConvert.SerializeObject(snapshot, Newtonsoft.Json.Formatting.Indented);
+
+                File.WriteAllText(WorldLocationsPath, locJson);
+            }
         }
 
         [MemberNotNull(nameof(IlvConvertTable))]

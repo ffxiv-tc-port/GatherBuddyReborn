@@ -21,7 +21,7 @@ public static partial class Fish
             return fish;
         }
 
-        data.Log.Error($"Could not find fish {id}.");
+        data.Log.Debug($"Could not find fish {id}.");
         return null;
     }
 

@@ -206,7 +206,16 @@ public class UptimeManager : IDisposable
         {
             > 0 => UpdateUptime(item),
             < 0 => (GetLocation(item), TimeInterval.Always),
-            _   => (item.Locations.FirstOrDefault() ?? GatherBuddy.GameData.GatheringNodes.First().Value, TimeInterval.Always),
+            _   => (FirstLocation(item) ?? GatherBuddy.GameData.GatheringNodes.First().Value, TimeInterval.Always),
+        };
+
+    // 等同 item.Locations.FirstOrDefault()；直接取索引，不為每次呼叫裝箱一個列舉器（採集視窗每幀對每個品項問一次）。
+    private static ILocation? FirstLocation(IGatherable item)
+        => item switch
+        {
+            Gatherable g => g.NodeList.Count > 0 ? g.NodeList[0] : null,
+            Fish f       => f.FishingSpots.Count > 0 ? f.FishingSpots[0] : null,
+            _            => item.Locations.FirstOrDefault(),
         };
 
     public TimeInterval NextUptime(Fish fish, Territory territory, TimeStamp now)

@@ -10,6 +10,7 @@ using System.Linq;
 using System.Numerics;
 using Dalamud.Game.ClientState.Objects.Types;
 using ECommons.DalamudServices;
+using ECommons.LanguageHelpers;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using GatherBuddy.SeFunctions;
 using GatherBuddy.Data;
@@ -95,12 +96,17 @@ namespace GatherBuddy.AutoGather
                         {
                             try
                             {
-                                var floor = VNavmesh.Query.Mesh.PointOnFloor(Player.Position, false, 3);
-                                Navigate(floor, true);
-                                TaskManager.Enqueue(() => !IsPathGenerating);
-                                TaskManager.DelayNext(50);
-                                TaskManager.Enqueue(() => !IsPathing, 1000);
-                                EnqueueDismount();
+                                // 🔴 提供端回的是 Vector3?(navmeshManager.Query?.FindPointOnFloor):取不到落點時是 null。
+                                //    取不到就整段跳過,留給後面的進階脫困處理。
+                                var floor = VNavmesh.Query.Mesh.PointOnFloorSafe(Player.Position, false, 3);
+                                if (floor.HasValue)
+                                {
+                                    Navigate(floor.Value, true);
+                                    TaskManager.Enqueue(() => !IsPathGenerating);
+                                    TaskManager.DelayNext(50);
+                                    TaskManager.Enqueue(() => !IsPathing, 1000);
+                                    EnqueueDismount();
+                                }
                             }
                             catch { }
                             //If even that fails, do advanced unstuck
@@ -111,7 +117,7 @@ namespace GatherBuddy.AutoGather
                 else if (waitGP)
                 {
                     StopNavigation();
-                    AutoStatus = "Waiting for GP to regenerate...";
+                    AutoStatus = "Waiting for GP to regenerate...".Loc();
                 }
                 else
                 {
@@ -129,7 +135,7 @@ namespace GatherBuddy.AutoGather
                         if (DiscipleOfLand.Perception < targetItem.GatheringData.PerceptionReq)
                         {
                             Communicator.PrintError($"Insufficient Perception to gather this item. Required: {targetItem.GatheringData.PerceptionReq}, current: {DiscipleOfLand.Perception}");
-                            AbortAutoGather();
+                            AbortAutoGather(reason: "Not enough Perception for this item.");
                             return;
                         }
 
@@ -138,7 +144,7 @@ namespace GatherBuddy.AutoGather
                                 if (ChangeGearSet(targetItem.GatheringType.ToGroup(), 0)){
                                     EnqueueNodeInteraction(gameObject, targetItem);
                                 } else {
-                                    AbortAutoGather();
+                                    AbortAutoGather(reason: "Could not change to the required gear set.");
                                 }
                             }
                             else {
@@ -148,9 +154,11 @@ namespace GatherBuddy.AutoGather
                         // The node could be behind a rock or a tree and not be interactable. This happened in the Endwalker, but seems not to be reproducible in the Dawntrail.
                         // Enqueue navigation anyway, just in case.
                         // Also move if vertical separation is too large.
+                        // 採集點不會移動:座標在這一幀抄走,不讓後面的 tick 去讀已可能換人的物件包裝。
                         if (!Dalamud.Conditions[ConditionFlag.Diving])
                         {
-                            TaskManager.Enqueue(() => { if (!Dalamud.Conditions[ConditionFlag.Gathering]) Navigate(gameObject.Position, false); });
+                            var nodePosition = gameObject.Position;
+                            TaskManager.Enqueue(() => { if (!Dalamud.Conditions[ConditionFlag.Gathering]) Navigate(nodePosition, false); });
                         }
                     }
                 }
@@ -180,10 +188,8 @@ namespace GatherBuddy.AutoGather
             // For example, reinitiate navigation to the destination
             CurrentDestination = default;
             CurrentRotation    = default;
-            if (VNavmesh.Enabled)
-            {
-                VNavmesh.Path.Stop();
-            }
+            // 安全版自帶 Enabled 前置檢查、只攔 IpcNotReadyError、作廢存在性快取。
+            VNavmesh.Path.StopSafe();
         }
 
         private unsafe void SetRotation(Angle angle)
@@ -206,7 +212,7 @@ namespace GatherBuddy.AutoGather
             var correctedDestination = GetCorrectedDestination(CurrentDestination);
             GatherBuddy.Log.Debug($"Navigating to {destination} (corrected to {correctedDestination})");
 
-            LastNavigationResult = VNavmesh.SimpleMove.PathfindAndMoveTo(correctedDestination, shouldFly);
+            LastNavigationResult = VNavmesh.SimpleMove.PathfindAndMoveToSafe(correctedDestination, shouldFly);
         }
 
         private static Vector3 GetCorrectedDestination(Vector3 destination)
@@ -219,7 +225,12 @@ namespace GatherBuddy.AutoGather
                 float separation;
                 if (WorldData.NodeOffsets.TryGetValue(destination, out var offset))
                 {
-                    offset = VNavmesh.Query.Mesh.NearestPoint(offset, MaxHorizontalSeparation, MaxVerticalSeparation);
+                    // 🔴 提供端回 Vector3?:null ⇒ 直接回未修正的 destination。
+                    var meshOffset = VNavmesh.Query.Mesh.NearestPointSafe(offset, MaxHorizontalSeparation, MaxVerticalSeparation);
+                    if (!meshOffset.HasValue)
+                        return destination;
+
+                    offset = meshOffset.Value;
                     if ((separation = Vector2.Distance(offset.ToVector2(), destination.ToVector2())) > MaxHorizontalSeparation)
                         GatherBuddy.Log.Warning($"Offset is ignored because the horizontal separation {separation} is too large after correcting for mesh. Maximum allowed is {MaxHorizontalSeparation}.");
                     else if ((separation = Math.Abs(offset.Y - destination.Y)) > MaxVerticalSeparation)
@@ -228,7 +239,12 @@ namespace GatherBuddy.AutoGather
                         return offset;
                 }
 
-                var correctedDestination = VNavmesh.Query.Mesh.NearestPoint(destination, MaxHorizontalSeparation, MaxVerticalSeparation);
+                // 🔴 null ⇒ 一樣直接回未修正的 destination。
+                var meshDestination = VNavmesh.Query.Mesh.NearestPointSafe(destination, MaxHorizontalSeparation, MaxVerticalSeparation);
+                if (!meshDestination.HasValue)
+                    return destination;
+
+                var correctedDestination = meshDestination.Value;
                 if ((separation = Vector2.Distance(correctedDestination.ToVector2(), destination.ToVector2())) > MaxHorizontalSeparation)
                     GatherBuddy.Log.Warning($"Query.Mesh.NearestPoint() returned a point with too large horizontal separation {separation}. Maximum allowed is {MaxHorizontalSeparation}.");
                 else if ((separation = Math.Abs(correctedDestination.Y - destination.Y)) > MaxVerticalSeparation)
@@ -295,7 +311,7 @@ namespace GatherBuddy.AutoGather
             var aetheryte = FindClosestAetheryte(location);
             if (aetheryte == null)
             {
-                Communicator.PrintError("Couldn't find an attuned aetheryte to teleport to.");
+                Communicator.PrintError("Couldn't find an attuned aetheryte to teleport to.".Loc());
                 return false;
             }
 

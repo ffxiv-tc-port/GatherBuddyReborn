@@ -17,6 +17,7 @@ using OtterGui;
 using OtterGui.Widgets;
 using ImRaii = OtterGui.Raii.ImRaii;
 using ECommons.ImGuiMethods;
+using ECommons.LanguageHelpers;
 using ECommons;
 using GatherBuddy.Interfaces;
 
@@ -195,7 +196,7 @@ public partial class Interface
 
     private void DrawAutoGatherListsLine()
     {
-        if (ImGuiUtil.DrawDisabledButton(FontAwesomeIcon.Copy.ToIconString(), IconButtonSize, "Copy current auto-gather list to clipboard.",
+        if (ImGuiUtil.DrawDisabledButton(FontAwesomeIcon.Copy.ToIconString(), IconButtonSize, "Copy current auto-gather list to clipboard.".Loc(),
                 _autoGatherListsCache.Selector.Current == null, true))
         {
             var list = _autoGatherListsCache.Selector.Current!;
@@ -203,18 +204,18 @@ public partial class Interface
             {
                 var s = new AutoGatherList.Config(list).ToBase64();
                 ImGui.SetClipboardText(s);
-                Communicator.PrintClipboardMessage("Auto-gather list ", list.Name);
+                Communicator.PrintClipboardMessage("Auto-gather list ".Loc(), list.Name);
             }
             catch (Exception e)
             {
-                Communicator.PrintClipboardMessage("Auto-gather list ", list.Name, e);
+                Communicator.PrintClipboardMessage("Auto-gather list ".Loc(), list.Name, e);
             }
         }
 
         if (GatherBuddy.AutoGather.ArtisanExporter.ArtisanAssemblyEnabled)
         {
-            if (ImGuiUtil.DrawDisabledButton("Import From Artisan", Vector2.Zero,
-                    "Import your lists from Artisan into GBR\nBrings up a dropdown to select which list to import.\nA new list will be created in GBR when you click on the name of the list in the dropdown.",
+            if (ImGuiUtil.DrawDisabledButton("Import From Artisan".Loc(), Vector2.Zero,
+                    "Import your lists from Artisan into GBR\nBrings up a dropdown to select which list to import.\nA new list will be created in GBR when you click on the name of the list in the dropdown.".Loc(),
                     !GatherBuddy.AutoGather.ArtisanExporter.ArtisanAssemblyEnabled))
             {
                 ImGui.OpenPopup($"artisanImport");
@@ -237,11 +238,11 @@ public partial class Interface
                     {
                         if (ImGui.Selectable($"{kvp.Value}##{kvp.Key}"))
                         {
-                            Communicator.Print($"Importing '{kvp.Value}' from Artisan...");
+                            Communicator.Print("Importing '??' from Artisan...".Loc(kvp.Value));
                             GatherBuddy.AutoGather.ArtisanExporter.StartArtisanImport(kvp);
                         }
 
-                        ImGuiUtil.HoverTooltip($"{kvp.Value} ({kvp.Key})\n(Click to import to new auto-gather list)");
+                        ImGuiUtil.HoverTooltip($"{kvp.Value} ({kvp.Key})\n" + "(Click to import to new auto-gather list)".Loc());
                     }
                 }
 
@@ -250,7 +251,7 @@ public partial class Interface
             }
         }
 
-        if (ImGuiUtil.DrawDisabledButton("Import from TeamCraft", Vector2.Zero, "Populate list from clipboard contents (TeamCraft format)",
+        if (ImGuiUtil.DrawDisabledButton("Import from TeamCraft".Loc(), Vector2.Zero, "Populate list from clipboard contents (TeamCraft format)".Loc(),
                 _autoGatherListsCache.Selector.Current == null))
         {
             var clipboardText = ImGuiUtil.GetClipboardText();
@@ -291,21 +292,21 @@ public partial class Interface
                 }
                 catch (Exception e)
                 {
-                    Communicator.PrintClipboardMessage("Error importing auto-gather list", e.ToString());
+                    Communicator.PrintClipboardMessage("Error importing auto-gather list".Loc(), e.ToString());
                 }
             }
         }
 
         ImGui.SetCursorPosX(ImGui.GetWindowSize().X - 50);
         string agHelpText =
-            "If the config option to sort by location is not selected, items are gathered in order of enabled list, then order of item in list.\n"
+            ("If the config option to sort by location is not selected, items are gathered in order of enabled list, then order of item in list.\n"
           + "You can drag and draw lists to move them.\n"
           + "You can drag and draw items in a specific list to move them.\n"
           + "You can drag and draw an item onto a different list from the selector to add it to that list and remove it from the current.\n"
-          + "In the Gather Window, you can hold Control and Right-Click an item to delete it from the list it comes from.";
+          + "In the Gather Window, you can hold Control and Right-Click an item to delete it from the list it comes from.").Loc();
 
         ImGuiEx.InfoMarker(agHelpText,                    null, FontAwesomeIcon.InfoCircle.ToIconString(), false);
-        ImGuiEx.InfoMarker("Auto-Gather Support Discord", null, FontAwesomeIcon.Comments.ToIconString(),   false);
+        ImGuiEx.InfoMarker("Auto-Gather Support Discord".Loc(), null, FontAwesomeIcon.Comments.ToIconString(),   false);
         if (ImGuiEx.HoveredAndClicked())
         {
             GenericHelpers.ShellStart("https://discord.gg/p54TZMPnC9");
@@ -322,14 +323,14 @@ public partial class Interface
             _plugin.AutoGatherListsManager.ChangeDescription(list, newDesc);
 
         var tmp = list.Enabled;
-        if (ImGui.Checkbox("Enabled##list", ref tmp) && tmp != list.Enabled)
+        if (ImGui.Checkbox("Enabled".Loc() + "##list", ref tmp) && tmp != list.Enabled)
             _plugin.AutoGatherListsManager.ToggleList(list);
 
         ImGui.SameLine();
-        ImGuiUtil.Checkbox("Fallback##list",
-            "Items from fallback lists won't be auto-gathered.\n"
+        ImGuiUtil.Checkbox("Fallback".Loc() + "##list",
+            ("Items from fallback lists won't be auto-gathered.\n"
           + "But if a node doesn't contain any items from regular lists or if you gathered enough of them,\n"
-          + "items from fallback lists would be gathered instead if they could be found in that node.",
+          + "items from fallback lists would be gathered instead if they could be found in that node.").Loc(),
             list.Fallback, (v) => _plugin.AutoGatherListsManager.SetFallback(list, v));
 
         ImGui.NewLine();
@@ -348,7 +349,7 @@ public partial class Interface
             var       item  = list.Items[i];
             using var id    = ImRaii.PushId((int)item.ItemId);
             using var group = ImRaii.Group();
-            if (ImGuiUtil.DrawDisabledButton(FontAwesomeIcon.Trash.ToIconString(), IconButtonSize, "Delete this item from the list", false,
+            if (ImGuiUtil.DrawDisabledButton(FontAwesomeIcon.Trash.ToIconString(), IconButtonSize, "Delete this item from the list".Loc(), false,
                     true))
                 deleteIndex = i;
             ImGui.SameLine();
@@ -365,7 +366,7 @@ public partial class Interface
             }
 
             ImGui.SameLine();
-            ImGui.Text("Inventory: ");
+            ImGui.Text("Inventory: ".Loc());
             var invTotal = item.GetInventoryCount();
             ImGui.SameLine(0f, ImGui.CalcTextSize($"0000 / ").X - ImGui.CalcTextSize($"{invTotal} / ").X);
             ImGui.Text($"{invTotal} / ");
@@ -392,7 +393,7 @@ public partial class Interface
         if (changeIndex >= 0)
             _plugin.AutoGatherListsManager.ChangeItem(list, gatherables[changeItemIndex], changeIndex);
 
-        if (ImGuiUtil.DrawDisabledButton(FontAwesomeIcon.Plus.ToIconString(), IconButtonSize, "Add this item at the end of the list", false,
+        if (ImGuiUtil.DrawDisabledButton(FontAwesomeIcon.Plus.ToIconString(), IconButtonSize, "Add this item at the end of the list".Loc(), false,
                 true))
             _plugin.AutoGatherListsManager.AddItem(list, gatherables[_autoGatherListsCache.NewGatherableIdx]);
 
@@ -402,7 +403,7 @@ public partial class Interface
         {
             list.Items.Each(i => _plugin.AutoGatherListsManager.ChangeEnabled(list, i, allEnabled));
         }
-        ImGuiUtil.HoverTooltip((allEnabled ? "Disable" : "Enable" ) + " all items in the list");
+        ImGuiUtil.HoverTooltip((allEnabled ? "Disable".Loc() : "Enable".Loc()) + " all items in the list".Loc());
 
         ImGui.SameLine();
         if (selector.Draw(_autoGatherListsCache.NewGatherableIdx, out var idx))
@@ -415,10 +416,10 @@ public partial class Interface
     private void DrawAutoGatherTab()
     {
         using var id  = ImRaii.PushId("AutoGatherLists");
-        using var tab = ImRaii.TabItem("Auto-Gather");
+        using var tab = ImRaii.TabItem("Auto-Gather".Loc());
 
         ImGuiUtil.HoverTooltip(
-            "You read that right! Auto-gather!");
+            "You read that right! Auto-gather!".Loc());
 
         if (!tab)
             return;
@@ -428,7 +429,7 @@ public partial class Interface
         _autoGatherListsCache.Selector.Draw(SelectorWidth);
         ImGui.SameLine();
 
-        ItemDetailsWindow.Draw("List Details", DrawAutoGatherListsLine, () =>
+        ItemDetailsWindow.Draw("List Details".Loc(), DrawAutoGatherListsLine, () =>
         {
             if (_autoGatherListsCache.Selector.Current != null)
                 DrawAutoGatherList(_autoGatherListsCache.Selector.Current);

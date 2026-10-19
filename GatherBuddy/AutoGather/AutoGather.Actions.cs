@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using Dalamud.Game.ClientState.Objects.Enums;
 using ECommons;
 using ECommons.DalamudServices;
+using ECommons.LanguageHelpers;
 using ECommons.Throttlers;
 using GatherBuddy.AutoGather.AtkReaders;
 using GatherBuddy.AutoGather.Helpers;
@@ -177,11 +178,20 @@ namespace GatherBuddy.AutoGather
         {
             LureSuccess = false;
 
+            // 讀不到咬鉤力道就不拋竿：拋了也不會提鉤，只會一直浪費魚餌。
+            if (!GatherBuddy.TugType.IsAvailable)
+            {
+                Communicator.PrintError("[GatherBuddy Reborn] 遊戲改版後讀不到咬鉤力道，自動釣魚無法繼續。請等插件更新。");
+                AbortAutoGather(reason: "遊戲改版後讀不到咬鉤力道，自動釣魚停用。");
+                TaskManager.DelayNext(1000);
+                return;
+            }
+
             var bait = GetCorrectBaitId(target);
             if (bait == 0)
             {
                 Communicator.Print($"No bait found in inventory. Auto-fishing cannot continue.");
-                AbortAutoGather();
+                AbortAutoGather(reason: "No bait found in inventory.");
             }
 
             if (bait != GatherBuddy.CurrentBait.Current)
@@ -191,19 +201,23 @@ namespace GatherBuddy.AutoGather
                 {
                     case CurrentBait.ChangeBaitReturn.InvalidBait:
                         Svc.Log.Error("Invalid bait selected: " + bait);
-                        AbortAutoGather();
+                        AbortAutoGather(reason: "The selected bait is invalid.");
                         break;
                     case CurrentBait.ChangeBaitReturn.NotInInventory:
                         Communicator.Print(
                             $"Bait '{target.Fish!.InitialBait.Name}' for fish '{target.Fish!.Name[GatherBuddy.Language]}' not in inventory. Auto-fishing cannot continue.");
-                        AbortAutoGather();
+                        AbortAutoGather(reason: "The required bait is not in your inventory.");
                         break;
                     case CurrentBait.ChangeBaitReturn.Success:
                     case CurrentBait.ChangeBaitReturn.AlreadyEquipped:
                         break;
                     case CurrentBait.ChangeBaitReturn.UnknownError:
                         Svc.Log.Error("Unknown error when switching bait. Auto-gather cannot continue.");
-                        AbortAutoGather();
+                        AbortAutoGather(reason: "Could not switch bait.");
+                        break;
+                    case CurrentBait.ChangeBaitReturn.Unavailable:
+                        // 不停下來的話會每秒重試一次換餌、永遠不拋竿。
+                        AbortAutoGather(reason: "遊戲改版後換餌功能停用，自動釣魚無法換上需要的魚餌。");
                         break;
                 }
 
@@ -371,7 +385,7 @@ namespace GatherBuddy.AutoGather
                                         ActionSequence = task.Result.GetEnumerator();
                                     return task.IsCompleted;
                                 });
-                                AutoStatus = "Calculating best action sequence...";
+                                AutoStatus = "Calculating best action sequence...".Loc();
                                 return;
                             }
                         }
@@ -516,9 +530,9 @@ namespace GatherBuddy.AutoGather
                 return false;
 
             var yield = slot.Yield;
-            if (Dalamud.ClientState.LocalPlayer!.StatusList.Any(s => s.StatusId == Actions.Bountiful.EffectId))
+            if (Dalamud.Objects.LocalPlayer!.StatusList.Any(s => s.StatusId == Actions.Bountiful.EffectId))
                 yield -= 1;
-            if (Dalamud.ClientState.LocalPlayer!.StatusList.Any(s => s.StatusId == Actions.BountifulII.EffectId))
+            if (Dalamud.Objects.LocalPlayer!.StatusList.Any(s => s.StatusId == Actions.BountifulII.EffectId))
                 yield -= CalculateBountifulBonus(slot.Item);
             if (yield < config.SolidAge.MinYieldTotal)
                 return false;

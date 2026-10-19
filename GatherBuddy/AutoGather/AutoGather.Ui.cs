@@ -14,6 +14,7 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Windowing;
 using ECommons.DalamudServices;
 using ECommons.ImGuiMethods;
+using ECommons.LanguageHelpers;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using GatherBuddy.CustomInfo;
 using Newtonsoft.Json;
@@ -29,18 +30,18 @@ namespace GatherBuddy.AutoGather
         public static void DrawAutoGatherStatus()
         {
             var enabled = GatherBuddy.AutoGather.Enabled;
-            if (ImGui.Checkbox("Enabled", ref enabled))
+            if (ImGui.Checkbox("Enabled".Loc(), ref enabled))
             {
                 GatherBuddy.AutoGather.Enabled = enabled;
             }
 
-            ImGui.Text($"Status: {GatherBuddy.AutoGather.AutoStatus}");
+            ImGui.Text("Status: ".Loc() + GatherBuddy.AutoGather.AutoStatus);
             var lastNavString = GatherBuddy.AutoGather.LastNavigationResult.HasValue
                 ? GatherBuddy.AutoGather.LastNavigationResult.Value
-                    ? "Successful"
-                    : "Failed (If you're seeing this you probably need to restart your game)"
-                : "None";
-            ImGui.Text($"Navigation: {lastNavString}");
+                    ? "Successful".Loc()
+                    : "Failed (If you're seeing this you probably need to restart your game)".Loc()
+                : "None".Loc();
+            ImGui.Text("Navigation: ".Loc() + lastNavString);
         }
 
 
@@ -89,7 +90,7 @@ namespace GatherBuddy.AutoGather
                     ImGui.TableSetColumnIndex(1);
                     ImGui.Text(node.IsTargetable ? "Y" : "N");
                     ImGui.TableSetColumnIndex(2);
-                    ImGui.Text(node.DataId.ToString());
+                    ImGui.Text(node.BaseId.ToString());
                     ImGui.TableSetColumnIndex(3);
                     ImGui.Text(node.Position.ToString());
                     ImGui.TableSetColumnIndex(4);
@@ -133,12 +134,14 @@ namespace GatherBuddy.AutoGather
                     {
                         if (GatherBuddy.AutoGather.Enabled)
                         {
-                            Communicator.PrintError("[GatherBuddyReborn] Auto-Gather is enabled! Unable to navigate.");
+                            Communicator.PrintError("[GatherBuddyReborn] Auto-Gather is enabled! Unable to navigate.".Loc());
                             return;
                         }
                         //VNavmesh_IPCSubscriber.Nav_PathfindCancelAll();
-                        VNavmesh.Path.Stop();
-                        VNavmesh.SimpleMove.PathfindAndMoveTo(node.Position, GatherBuddy.AutoGather.ShouldFly(node.Position));
+                        // 🔴 ImGui 按鈕回呼:例外會冒到 WindowSystem.Draw 變成視窗錯誤面板(沒裝 vnavmesh 的人按下「導航」就會踩到)
+                        //    ⇒ 走安全版,對端不在時什麼都不做。
+                        VNavmesh.Path.StopSafe();
+                        VNavmesh.SimpleMove.PathfindAndMoveToSafe(node.Position, GatherBuddy.AutoGather.ShouldFlyManual(node.Position));
                     }
 
                     if (WorldData.NodeOffsets.TryGetValue(node.Position, out var offset))
@@ -153,12 +156,13 @@ namespace GatherBuddy.AutoGather
                         {
                             if (GatherBuddy.AutoGather.Enabled)
                             {
-                                Communicator.PrintError("[GatherBuddyReborn] Auto-Gather is enabled! Unable to navigate.");
+                                Communicator.PrintError("[GatherBuddyReborn] Auto-Gather is enabled! Unable to navigate.".Loc());
                                 return;
                             }
                             //VNavmesh_IPCSubscriber.Nav_PathfindCancelAll();
-                            VNavmesh.Path.Stop();
-                            VNavmesh.SimpleMove.PathfindAndMoveTo(offset, GatherBuddy.AutoGather.ShouldFly(offset));
+                            // 🔴 ImGui 按鈕回呼:同樣走安全版。
+                            VNavmesh.Path.StopSafe();
+                            VNavmesh.SimpleMove.PathfindAndMoveToSafe(offset, GatherBuddy.AutoGather.ShouldFlyManual(offset));
                         }
                     }
                     else
@@ -176,27 +180,37 @@ namespace GatherBuddy.AutoGather
             }
         }
 
+        private static (uint RowId, string Name)[]? _mountChoices;
+
+        // 全部坐騎按顯示名排序，建一次；解鎖與否仍每幀判。
+        private static (uint RowId, string Name)[] MountChoices
+            => _mountChoices ??= [.. Dalamud.GameData.GetExcelSheet<Mount>()
+                .Select(x => (x.RowId, Name: x.Singular.ToString().ToProperCase()))
+                .OrderBy(x => x.Name)];
+
         public unsafe static void DrawMountSelector()
         {
             ImGui.PushItemWidth(300);
             var ps = PlayerState.Instance();
-            var preview = Dalamud.GameData.GetExcelSheet<Mount>().First(x => x.RowId == GatherBuddy.Config.AutoGatherConfig.AutoGatherMountId)
-                .Singular.ToString().ToProperCase();
+            // GetRowOrDefault 是索引查詢(這裡在 Draw 路徑上);找不到時回傳空字串,落進下面既有的「Mount Roulette」後備。
+            var preview = Dalamud.GameData.GetExcelSheet<Mount>()
+                .GetRowOrDefault(GatherBuddy.Config.AutoGatherConfig.AutoGatherMountId)
+                ?.Singular.ToString().ToProperCase() ?? "";
             if (string.IsNullOrEmpty(preview))
-                preview = "Mount Roulette";
-            if (ImGui.BeginCombo("Select Mount", preview))
+                preview = "Mount Roulette".Loc();
+            if (ImGui.BeginCombo("Select Mount".Loc(), preview))
             {
-                if (ImGui.Selectable("Mount Roulette", GatherBuddy.Config.AutoGatherConfig.AutoGatherMountId == 0))
+                if (ImGui.Selectable("Mount Roulette".Loc(), GatherBuddy.Config.AutoGatherConfig.AutoGatherMountId == 0))
                 {
                     GatherBuddy.Config.AutoGatherConfig.AutoGatherMountId = 0;
                     GatherBuddy.Config.Save();
                 }
 
-                foreach (var mount in Dalamud.GameData.GetExcelSheet<Mount>().OrderBy(x => x.Singular.ToString().ToProperCase()))
+                foreach (var mount in MountChoices)
                 {
                     if (ps->IsMountUnlocked(mount.RowId))
                     {
-                        var selected = ImGui.Selectable(mount.Singular.ToString().ToProperCase(),
+                        var selected = ImGui.Selectable(mount.Name,
                             GatherBuddy.Config.AutoGatherConfig.AutoGatherMountId == mount.RowId);
 
                         if (selected)

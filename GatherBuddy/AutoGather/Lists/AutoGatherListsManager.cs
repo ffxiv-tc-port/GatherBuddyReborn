@@ -25,20 +25,22 @@ public partial class AutoGatherListsManager : IDisposable
     private readonly List<(Gatherable Item, uint Quantity)> _fallbackItems = [];
     private readonly List<(Fish Fish, uint Quantity)>       _activeFish    = [];
 
-    public ReadOnlyCollection<AutoGatherList> Lists
-        => _lists.AsReadOnly();
+    // 唯讀外殼只包一次：它是底下那個 List 的即時檢視，每次讀屬性都重包只是多配置一個物件。
+    public ReadOnlyCollection<AutoGatherList> Lists { get; }
 
-    public ReadOnlyCollection<(Gatherable Item, uint Quantity)> ActiveItems
-        => _activeItems.AsReadOnly();
+    public ReadOnlyCollection<(Gatherable Item, uint Quantity)> ActiveItems { get; }
 
-    public ReadOnlyCollection<(Gatherable Item, uint Quantity)> FallbackItems
-        => _fallbackItems.AsReadOnly();
+    public ReadOnlyCollection<(Gatherable Item, uint Quantity)> FallbackItems { get; }
 
-    public ReadOnlyCollection<(Fish Fish, uint Quantity)> ActiveFish
-        => _activeFish.AsReadOnly();
+    public ReadOnlyCollection<(Fish Fish, uint Quantity)> ActiveFish { get; }
 
     public AutoGatherListsManager()
-    { }
+    {
+        Lists         = _lists.AsReadOnly();
+        ActiveItems   = _activeItems.AsReadOnly();
+        FallbackItems = _fallbackItems.AsReadOnly();
+        ActiveFish    = _activeFish.AsReadOnly();
+    }
 
     public void Dispose()
     { }

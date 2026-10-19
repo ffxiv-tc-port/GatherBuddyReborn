@@ -60,7 +60,10 @@ public partial class FishRecorder
             return Bait.Unknown;
         }
 
-        var baitId = GatherBuddy.CurrentBait.Current;
+        // 不知道目前的魚餌（位址沒解到）：記成未知，這筆紀錄會被判無效、不上傳。
+        if (!GatherBuddy.CurrentBait.TryGetCurrent(out var baitId))
+            return Bait.Unknown;
+
         if (GatherBuddy.GameData.Bait.TryGetValue(baitId, out var bait))
             return bait;
 
@@ -70,10 +73,10 @@ public partial class FishRecorder
 
     private void CheckBuffs()
     {
-        if (Dalamud.ClientState.LocalPlayer?.StatusList == null)
+        if (Dalamud.Objects.LocalPlayer?.StatusList == null)
             return;
 
-        foreach (var buff in Dalamud.ClientState.LocalPlayer.StatusList)
+        foreach (var buff in Dalamud.Objects.LocalPlayer.StatusList)
         {
             Record.Flags |= buff.StatusId switch
             {
@@ -98,10 +101,10 @@ public partial class FishRecorder
 
     private void UpdateLure()
     {
-        if (Dalamud.ClientState.LocalPlayer?.StatusList == null)
+        if (Dalamud.Objects.LocalPlayer?.StatusList == null)
             return;
 
-        foreach (var buff in Dalamud.ClientState.LocalPlayer.StatusList)
+        foreach (var buff in Dalamud.Objects.LocalPlayer.StatusList)
         {
             Record.Flags |= buff.StatusId switch
             {
@@ -273,10 +276,7 @@ public partial class FishRecorder
     private void OnFrameworkUpdate(IFramework _)
     {
         if (GatherBuddy.Config.AutoGatherConfig.FishDataCollection && UploadTaskReady && NextRemoteRecordsUpdate < DateTime.Now)
-        {
-            var token = RemoteRecordsCancellationTokenSource.Token;
-            RemoteRecordsUploadTask = Task.Run(() => UploadLocalRecords(token), token);
-        }
+            StartRemoteRecordsUpload();
         TimedSave();
         UpdateLureStatus();
         var state = GatherBuddy.EventFramework.FishingState;
@@ -298,13 +298,43 @@ public partial class FishRecorder
         }
     }
 
-    private void UpdateLureStatus()
+    // 閉包放在自己的方法裡：寫在 OnFrameworkUpdate 裡時，編譯器會在每幀進入方法時就配置它。
+    private void StartRemoteRecordsUpload()
     {
-        if (Dalamud.ClientState.LocalPlayer?.StatusList.FirstOrDefault(s => s.StatusId is 3972 or 3973) is { } currentStatus
-         && currentStatus.Param != _currentLureStack)
+        var token = RemoteRecordsCancellationTokenSource.Token;
+        RemoteRecordsUploadTask = Task.Run(() => UploadLocalRecords(token), token);
+    }
+
+    // 與 LocalPlayer.StatusList.FirstOrDefault(StatusId is 3972 or 3973) 同序同條件（空格略過、PlayerState 未載入＝沒有狀態），
+    // 只是不建 StatusList／Status 包裝與列舉器。指標只在這一幀內使用。
+    private unsafe void UpdateLureStatus()
+    {
+        var player = Dalamud.Objects.LocalPlayer;
+        if (player == null)
+            return;
+
+        var manager = ((FFXIVClientStructs.FFXIV.Client.Game.Character.BattleChara*)player.Address)->GetStatusManager();
+        if (manager == null)
+            return;
+
+        int length = manager->NumValidStatuses;
+        if (length == 0 || !FFXIVClientStructs.FFXIV.Client.Game.UI.PlayerState.Instance()->IsLoaded)
+            return;
+
+        var statuses = manager->Status;
+        for (var i = 0; i < length; i++)
         {
-            _currentLureStack = (byte)currentStatus.Param;
-            UsedLure.Invoke();
+            ref var status = ref statuses[i];
+            if (status.StatusId is not (3972 or 3973))
+                continue;
+
+            if (status.Param != _currentLureStack)
+            {
+                _currentLureStack = (byte)status.Param;
+                UsedLure.Invoke();
+            }
+
+            return;
         }
     }
 }

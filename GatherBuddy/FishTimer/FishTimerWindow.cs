@@ -227,7 +227,14 @@ public partial class FishTimerWindow : Window, IDisposable
             _availableFish = enumerator.OrderBy(f => f.SortOrder).ToArray();
 
             var currentTime = GatherBuddy.Time.ServerTime;
-            _nextUptimeChange = _availableFish.Min(f => f.NextUptime.Start < currentTime ? f.NextUptime.End : f.NextUptime.Start);
+            if (_availableFish.Length > 0)
+            {
+                _nextUptimeChange = _availableFish.Min(f => f.NextUptime.Start < currentTime ? f.NextUptime.End : f.NextUptime.Start);
+            }
+            else
+            {
+                _nextUptimeChange = TimeStamp.MaxValue;
+            }
         }
     }
 
@@ -238,6 +245,8 @@ public partial class FishTimerWindow : Window, IDisposable
 
     public override void PreDraw()
     {
+        // Dalamud 的每視窗不透明度是在 Window.PreDraw() 裡 push 的,不呼叫 base 會讓右鍵選單的「不透明度」滑桿靜默失效。
+        base.PreDraw();
         _originalSpacing = ImGui.GetStyle().ItemSpacing;
         _itemSpacing     = new Vector2(0, ImGuiHelpers.GlobalScale);
         _style.Push(ImGuiStyleVar.ItemSpacing,   _itemSpacing);
@@ -263,6 +272,8 @@ public partial class FishTimerWindow : Window, IDisposable
     public override void PostDraw()
     {
         _style.Dispose();
+        // 後進先出:本類別在 PreDraw 推的樣式先 pop 完,最後才讓 base 收掉它自己推的那一個。
+        base.PostDraw();
     }
 
     public override bool DrawConditions()
@@ -300,7 +311,11 @@ public partial class FishTimerWindow : Window, IDisposable
                 baitString = baitCount > 999 ? " (>1k)" : $" ({baitCount})";
             }
 
-            DrawTextHeader(_recorder.Record.Bait.Name + baitString, _spotName, _milliseconds);
+            // 解析器停用時計時器不會動，在列上直接寫明，不讓它看起來像「還沒咬鉤」。
+            var baitText = _recorder.Parser.Available
+                ? _recorder.Record.Bait.Name + baitString
+                : "計時器停用：遊戲改版後有位址對不上";
+            DrawTextHeader(baitText, _spotName, _milliseconds);
             DrawSecondLines();
             foreach (var (fish, i) in _availableFish.WithIndex())
                 fish.DrawBackground(this, i);

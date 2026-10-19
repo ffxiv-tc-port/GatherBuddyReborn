@@ -8,8 +8,10 @@ using System.Threading.Tasks;
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Game.ClientState.Conditions;
+using Dalamud.Plugin.Ipc.Exceptions;
 using ECommons.DalamudServices;
 using ECommons.GameHelpers;
+using GatherBuddy.AutoGather.Helpers;
 using GatherBuddy.AutoGather.Movement;
 using GatherBuddy.CustomInfo;
 using GatherBuddy.Enums;
@@ -18,9 +20,11 @@ using FFXIVClientStructs.FFXIV.Client.Game;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Game.Text;
+using Dalamud.Interface.ImGuiNotification;
 using Dalamud.Utility;
 using ECommons;
 using ECommons.ExcelServices;
+using ECommons.LanguageHelpers;
 using ECommons.Automation;
 using ECommons.MathHelpers;
 using GatherBuddy.Data;
@@ -49,6 +53,7 @@ namespace GatherBuddy.AutoGather
             _plugin                      =  plugin;
             _soundHelper                 =  new SoundHelper();
             _advancedUnstuck             =  new();
+            _antiStuckManager            =  new(_advancedUnstuck);
             _activeItemList              =  new ActiveItemList(plugin.AutoGatherListsManager);
             ArtisanExporter              =  new Reflection.ArtisanExporter(plugin.AutoGatherListsManager);
             Svc.Chat.CheckMessageHandled += OnMessageHandled;
@@ -92,8 +97,19 @@ namespace GatherBuddy.AutoGather
 
         private readonly GatherBuddy     _plugin;
         private readonly SoundHelper     _soundHelper;
-        private readonly AdvancedUnstuck _advancedUnstuck;
-        private readonly ActiveItemList  _activeItemList;
+
+        /// <summary>
+        /// 下一次 Enabled 被設成 false 時的「自己停下來」原因(英文原文,顯示時才 .Loc())。
+        /// null = 那次是使用者主動關的(勾選框 / 採集視窗 / /gather auto / IPC),不通知。
+        /// 這是白名單:只有 MarkSelfStop 會填。新增停止點忘了呼叫的預設結果是「不通知」。
+        /// </summary>
+        private string? _pendingStopReason;
+
+        /// <summary>那次停止的 honk 是不是已經由 AbortAutoGather 播過了,用來避免響兩次。</summary>
+        private bool _pendingStopSoundPlayed;
+        private readonly AdvancedUnstuck  _advancedUnstuck;
+        private readonly AntiStuckManager _antiStuckManager;
+        private readonly ActiveItemList   _activeItemList;
 
         public Reflection.ArtisanExporter ArtisanExporter;
         public TaskManager                TaskManager { get; }
@@ -105,9 +121,12 @@ namespace GatherBuddy.AutoGather
             get;
             private set
             {
-                if (GatherBuddy.Config.AutoGatherConfig.AutoRetainerMultiMode)
-                    GatherBuddy.AutoRetainerApi.Suppressed = !value;
-                field                                  = value;
+                // 🔴 這裡刻意不寫 AutoRetainerApi.Suppressed(IPC 端點 AutoRetainer.SetSuppressed):那是無主布林、邊緣觸發,
+                //    而 Enabled 的停用分支會執行「Waiting = false」⇒ Suppressed = true —— 使用者一關掉自動採集反而把 AutoRetainer 壓死;
+                //    Artisan 與 ICE 也在寫同一個旗標,誰最後寫誰算數。
+                // 正解是具名租約 AutoRetainerSuppression:由 DoAutoGather 每個 tick 依「Enabled && !Waiting」對齊,
+                // 冪等、可計數、會逾時,停用(Enabled setter)與卸載(Dispose)都有明確的歸還點。
+                field = value;
             }
         } = false;
 
@@ -116,22 +135,36 @@ namespace GatherBuddy.AutoGather
             get => _enabled;
             set
             {
+                // 先無條件取走「自己停下來」旗標(取走即消耗)。包含「已經是 false 又被設一次
+                // false」這種沒有狀態邊緣的情況 —— 那次不該通知,但旗標也絕不能留到下一次。
+                string? selfStopReason = _pendingStopReason;
+                bool    soundPlayed    = _pendingStopSoundPlayed;
+                _pendingStopReason      = null;
+                _pendingStopSoundPlayed = false;
+
                 if (_enabled == value)
                     return;
 
                 if (!value)
                 {
-                    AutoStatus = "Idle...";
+                    AutoStatus = "Idle...".Loc();
                     TaskManager.Abort();
                     YesAlready.Unlock();
+                    TextAdvance.Unlock();
+                    _diademDialogLockSince = 0;
+                    // 具名壓制租約:停用就立刻還回去,不要讓 AutoRetainer 等到租約逾時(5 分鐘)才恢復。
+                    AutoRetainerSuppression.ReleaseNow("自動採集已停用");
+                    // 借走 AutoHook 的啟用開關就要還(與啟用分支的 SuppressNow 成對)。
+                    AutoHookSuppression.RestoreNow("自動採集已停用");
 
                     _activeItemList.Reset();
                     Waiting                    = false;
                     ActionSequence             = null;
                     CurrentCollectableRotation = null;
 
-                    if (VNavmesh.Enabled && IsPathGenerating)
-                        VNavmesh.Nav.PathfindCancelAll();
+                    // 🔴 這裡是 Enabled 的 setter,例外會一路冒到「按下勾選框」的 ImGui 回呼上 ⇒ 兩個呼叫都走 vnavmesh 的安全版。
+                    if (IsPathGenerating)
+                        VNavmesh.Nav.PathfindCancelAllSafe();
                     StopNavigation();
                     CurrentFarNodeLocation   = null;
                     _homeWorldWarning        = false;
@@ -142,12 +175,22 @@ namespace GatherBuddy.AutoGather
                 else
                 {
                     WentHome = true; //Prevents going home right after enabling auto-gather
-                    if (AutoHook.Enabled)
-                        AutoHook.SetPluginState(false); //Make sure AutoHook doesn't interfere with us
+                    // 🔑 借:請 AutoHook 在自動採集期間別動,停用時歸還(見 AutoHookSuppression)。
+                    AutoHookSuppression.SuppressNow(); //Make sure AutoHook doesn't interfere with us
+                    // 具名壓制租約:請 AutoRetainer 在自動採集期間不要去跑僱員/換角色。
+                    // 🔴 fail-safe:拿不到(沒安裝/舊版沒有這個端點)就照現況跑,絕不卡住這裡。
+                    // 續租與「狀態被別的路徑改掉」的對齊由 DoAutoGather 每個 tick 的 Sync 負責。
+                    AutoRetainerSuppression.Sync(true);
                 }
 
                 _enabled = value;
+                _antiStuckManager.OnEnabledChanged(value);
+                // 先拍快照再通知：訂閱端收到事件時多半會立刻回頭問 IsAutoGatherEnabled。
+                GatherBuddyIpc.PublishStateSnapshot();
                 _plugin.Ipc.AutoGatherEnabledChanged(value);
+
+                if (!value && selfStopReason != null)
+                    NotifyStoppedItself(selfStopReason, soundPlayed);
             }
         }
 
@@ -163,18 +206,33 @@ namespace GatherBuddy.AutoGather
             if (Dalamud.Conditions[ConditionFlag.BoundByDuty])
                 return false;
 
-            if (Lifestream.Enabled && !Lifestream.IsBusy())
+            // 🔴 Lifestream.Enabled 是節流過的答案(最多 5 秒舊)。它剛好在那個窗裡被卸載的話,
+            //    下面三個 IPC 呼叫會擲 IpcNotReadyError。安全值＝與「找不到 Lifestream」同一條路:
+            //    GoHome 回 false,自動採集不回家、照常繼續。只攔 IpcNotReadyError,
+            //    參數/型別寫錯擲的其他 IpcError 照樣往上冒。
+            try
             {
-                var command = GatherBuddy.Config.AutoGatherConfig.LifestreamCommand;
-                if (command.Contains("/li "))
-                    command = command.Replace("/li ", "");
-                Lifestream.ExecuteCommand(command);
-                TaskManager.EnqueueImmediate(() => !Lifestream.IsBusy(), 120000, "Wait until Lifestream is done");
-                return true;
+                if (Lifestream.Enabled && !Lifestream.IsBusy())
+                {
+                    var command = GatherBuddy.Config.AutoGatherConfig.LifestreamCommand;
+                    if (command.Contains("/li "))
+                        command = command.Replace("/li ", "");
+                    Lifestream.ExecuteCommand(command);
+                    // 🔴 這個 lambda 是之後才在 TaskManager 裡跑的,不在上面那個 try 的保護範圍內,
+                    //    所以換成自帶保護的 IsBusySafe():對端不在時回 false(＝沒在忙),
+                    //    這個等待步驟直接視為完成,不會卡到 120 秒逾時。
+                    TaskManager.EnqueueImmediate(() => !Lifestream.IsBusySafe(), 120000, "Wait until Lifestream is done");
+                    return true;
+                }
+                else
+                {
+                    GatherBuddy.Log.Warning("Lifestream not found or not ready");
+                    return false;
+                }
             }
-            else
+            catch (IpcNotReadyError)
             {
-                GatherBuddy.Log.Warning("Lifestream not found or not ready");
+                IPCSubscriber.InvalidatePresence(Lifestream.InternalName);
                 return false;
             }
         }
@@ -188,8 +246,29 @@ namespace GatherBuddy.AutoGather
         private bool _diademQueuingInProgress = false;
         private bool _homeWorldWarning        = false;
 
+        // 雲冠群島報名對話分好幾輪 DoAutoGather 按（Talk、SelectString、SelectYesno），中間佇列會空。
+        // 這段期間 YesAlready／TextAdvance 的暫停要留著，否則對方同幀搶按＝AVE；0＝沒有持有，上限防報名卡住時一直壓著別人。
+        private long _diademDialogLockSince;
+        private const long DiademDialogLockMaxMs = 60_000;
+
+        private bool HoldingDiademDialogLocks()
+            => _diademQueuingInProgress && _diademDialogLockSince != 0
+             && Environment.TickCount64 - _diademDialogLockSince < DiademDialogLockMaxMs;
+
         public void DoAutoGather()
         {
+            // 具名壓制租約的續租/歸還。
+            // 🔴 放在 !Enabled 的 early return **之前**:停用之後也要走到這裡才還得掉租約
+            //    (Enabled 的 setter 已經先還過一次,這裡是「狀態被別的路徑改掉」時的補網)。
+            // 📌 Waiting 代表 AutoGather 自己也沒事做(沒有可採的東西,或正在把場子讓給
+            //    AutoRetainer 的 MultiMode),那時候擋著 AutoRetainer 沒有道理。
+            AutoRetainerSuppression.Sync(Enabled && !Waiting);
+
+            // AutoHook 的暫停租約續約/歸還(refcount 語意:拿到就開始壓制)。
+            // 🔴 條件刻意只有 Enabled,沒有 !Waiting:等待期間仍然可能走到釣魚點,那正是要擋 AutoHook 搶竿的時候。
+            // 📌 使用者手上的 AutoHook 若還沒有租約端點,Sync 走的是退回軌(舊的 SetPluginState
+            //    對稱借還),那條路沒有續約這回事,只會週期性確認 AutoHook 還在不在。
+            AutoHookSuppression.Sync(Enabled);
 
             // Always check these first
             if (!IsGathering)
@@ -212,11 +291,11 @@ namespace GatherBuddy.AutoGather
                     var gatherable = gatherTarget.Value.Gatherable;
                     var node = gatherTarget.Value.Node;
                     if (gatherable != null && (gatherable.NodeType == NodeType.Regular || gatherable.NodeType == NodeType.Ephemeral)
-                        && (VisitedNodes.Last?.Value != targetNode.DataId)
-                        && node != null && node.WorldPositions.ContainsKey(targetNode.DataId))
+                        && (VisitedNodes.Last?.Value != targetNode.BaseId)
+                        && node != null && node.WorldPositions.ContainsKey(targetNode.BaseId))
                     {
                         FarNodesSeenSoFar.Clear();
-                        VisitedNodes.AddLast(targetNode.DataId);
+                        VisitedNodes.AddLast(targetNode.BaseId);
                         while (VisitedNodes.Count > (node.WorldPositions.Count <= 4 ? 2 : 4))
                             VisitedNodes.RemoveFirst();
                     }
@@ -226,18 +305,28 @@ namespace GatherBuddy.AutoGather
             }
 
 
+            // 🔴 NavReady 是安全版,沒裝 vnavmesh 時回 false 而不是擲例外 ⇒ 先問在不在,
+            //    否則使用者看到的會是「等待 Navmesh…」而不是「你有安裝它嗎」這則正確的診斷。
+            if (!VNavmesh.Enabled)
+            {
+                AutoStatus = "vnavmesh communication failed. Do you have it installed??".Loc();
+                return;
+            }
+
+            // ⚠️ 下面這個 catch 刻意留著:安全版只攔 IpcNotReadyError,
+            //    vnavmesh 在場但用別的方式壞掉時仍然要收斂到同一則訊息(既有行為不動)。
             try
             {
                 if (!NavReady)
                 {
-                    AutoStatus = "Waiting for Navmesh...";
+                    AutoStatus = "Waiting for Navmesh...".Loc();
                     return;
                 }
             }
             catch (Exception)
             {
                 //GatherBuddy.Log.Error(e.Message);
-                AutoStatus = "vnavmesh communication failed. Do you have it installed??";
+                AutoStatus = "vnavmesh communication failed. Do you have it installed??".Loc();
                 return;
             }
 
@@ -247,27 +336,37 @@ namespace GatherBuddy.AutoGather
                 return;
             }
 
+            // Clean up lock that may have been left behind by cancelled or timed-out tasks.
+            // Every Lock()/Unlock() pair lives inside a single task batch, so an idle task manager
+            // means nothing can still be relying on the lock. This MUST stay above the CanAct gate
+            // below: a task chain that timed out while the player is Occupied would otherwise never
+            // reach it, and the lock is a cross-plugin flag that keeps YesAlready globally disabled.
+            // Exception: the Diadem queue dialogue spans several idle passes, so it keeps both locks (bounded).
+            if (!HoldingDiademDialogLocks())
+            {
+                YesAlready.Unlock();
+                TextAdvance.Unlock();
+            }
+
             if (!_homeWorldWarning && !Functions.OnHomeWorld())
             {
                 _homeWorldWarning = true;
-                Communicator.PrintError("You are not on your home world, some items will not be gatherable.");
+                Communicator.PrintError("You are not on your home world, some items will not be gatherable.".Loc());
             }
 
             if (DiscipleOfLand.NextTreasureMapAllowance == DateTime.MinValue)
             {
                 //Wait for timer refresh
-                AutoStatus = "Refreshing timers...";
+                AutoStatus = "Refreshing timers...".Loc();
                 DiscipleOfLand.RefreshNextTreasureMapAllowance();
                 return;
             }
 
             if (!CanAct && !_diademQueuingInProgress)
             {
-                AutoStatus = Dalamud.Conditions[ConditionFlag.Gathering] ? "Gathering..." : "Player is busy...";
+                AutoStatus = Dalamud.Conditions[ConditionFlag.Gathering] ? "Gathering...".Loc() : "Player is busy...";
                 return;
             }
-
-            YesAlready.Unlock(); // Clean up lock that may have been left behind by cancelled tasks
 
             if (FreeInventorySlots == 0)
             {
@@ -290,8 +389,8 @@ namespace GatherBuddy.AutoGather
              && !GatherBuddy.Config.AutoGatherConfig.FishDataCollection)
             {
                 Communicator.PrintError(
-                    "You have fish on your auto-gather list but you have not opted in to fishing data collection. Auto-gather cannot continue. Please enable fishing data collection in your configuration options or remove fish from your auto-gather lists.");
-                AbortAutoGather();
+                    "You have fish on your auto-gather list but you have not opted in to fishing data collection. Auto-gather cannot continue. Please enable fishing data collection in your configuration options or remove fish from your auto-gather lists.".Loc());
+                AbortAutoGather(reason: "Fish are on the list but fishing data collection is off.");
                 return;
             }
 
@@ -302,7 +401,7 @@ namespace GatherBuddy.AutoGather
                 if (_currentGatherTarget == null)
                 {
                     if (!_activeItemList.IsInitialized)
-                        _currentGatherTarget = _activeItemList.GetNextOrDefault([Svc.Targets.Target!.DataId]).FirstOrDefault();
+                        _currentGatherTarget = _activeItemList.GetNextOrDefault([Svc.Targets.Target!.BaseId]).FirstOrDefault();
                     else
                         _currentGatherTarget = _activeItemList.CurrentOrDefault;
                 }
@@ -312,7 +411,7 @@ namespace GatherBuddy.AutoGather
                 if (!GatherBuddy.Config.AutoGatherConfig.DoGathering)
                     return;
 
-                AutoStatus = "Gathering...";
+                AutoStatus = "Gathering...".Loc();
                 StopNavigation();
 
                 var fish = _activeItemList.GetNextOrDefault(new List<uint>()).Where(g => g.Fish != null);
@@ -340,15 +439,19 @@ namespace GatherBuddy.AutoGather
                 catch (NoCollectableActionsException)
                 {
                     Communicator.PrintError(
-                        "Unable to pick a collectability increasing action to use. Make sure that at least one of the collectable actions is enabled.");
-                    AbortAutoGather();
+                        "Unable to pick a collectability increasing action to use. Make sure that at least one of the collectable actions is enabled.".Loc());
+                    AbortAutoGather(reason: "No collectability action is enabled.");
                 }
 
 
                 return;
             }
 
-            if (AutoRetainer.IsEnabled && GatherBuddy.Config.AutoGatherConfig.AutoRetainerMultiMode && AutoRetainer.AreAnyRetainersAvailableForCurrentChara())
+            // 🔴 運算元順序刻意是「先看設定,再問 AutoRetainer 在不在」:AutoRetainer.IsEnabled 走 IsReadyThrottled,
+            //    節流到期的那一次要把 Dalamud 的 InstalledPlugins 整表反射掃一遍,而 AutoRetainerMultiMode 只是讀一個設定欄位
+            //    (預設關)⇒ 沒開多重模式的人完全不會走到那個查詢。
+            //    ⚠️ IsEnabled 仍排在 AreAnyRetainers... 之前:AutoRetainer 不在時在它那裡短路,不會去打不存在的端點。
+            if (GatherBuddy.Config.AutoGatherConfig.AutoRetainerMultiMode && AutoRetainer.IsEnabled && AutoRetainer.AreAnyRetainersAvailableForCurrentChara())
             {
                 Waiting = true;
                 _plugin.Ipc.AutoGatherWaiting();
@@ -362,7 +465,13 @@ namespace GatherBuddy.AutoGather
             var isPathGenerating = IsPathGenerating;
             var isPathing        = IsPathing;
 
-            switch (_advancedUnstuck.Check(CurrentDestination, isPathGenerating, isPathing))
+            if (YieldToManualMovement(isPathGenerating, isPathing))
+            {
+                AutoStatus = "Yielding to manual movement...".Loc();
+                return;
+            }
+
+            switch (CheckAntiStuck(isPathGenerating, isPathing))
             {
                 case AdvancedUnstuckCheckResult.Pass: break;
                 case AdvancedUnstuckCheckResult.Wait: return;
@@ -374,7 +483,7 @@ namespace GatherBuddy.AutoGather
 
             if (isPathGenerating)
             {
-                AutoStatus = "Generating path...";
+                AutoStatus = "Generating path...".Loc();
                 return;
             }
 
@@ -400,14 +509,14 @@ namespace GatherBuddy.AutoGather
                 }
             }
 
-            var nearbyNodes = Svc.Objects.Where(o => o.ObjectKind == ObjectKind.GatheringPoint && o.IsTargetable).Select(o => o.DataId);
+            var nearbyNodes = Svc.Objects.Where(o => o.ObjectKind == ObjectKind.GatheringPoint && o.IsTargetable).Select(o => o.BaseId);
             var next = _activeItemList.GetNextOrDefault(nearbyNodes)
                 .OrderByDescending(nodes => nodes.Item.ItemId);
             if (!next.Any())
             {
                 if (!_activeItemList.HasItemsToGather)
                 {
-                    AbortAutoGather();
+                    AbortAutoGather(reason: "Nothing left to gather.");
                     return;
                 }
 
@@ -427,7 +536,7 @@ namespace GatherBuddy.AutoGather
                     _plugin.Ipc.AutoGatherWaiting();
                 }
 
-                AutoStatus = "No available items to gather";
+                AutoStatus = "No available items to gather".Loc();
                 return;
             }
 
@@ -436,7 +545,7 @@ namespace GatherBuddy.AutoGather
             if (next.Any(n => n.Item.ItemData.IsCollectable
                  && !CheckCollectablesUnlocked(n.Fish != null ? GatheringType.Fisher : n.Gatherable!.GatheringType.ToGroup())))
             {
-                AbortAutoGather();
+                AbortAutoGather(reason: "Collectables are not unlocked for this job.");
                 return;
             }
 
@@ -445,14 +554,18 @@ namespace GatherBuddy.AutoGather
 
             if (!GatherBuddy.Config.AutoGatherConfig.UseNavigation)
             {
-                AutoStatus = "Waiting for Gathering Point... (No Nav Mode)";
+                AutoStatus = "Waiting for Gathering Point... (No Nav Mode)".Loc();
                 return;
             }
 
             var territoryId = Svc.ClientState.TerritoryType;
             //Idyllshire to The Dravanian Hinterlands
-            if ((territoryId == 478 && next.First().Node.Territory.Id == 399)
-             || (territoryId == 418 && next.First().Node.Territory.Id is 901 or 929 or 939) && Lifestream.Enabled)
+            // 🔴 外層括號不可省:C# 的 && 綁得比 || 緊,少了它 Lifestream.Enabled 只會套到 418 那一支,
+            //    田園郡(478)那一支就不檢查 Lifestream 在不在。沒裝 Lifestream 的人要落到下面 forcedAetheryte 分支的
+            //    「Install Lifestream or teleport to … manually」(399 在 ForcedAetherytes.ZonesWithoutAetherytes 裡),
+            //    而不是走到乙太網傳送點前面卡住。
+            if (((territoryId == 478 && next.First().Node.Territory.Id == 399)
+              || (territoryId == 418 && next.First().Node.Territory.Id is 901 or 929 or 939)) && Lifestream.Enabled)
             {
                 var aetheryte = Svc.Objects.Where(x => x.ObjectKind == ObjectKind.Aetheryte && x.IsTargetable)
                     .OrderBy(x => x.Position.DistanceToPlayer()).FirstOrDefault();
@@ -460,13 +573,18 @@ namespace GatherBuddy.AutoGather
                 {
                     if (aetheryte.Position.DistanceToPlayer() > 10)
                     {
-                        AutoStatus = "Moving to aetheryte...";
+                        AutoStatus = "Moving to aetheryte...".Loc();
                         if (!isPathing && !isPathGenerating)
                             Navigate(aetheryte.Position, false);
                     }
-                    else if (!Lifestream.IsBusy())
+                    // 🔴 Lifestream 可能在存在性快取的 5 秒窗內被卸載。TryIsBusy 回 false 代表
+                    //    「問不到」(對端已經不在),它自己會作廢快取;那一幀就明講需要手動傳送,
+                    //    不要掉進下面那個會呼叫 AethernetTeleport 的分支。
+                    else if (!Lifestream.TryIsBusy(out var lifestreamBusy))
+                        AutoStatus = "Manual teleporting required".Loc();
+                    else if (!lifestreamBusy)
                     {
-                        AutoStatus = "Teleporting...";
+                        AutoStatus = "Teleporting...".Loc();
                         StopNavigation();
                         string name = string.Empty;
                         switch (territoryId)
@@ -482,7 +600,8 @@ namespace GatherBuddy.AutoGather
                                 break;
                         }
 
-                        TaskManager.Enqueue(() => Lifestream.AethernetTeleport(name));
+                        // 🔴 這個 lambda 之後才在 TaskManager 裡跑,不受任何 try 保護 ⇒ 用自帶保護的版本。
+                        TaskManager.Enqueue(() => Lifestream.AethernetTeleportSafe(name));
                         TaskManager.DelayNext(1000);
                         TaskManager.Enqueue(() => GenericHelpers.IsScreenReady());
                     }
@@ -493,16 +612,25 @@ namespace GatherBuddy.AutoGather
 
             if (territoryId == 886 && next.First().Node.Territory.Id is 901 or 929 or 939)
             {
-                var dutyNpc                    = Svc.Objects.FirstOrDefault(o => o.DataId == 1031694);
+                var dutyNpc                    = Svc.Objects.FirstOrDefault(o => o.BaseId == 1031694);
                 var selectStringAddon          = Dalamud.GameGui.GetAddonByName("SelectString");
                 var talkAddon                  = Dalamud.GameGui.GetAddonByName("Talk");
                 var selectYesNoAddon           = Dalamud.GameGui.GetAddonByName("SelectYesno");
                 var contentsFinderConfirmAddon = Dalamud.GameGui.GetAddonByName("ContentsFinderConfirm");
-                Svc.Log.Verbose($"Addons: {selectStringAddon}, {talkAddon}, {selectYesNoAddon}, {contentsFinderConfirmAddon}");
+                if (LogGate.VerboseEnabled)
+                    Svc.Log.Verbose($"Addons: {selectStringAddon}, {talkAddon}, {selectYesNoAddon}, {contentsFinderConfirmAddon}");
                 if (dutyNpc != null && dutyNpc.Position.DistanceToPlayer() > 3)
                 {
-                    var point = VNavmesh.Query.Mesh.NearestPoint(dutyNpc.Position, 10, 10000);
-                    VNavmesh.SimpleMove.PathfindAndMoveTo(point, false);
+                    // 🔴 提供端回的是 Vector3?:網格沒載入或該點不在網格上時回 null。
+                    //    這條路徑外面**沒有** try/catch;取不到就這一輪不動,下一個 tick 再試。
+                    var point = VNavmesh.Query.Mesh.NearestPointSafe(dutyNpc.Position, 10, 10000);
+                    if (!point.HasValue)
+                    {
+                        GatherBuddy.Log.Debug("Query.Mesh.NearestPoint() returned null for the duty NPC position; retrying next tick.");
+                        return;
+                    }
+
+                    VNavmesh.SimpleMove.PathfindAndMoveToSafe(point.Value, false);
                     return;
                 }
                 else
@@ -510,11 +638,27 @@ namespace GatherBuddy.AutoGather
                     {
                         case false when contentsFinderConfirmAddon > 0:
                         {
-                            var contents = new AddonMaster.ContentsFinderConfirm(contentsFinderConfirmAddon);
-                            TaskManager.Enqueue(contents.Commence);
-                            TaskManager.Enqueue(() => _diademQueuingInProgress = false);
+                            // 🔴 不在 enqueue 那一幀捕獲原生指標:任務跑到的時候才重查位址、過守衛、再按(見 PressAddonOnce)。
+                            // 🔴 Func<bool?> 多載(區塊 lambda 有回傳值):被守衛擋下回 false＝下一個 tick 再試,
+                            // 不是 Enqueue(Action, …) 那種把 false 吞掉、這一輪整個跳過。
+                            TaskManager.Enqueue(() =>
+                            {
+                                return PressAddonOnce("ContentsFinderConfirm", "Commence", AddonPressGuard.DefaultEscapeFrames,
+                                    addon => new AddonMaster.ContentsFinderConfirm(addon).Commence());
+                            }, "雲冠群島排隊:按下 ContentsFinderConfirm 的參加鈕");
+                            // 🔴 區塊 lambda 明確 return true:寫成運算式 lambda 的話,賦值運算式**有值**(被指派的 false),
+                            // lambda 會綁到 Enqueue(Func<bool?>) 而不是 Enqueue(Action);TaskManager 把 false 讀成「這一步還沒完成」,
+                            // 每個 framework tick 重跑一次,直到 LegacyTaskManager 預設的 TimeLimitMS(10 秒)到期才丟掉這顆任務 ——
+                            // TaskManager.IsBusy 會把整個 DoAutoGather 卡住十秒,後面的「等 BoundByDuty」與「解開 YesAlready」也一起被往後推。
+                            TaskManager.Enqueue(() =>
+                            {
+                                _diademQueuingInProgress = false;
+                                _diademDialogLockSince   = 0;
+                                return true;
+                            }, "雲冠群島排隊:清除排隊中旗標");
                             TaskManager.Enqueue(() => Dalamud.Conditions[ConditionFlag.BoundByDuty]);
                             TaskManager.Enqueue(YesAlready.Unlock);
+                            TaskManager.Enqueue(TextAdvance.Unlock);
                             return;
                         }
                         case false when contentsFinderConfirmAddon == nint.Zero
@@ -526,59 +670,97 @@ namespace GatherBuddy.AutoGather
                                 if (targetSystem == null)
                                     return;
 
+                                // 互動在幾個 tick 後才跑:只抄 id,執行時重查(ObjectTable 包裝每格共用、就地改寫 Address)。
+                                // 查不到就放棄這一步,和 EnqueueNodeInteraction 同一條失敗路徑。
+                                var dutyNpcId = dutyNpc?.GameObjectId ?? 0;
                                 TaskManager.Enqueue(YesAlready.Lock);
+                                // 接下來要按 Talk：TextAdvance 在 OccupiedInQuestEvent 下也會按，不暫停它就是同幀搶按。
+                                TaskManager.Enqueue(TextAdvance.Lock);
                                 TaskManager.Enqueue(StopNavigation);
-                                TaskManager.Enqueue(()
-                                    => targetSystem->OpenObjectInteraction(
-                                        (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)dutyNpc.Address));
+                                TaskManager.Enqueue(() =>
+                                {
+                                    var npc = Svc.Objects.SearchById(dutyNpcId);
+                                    if (npc == null || npc.BaseId != 1031694)
+                                    {
+                                        GatherBuddy.Log.Warning("Diadem duty NPC is no longer in the object table; skipping the interaction.");
+                                        return;
+                                    }
+
+                                    targetSystem->OpenObjectInteraction((FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)npc.Address);
+                                });
                                 TaskManager.Enqueue(() => Dalamud.Conditions[ConditionFlag.OccupiedInQuestEvent]);
-                                TaskManager.Enqueue(() => _diademQueuingInProgress = true);
+                                // 📌 這一顆的賦值值剛好是 true,所以同樣綁到 Func<bool?> 卻能立刻完成 —— 那是巧合不是設計。
+                                // 一併寫成明確 return true,免得日後有人把常數翻成 false 就變成上面那種十秒空轉。
+                                TaskManager.Enqueue(() =>
+                                {
+                                    _diademQueuingInProgress = true;
+                                    _diademDialogLockSince   = Environment.TickCount64;
+                                    return true;
+                                }, "雲冠群島排隊:標記排隊中旗標");
                                 return;
                             }
                         case true when selectStringAddon > 0:
                         {
-                            var select = new AddonMaster.SelectString(selectStringAddon);
-                            TaskManager.Enqueue(() => select.Entries[0].Select());
+                            TaskManager.Enqueue(() =>
+                            {
+                                return PressAddonOnce("SelectString", "Select|0", AddonPressGuard.DefaultEscapeFrames,
+                                    addon => new AddonMaster.SelectString(addon).Entries[0].Select());
+                            }, "雲冠群島排隊:選 SelectString 的第一項");
                             return;
                         }
                         case true when selectYesNoAddon > 0:
                         {
-                            var yesNo = new AddonMaster.SelectYesno(selectYesNoAddon);
-                            TaskManager.Enqueue(yesNo.Yes);
+                            // 🔴 這一顆非改 Func<bool?> 不可:後面緊接著 DelayNext(5000),用 Action 多載的話
+                            // 「被守衛擋下」會被吞成成功,那五秒就是對著根本沒按下去的確認框白等。
+                            TaskManager.Enqueue(() =>
+                            {
+                                return PressAddonOnce("SelectYesno", "Yes", AddonPressGuard.DefaultEscapeFrames,
+                                    addon => new AddonMaster.SelectYesno(addon).Yes());
+                            }, "雲冠群島排隊:對 SelectYesno 按是");
                             TaskManager.DelayNext(5000);
                             return;
                         }
                         case true when talkAddon > 0:
                         {
-                            var talk = new AddonMaster.Talk(talkAddon);
-                            TaskManager.Enqueue(talk.Click);
+                            // Talk 按一次翻一頁、窗不消失:逃生口 15 幀,走逃生口是常態寫 Debug。
+                            TaskManager.Enqueue(() =>
+                            {
+                                // TextAdvance 的暫停剛補回的那一幀不按：它同一幀稍早可能已經按過。
+                                if (!TextAdvance.MayClickTalk)
+                                    return false;
+
+                                return PressAddonOnce("Talk", "Click", AddonPressGuard.RoutineRePressEscapeFrames,
+                                    addon => new AddonMaster.Talk(addon).Click());
+                            }, "雲冠群島排隊:點 Talk 翻頁");
                             return;
                         }
                     }
             }
 
-            var forcedAetheryte = ForcedAetherytes.ZonesWithoutAetherytes
-                .FirstOrDefault(z => z.ZoneId == next.First().Location.Territory.Id);
+            var forcedAetheryte = FindForcedAetheryte(next);
             if (forcedAetheryte.ZoneId != 0
              && GatherBuddy.GameData.Aetherytes[forcedAetheryte.AetheryteId].Territory.Id == territoryId)
             {
+                // 478 -> 399 沒裝 Lifestream 時給使用者看的訊息;ECommons 的 Loc(params) 會依序把 ?? 換成傳入的值。
                 if (territoryId == 478 && !Lifestream.Enabled)
-                    AutoStatus = $"Install Lifestream or teleport to {next.First().Location.Territory.Name} manually";
+                    AutoStatus = "Install Lifestream or teleport to ?? manually".Loc(next.First().Location.Territory.Name);
                 else
-                    AutoStatus = "Manual teleporting required";
+                    AutoStatus = "Manual teleporting required".Loc();
                 return;
             }
 
             //At this point, we are definitely going to gather something, so we may go home after that.
+            // 🔴 Enabled 是節流過的答案;Lifestream 剛被卸載時 Abort() 會擲 IpcNotReadyError,
+            //    而對端不在＝本來就沒有東西要中止。AbortSafe 會吞掉那一種、作廢快取,其餘照樣往上冒。
             if (Lifestream.Enabled)
-                Lifestream.Abort();
+                Lifestream.AbortSafe();
             WentHome = false;
 
             if (next.First().Location.Territory.Id != territoryId)
             {
                 if (Dalamud.Conditions[ConditionFlag.BoundByDuty] && !Functions.InTheDiadem())
                 {
-                    AutoStatus = "Can not teleport when bound by duty";
+                    AutoStatus = "Can not teleport when bound by duty".Loc();
                     return;
                 }
                 else if (Functions.InTheDiadem())
@@ -587,11 +769,11 @@ namespace GatherBuddy.AutoGather
                     return;
                 }
 
-                AutoStatus = "Teleporting...";
+                AutoStatus = "Teleporting...".Loc();
                 StopNavigation();
 
                 if (!MoveToTerritory(next.First().Location))
-                    AbortAutoGather();
+                    AbortAutoGather(reason: "Could not travel to the next gathering location.");
 
                 // Reset target to pick up closest item after teleport
                 next = default;
@@ -607,7 +789,7 @@ namespace GatherBuddy.AutoGather
             if (!LocationMatchesJob(next.First().Location))
             {
                 if (!ChangeGearSet(next.First().Location.GatheringType.ToGroup(), 2400))
-                    AbortAutoGather();
+                    AbortAutoGather(reason: "Could not change to the required gear set.");
             }
 
             if (next.First().Fish != null)
@@ -622,9 +804,13 @@ namespace GatherBuddy.AutoGather
                 return;
             }
 
-            AutoStatus = "Fell out of control loop unexpectedly. Please report this error.";
+            AutoStatus = "Fell out of control loop unexpectedly. Please report this error.".Loc();
             return;
         }
+
+        // 捕捉 next 的 lambda 不可寫在 DoAutoGather 裡：next 宣告在方法最外層，閉包會在每幀進入方法時就配置（自動採集關著也一樣）。
+        private static (uint ZoneId, uint AetheryteId) FindForcedAetheryte(IEnumerable<GatherTarget> next)
+            => ForcedAetherytes.ZonesWithoutAetherytes.FirstOrDefault(z => z.ZoneId == next.First().Location.Territory.Id);
 
         public readonly Dictionary<GatherTarget, (Vector3 Position, Angle Rotation, DateTime Expiration)> FishingSpotData = new();
 
@@ -639,7 +825,7 @@ namespace GatherBuddy.AutoGather
                 {
                     Communicator.PrintError(
                         $"No position data for fishing spot {fish.FishingSpot.Name}. Auto-Fishing cannot continue. Please, manually fish at least once at {fish.FishingSpot.Name} so GBR can know its location.");
-                    AbortAutoGather();
+                    AbortAutoGather(reason: "No recorded position for that fishing spot.");
                     return;
                 }
 
@@ -664,14 +850,23 @@ namespace GatherBuddy.AutoGather
             if (Vector3.Distance(fishingSpotData.Position, Player.Position) < 1)
             {
                 if (Dalamud.Conditions[ConditionFlag.Mounted])
+                {
                     EnqueueDismount();
+                    // Sneak cannot be cast mounted; wait one round for the dismount instead of fishing right away.
+                    if (GatherBuddy.Config.AutoGatherConfig.UseSneakBeforeFishing)
+                        return;
+                }
+
+                if (ActivateFishingSneak())
+                    return;
 
                 var playerAngle = new Angle(Player.Rotation);
                 if (playerAngle != fishingSpotData.Rotation)
                     TaskManager.Enqueue(() => SetRotation(fishingSpotData.Rotation));
-                Svc.Log.Debug($"Fishing Spot is valid for {(fishingSpotData.Expiration - DateTime.Now).TotalSeconds} seconds");
+                if (LogGate.DebugEnabled)
+                    Svc.Log.Debug($"Fishing Spot is valid for {(fishingSpotData.Expiration - DateTime.Now).TotalSeconds} seconds");
 
-                AutoStatus = "Fishing...";
+                AutoStatus = "Fishing...".Loc();
                 DoFishingTasks(next);
                 return;
             }
@@ -679,7 +874,7 @@ namespace GatherBuddy.AutoGather
             if (CurrentDestination != fishingSpotData.Position)
             {
                 StopNavigation();
-                AutoStatus = "Moving to fishing spot...";
+                AutoStatus = "Moving to fishing spot...".Loc();
                 if (IsGathering || IsFishing)
                 {
                     QueueQuitFishingTasks();
@@ -689,8 +884,42 @@ namespace GatherBuddy.AutoGather
             }
         }
 
+        // Environment.TickCount64 before which Sneak is not retried, so a cast the game keeps refusing never stalls fishing.
+        private long _fishingSneakRetryAtMs;
+
+        private unsafe bool ActivateFishingSneak()
+        {
+            if (!GatherBuddy.Config.AutoGatherConfig.UseSneakBeforeFishing)
+                return false;
+            if (Player.Job != Job.FSH || Player.Level < Actions.FisherSneak.MinLevel)
+                return false;
+            if (IsGathering || IsFishing || Dalamud.Conditions[ConditionFlag.InCombat] || Dalamud.Conditions[ConditionFlag.Mounted])
+                return false;
+            if (Environment.TickCount64 < _fishingSneakRetryAtMs)
+                return false;
+            if (Player.Status.Any(s => s.StatusId == Actions.FisherSneak.StatusProvide![0]))
+                return false;
+            // Non-zero covers recast, being unable to act, and the action not being learned.
+            if (ActionManager.Instance()->GetActionStatus(ActionType.Action, Actions.FisherSneak.ActionId) != 0)
+                return false;
+
+            _fishingSneakRetryAtMs = Environment.TickCount64 + 10_000;
+            GatherBuddy.Log.Information("[自動採集] 釣魚前施放潛行。");
+            EnqueueActionWithDelay(() => UseAction(Actions.FisherSneak));
+            return true;
+        }
+
         private void DoNodeMovement(IEnumerable<GatherTarget> next, ConfigPreset config)
         {
+            // 採集技能的 ID 依職業決定，園藝師／採掘師以外取不到（GetJobValue 會擲）。
+            // 套裝剛切換、職業還沒換過來時這一輪整個略過：不移動、不排技能，套裝切換的等待結束後下一輪再判。
+            var job = Player.Job;
+            if (job is not (Job.BTN or Job.MIN))
+            {
+                GatherBuddy.Log.Debug($"[自動採集] 目前職業是 {job}，不是園藝師／採掘師（多半是套裝剛切換還沒生效），這一輪略過採集點處理。");
+                return;
+            }
+
             var allPositions = next.Where(n => n.Location.Territory.Id == Player.Territory)
                 .SelectMany(ne => ne.Node?.WorldPositions
                         .ExceptBy(VisitedNodes, n => n.Key)
@@ -712,14 +941,14 @@ namespace GatherBuddy.AutoGather
 
             if (closestTargetableNode != null)
             {
-                AutoStatus = "Moving to node...";
-                var targetItem = next.First(ti => ti.Node != null && ti.Node.WorldPositions.ContainsKey(closestTargetableNode.DataId))
+                AutoStatus = "Moving to node...".Loc();
+                var targetItem = next.First(ti => ti.Node != null && ti.Node.WorldPositions.ContainsKey(closestTargetableNode.BaseId))
                     .Gatherable;
                 MoveToCloseNode(closestTargetableNode, targetItem, config);
                 return;
             }
 
-            AutoStatus = "Moving to far node...";
+            AutoStatus = "Moving to far node...".Loc();
 
             if (CurrentDestination != default)
             {
@@ -753,7 +982,7 @@ namespace GatherBuddy.AutoGather
                 // marker not yet loaded on game
                 if (pos == null || timedNode.Time.Start > GatherBuddy.Time.ServerTime.AddSeconds(-8))
                 {
-                    AutoStatus = "Waiting on flag show up";
+                    AutoStatus = "Waiting on flag show up".Loc();
                     return;
                 }
 
@@ -762,7 +991,18 @@ namespace GatherBuddy.AutoGather
                     .OrderBy(o => Vector2.Distance(pos.Value, new Vector2(o.X, o.Z)))
                     .FirstOrDefault();
                 if (selectedFarNode == default)
-                    selectedFarNode = VNavmesh.Query.Mesh.NearestPoint(new Vector3(pos.Value.X, 0, pos.Value.Y), 10, 10000);
+                {
+                    // 🔴 提供端回 Vector3?。取不到就這一輪不動 —— 這裡**絕不能**寫 ?? default,
+                    //    那會讓 MoveToFarNode 拿到 Vector3.Zero 然後真的往地圖原點跑。
+                    var meshNode = VNavmesh.Query.Mesh.NearestPointSafe(new Vector3(pos.Value.X, 0, pos.Value.Y), 10, 10000);
+                    if (!meshNode.HasValue)
+                    {
+                        GatherBuddy.Log.Debug("Query.Mesh.NearestPoint() returned null for the flag position; retrying next tick.");
+                        return;
+                    }
+
+                    selectedFarNode = meshNode.Value;
+                }
             }
             else
             {
@@ -785,20 +1025,117 @@ namespace GatherBuddy.AutoGather
 
         private unsafe void LeaveTheDiadem()
         {
-            AgentModule.Instance()->GetAgentByInternalId(AgentId.ContentsFinderMenu)->Show();
-            if (GenericHelpers.TryGetAddonByName("ContentsFinderMenu", out AtkUnitBase* addon))
+            // AgentModule.Instance() 走 UIModule，UI 尚未建立時回 null（CS 手寫實作逐字是
+            // uiModule == null ? null : uiModule->GetAgentModule()），GetAgentByInternalId 也可能回 null。
+            // 取不到就不開選單直接返回——與同 repo Plugin/ContextMenu.cs HandleItemSearch 相同的失敗形式。
+            var agentModule = AgentModule.Instance();
+            if (agentModule == null)
+                return;
+
+            var contentsFinderMenu = agentModule->GetAgentByInternalId(AgentId.ContentsFinderMenu);
+            if (contentsFinderMenu == null)
+                return;
+
+            contentsFinderMenu->Show();
+            if (GenericHelpers.TryGetAddonByName<AtkUnitBase>("ContentsFinderMenu", out _))
             {
                 TaskManager.Enqueue(YesAlready.Lock);
-                TaskManager.Enqueue(() => Callback.Fire(addon, true,  0));
-                TaskManager.Enqueue(() => Callback.Fire(addon, false, -2));
+                // 🔴 這三顆一律走 Func<bool?> 多載(區塊 lambda 有回傳值)而不是 Action:ECommons LegacyTaskManager 把
+                // Enqueue(Action, …) 包成 () => { task(); return true; },被守衛擋下的 false 會被吞掉,
+                // 後面的 DelayNext(1000) 與 SelectYesno 那一顆照樣往下跑(對著根本沒被按過的選單去等確認框)。
+                // 語意:送出了、或視窗根本不在 → true;被守衛擋下 → false(下一個 tick 再試;守衛的 90 幀逃生口一到必放行,
+                // 任務的逾時預算 10 秒 > 90 個 framework tick)。🔴 絕不回 null —— bool? 三態裡 null 是 Abort(),會清掉整條佇列。
+                TaskManager.Enqueue(() => { return FireOnAddon("ContentsFinderMenu", true, 0); },
+                    "離開雲冠群島:對 ContentsFinderMenu 送出 (true,0)");
+                TaskManager.Enqueue(() => { return FireOnAddon("ContentsFinderMenu", false, -2); },
+                    "離開雲冠群島:對 ContentsFinderMenu 送出 (false,-2)");
                 TaskManager.DelayNext(1000);
-                TaskManager.Enqueue(() => Callback.Fire((AtkUnitBase*)(nint)Dalamud.GameGui.GetAddonByName("SelectYesno"), true, 0));
+                TaskManager.Enqueue(() => { return FireOnAddon("SelectYesno", true, 0); },
+                    "離開雲冠群島:對 SelectYesno 送出 (true,0)");
                 TaskManager.Enqueue(YesAlready.Unlock);
                 return;
             }
         }
 
-        private void AbortAutoGather(string? status = null)
+        /// <remarks>
+        /// 🔴 ECommons 的 <c>Callback.Fire</c> 在送出之前先做
+        /// <c>PluginLog.Verbose($"Firing callback: {Base->Name.Read()} …")</c> ——
+        /// <c>Base</c> 為 null 時**第一行就解參考 null**（內插字串在 log 等級閘門之外求值，Verbose 關著也一樣）。
+        /// AccessViolationException 在 .NET Core 是 corrupted-state exception，<c>try</c>/<c>catch</c> 與 <c>ExecuteSafe</c> 一律攔不到。
+        /// <para>
+        /// 所以這裡**存名字、跑到的時候重新查**（絕不跨幀保存原生指標）；找不到視窗是常態
+        /// （確認對話框沒跳出來：網路延遲、遊戲直接省略確認），而且它是 <c>DelayNext(1000)</c> 之後才跑的延遲工作。
+        /// 這是動作型路徑（自動採集離開雲冠群島），不是每幀路徑，所以取不到時記一行 <c>Information</c>（要使用者回報的診斷）再跳過。
+        /// </para>
+        /// </remarks>
+        /// <returns>
+        /// <see langword="true"/> ＝這一步已經處理完（送出去了，或視窗根本不在），鏈可以往下走；
+        /// <see langword="false"/> ＝被 <see cref="AddonPressGuard"/> 擋下，<b>下一個 tick 再試</b>。
+        /// 🔴 呼叫端必須用 <c>Func&lt;bool?&gt;</c> 多載（區塊 lambda 有回傳值）接這個回傳值：
+        /// <c>Enqueue(Action, …)</c> 會把它包成 <c>() =&gt; { task(); return true; }</c> 而<b>吞掉 false</b>，
+        /// 那樣「被守衛擋下」就變成「這一輪整個跳過」而不是「下一個 tick 再來」。
+        /// </returns>
+        private static unsafe bool FireOnAddon(string addonName, bool updateState, params object[] values)
+        {
+            if (GenericHelpers.TryGetAddonByName(addonName, out AtkUnitBase* addon))
+            {
+                // 同一扇窗的同一組參數在它走完生命週期前只送一次(ContentsFinderMenu 的 (true,0) 與 (false,-2) 是不同參數組,
+                // 照常各送一次;SelectYesno 是單答終結窗,不管參數一律併成同一次)。
+                // 🔴 被擋下回 false（不是吞掉）:呼叫端是 Func<bool?> 任務,下一個 tick 會再進來一次,
+                // 直到守衛的 90 幀逃生口放行為止 —— 這一發沒送出去,後面的 DelayNext 與確認框那一顆就不該先跑。
+                if (!AddonPressGuard.TryBeginPress(addonName, addon, AddonPressGuard.BuildPressKey(updateState, values)))
+                    return false;
+
+                Callback.Fire(addon, updateState, values);
+                return true;
+            }
+
+            GatherBuddy.Log.Information(
+                $"LeaveTheDiadem: 視窗 \"{addonName}\" 已經不在了，這一步當作完成往下走（不送出，避免解參考空指標）。");
+            return true;
+        }
+
+        /// <summary>
+        /// Diadem 排隊分支用:enqueue 那一幀<b>只記名字</b>,任務跑到的時候才重查位址、過 <see cref="AddonPressGuard"/>、再按。
+        /// </summary>
+        /// <remarks>
+        /// 🔴 不可以在 enqueue 那一幀 <c>new AddonMaster.X(位址)</c> 再把方法群組排進 TaskManager:指標被閉包捕獲、
+        /// 1~2 個 tick 之後才用 —— 對「按下即關、正在關閉中」的 SelectString/SelectYesno/ContentsFinderConfirm 與
+        /// 翻到最後一頁的 Talk 都是拿舊位址送第二發(攔不到的存取違規)。
+        /// 視窗跑到時已不在就跳過(正常結果,寫 Debug,回 true 讓鏈往下走)。
+        /// </remarks>
+        /// <returns>
+        /// <see langword="true"/> ＝這一步已經處理完（按下去了，或視窗根本不在）；
+        /// <see langword="false"/> ＝被 <see cref="AddonPressGuard"/> 擋下，<b>下一個 tick 再試</b>。
+        /// 🔴 四個呼叫端一律用 <c>Func&lt;bool?&gt;</c> 多載（區塊 lambda 有回傳值）:<c>Enqueue(Action, …)</c>
+        /// 會把 false 吞掉，那樣被擋下就變成「這一輪永久跳過」—— 最明顯的是 SelectYesno 那顆，
+        /// 後面接著 <c>DelayNext(5000)</c>，等於對著<b>根本沒按下去</b>的確認框白等五秒。
+        /// </returns>
+        private static bool PressAddonOnce(string addonName, string pressKey, int escapeFrames, Action<nint> press)
+        {
+            var addon = Dalamud.GameGui.GetAddonByName(addonName).Address;
+            if (addon == nint.Zero)
+            {
+                GatherBuddy.Log.Debug($"Diadem 排隊:視窗「{addonName}」跑到時已經不在了,略過這次按壓(不對已釋放的視窗送事件)。");
+                return true;
+            }
+
+            // Talk 是常駐窗:收起後位址仍非 0,當作「跑到時已經不在」,不對隱藏的窗送事件。
+            if (AddonPressGuard.IsPersistentHidden(addonName, addon))
+            {
+                GatherBuddy.Log.Debug($"Diadem 排隊:常駐視窗「{addonName}」跑到時已經收起,略過這次按壓。");
+                return true;
+            }
+
+            // 🔴 絕不回 null —— LegacyTaskManager 的 bool? 三態裡 null 是 Abort(),那會清掉整條佇列。
+            if (!AddonPressGuard.TryBeginPress(addonName, addon, pressKey, escapeFrames))
+                return false;
+
+            press(addon);
+            return true;
+        }
+
+        private void AbortAutoGather(string? status = null, string? reason = null)
         {
             if (Functions.InTheDiadem())
             {
@@ -815,9 +1152,69 @@ namespace GatherBuddy.AutoGather
                 EnqueueActionWithDelay(() => { GoHome(); });
             TaskManager.Enqueue(() =>
             {
+                // 必須在 Enabled = false 之前:setter 的停用分支第一件事就是把 AutoStatus
+                // 蓋成 "Idle...",所以通知端絕對不能等到那裡再去讀 AutoStatus。
+                // AbortAutoGather 走到這裡時 honk 已經播過(若 HonkMode 開著),記下來避免重複。
+                MarkSelfStop(reason ?? status ?? "Auto-gather could not continue.",
+                             GatherBuddy.Config.AutoGatherConfig.HonkMode);
                 Enabled    = false;
                 AutoStatus = status ?? AutoStatus;
             });
+        }
+
+        /// <summary>
+        /// 標記「接下來這一次 Enabled = false 是自動採集自己停的」並附上原因。
+        /// 使用者勾掉勾選框、點採集視窗、下 /gather auto(off)、或別的外掛叫 IPC 端點
+        /// SetAutoGatherEnabled 都不可以呼叫 —— 那些不算「自己停了」。
+        /// </summary>
+        private void MarkSelfStop(string reason, bool soundAlreadyPlayed = false)
+        {
+            _pendingStopReason      = reason;
+            _pendingStopSoundPlayed = soundAlreadyPlayed;
+        }
+
+        /// <summary>
+        /// 發出「自動化不是被你停掉、是自己停了」的通知。純顯示,不做任何遊戲動作。
+        /// </summary>
+        private void NotifyStoppedItself(string reason, bool soundAlreadyPlayed)
+        {
+            // 純顯示的方法：卸載窗內轉派會就地在背景執行緒跑，通知與 IPC 都不該在那裡發。
+            if (FrameworkUnloadGuard.ShouldSkip("自動採集停止通知"))
+                return;
+
+            // 🔴 刻意放在 NotifyWhenStoppedItself 的閘門「之前」：那個旗標是「Dalamud 桌面通知」的開關而且預設關；
+            //    語音通知是另一件事、有自己的開關，兩者不該互相牽連。
+            // 🔴 TataruPraise 的 IPC 實作跑在呼叫端（我們）的執行緒上 ⇒ 一律丟回主執行緒再叫（已經在主執行緒時就地同步執行）。
+            // 🔴 fail-safe：TataruPraise 沒裝／關著／池裡沒句子都只是安靜的 no-op，絕不影響採集流程本身。
+            if (GatherBuddy.Config.AutoGatherConfig.TataruPraiseOnStoppedItself)
+                _ = Svc.Framework.RunOnFrameworkThread(() => TataruPraiseIpc.TryPraise(reason));
+
+            if (!GatherBuddy.Config.AutoGatherConfig.NotifyWhenStoppedItself)
+                return;
+
+            // 要使用者回報的診斷。
+            GatherBuddy.Log.Information($"[StopNotify] 自動採集自己停了:{reason}");
+
+            var headline = "Auto-gather stopped on its own.".Loc();
+            var body     = reason.Loc();
+            // 幾乎總是已經在主執行緒上(TaskManager、AntiStuck、經 IpcFrameworkGate 進來的 IPC 端點都是),那時這個呼叫是同步的;
+            // 包起來是保險:通知一律在主執行緒上發。
+            _ = Svc.Framework.RunOnFrameworkThread(() =>
+            {
+                Svc.NotificationManager.AddNotification(new Notification
+                {
+                    Title           = "GatherBuddy Reborn",
+                    Content         = headline + "\n" + body,
+                    MinimizedText   = headline,
+                    Type            = NotificationType.Warning,
+                    InitialDuration = TimeSpan.FromSeconds(30),
+                    Minimized       = false,
+                });
+            });
+
+            // 沿用既有的 honk,不另外做播放層。AbortAutoGather 已經播過就不重複。
+            if (GatherBuddy.Config.AutoGatherConfig.HonkMode && !soundAlreadyPlayed)
+                Task.Run(() => _soundHelper.StartHonkSoundTask(3));
         }
 
         private unsafe void CloseGatheringAddons(bool closeGathering = true)
@@ -828,7 +1225,8 @@ namespace GatherBuddy.AutoGather
             {
                 EnqueueActionWithDelay(() =>
                 {
-                    if (MasterpieceAddon is var addon and not null)
+                    if (MasterpieceAddon is var addon and not null
+                     && AddonPressGuard.TryBeginPress("GatheringMasterpiece", &addon->AtkUnitBase, AddonPressGuard.ClosePressKey))
                     {
                         Callback.Fire(&addon->AtkUnitBase, true, -1);
                     }
@@ -845,8 +1243,15 @@ namespace GatherBuddy.AutoGather
                 {
                     if (GatheringAddon is var gathering and not null && gathering->IsReady)
                     {
-                        Callback.Fire(&gathering->AtkUnitBase, true, -1);
-                        TaskManager.DelayNextImmediate(100);
+                        // 🔴 刻意的重試迴圈也要罩:IsReady 擋不住「關閉中」的那幾幀 —— Fire(-1) 被接受後窗進入關閉幀,
+                        // 下一 tick 重跑仍見 IsReady 就會再送一發 = 攔不到的存取違規。同一扇窗(位址)在它走完生命週期前
+                        // 只送一次;真的沒生效(剛出現時 callback 被忽略)由守衛的逃生口(90 幀)放行補送,重試語意保留。
+                        if (AddonPressGuard.TryBeginPress("Gathering", &gathering->AtkUnitBase, AddonPressGuard.ClosePressKey))
+                        {
+                            Callback.Fire(&gathering->AtkUnitBase, true, -1);
+                            TaskManager.DelayNextImmediate(100);
+                        }
+
                         return false;
                     }
 
@@ -855,7 +1260,8 @@ namespace GatherBuddy.AutoGather
                     {
                         EnqueueActionWithDelay(() =>
                         {
-                            if (SelectYesnoAddon is var addon and not null)
+                            if (SelectYesnoAddon is var addon and not null
+                             && AddonPressGuard.TryBeginPress("SelectYesno", (AtkUnitBase*)addon, "Yes"))
                             {
                                 var master = new AddonMaster.SelectYesno(addon);
                                 master.Yes();
@@ -882,7 +1288,7 @@ namespace GatherBuddy.AutoGather
             };
             if (level < Actions.Collect.MinLevel)
             {
-                Communicator.PrintError("You've put a collectable on the gathering list, but your level is not high enough to gather it.");
+                Communicator.PrintError("You've put a collectable on the gathering list, but your level is not high enough to gather it.".Loc());
                 return false;
             }
 
@@ -895,7 +1301,7 @@ namespace GatherBuddy.AutoGather
 
             if (questId != 0 && !QuestManager.IsQuestComplete(questId))
             {
-                Communicator.PrintError("You've put a collectable on the gathering list, but you haven't unlocked the collectables.");
+                Communicator.PrintError("You've put a collectable on the gathering list, but you haven't unlocked the collectables.".Loc());
                 var sheet      = Dalamud.GameData.GetExcelSheet<Lumina.Excel.Sheets.Quest>()!;
                 var row        = sheet.GetRow(questId)!;
                 var loc        = row.IssuerLocation.Value!;
@@ -969,9 +1375,16 @@ namespace GatherBuddy.AutoGather
 
         public void Dispose()
         {
+            // 🔴 最先做:卸載時一定要把壓制租約還回去,否則 AutoRetainer 要等到逾時(5 分鐘)才會恢復。
+            AutoRetainerSuppression.ReleaseNow("GatherBuddyReborn 正在卸載");
+            AutoHookSuppression.RestoreNow("GatherBuddyReborn 正在卸載");
+            YesAlready.Unlock();
+            TextAdvance.Unlock();
+            _antiStuckManager.Dispose();
             _advancedUnstuck.Dispose();
             _activeItemList.Dispose();
             Svc.Chat.CheckMessageHandled -= OnMessageHandled;
+            AddonPressGuard.ForceTeardown();
             //Svc.AddonLifecycle.UnregisterListener(AddonEvent.PreFinalize, "Gathering", OnGatheringFinalize);
         }
     }

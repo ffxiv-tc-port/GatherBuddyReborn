@@ -24,14 +24,18 @@ namespace GatherBuddy.AutoGather
 {
     public partial class AutoGather
     {
+        // 🔴 這三支由 DoAutoGather 每幀讀、偵錯分頁每幀畫,TaskManager 的延後步驟也會在別的幀讀 ——
+        //    沒有任何一處在「vnavmesh 在不在」的閘門後面 ⇒ 用安全版:對端不在時回安全值並作廢存在性快取。
+        //    ⚠️ 安全值刻意都是 false:「沒在移動、沒在算路、網格還沒好」——
+        //    這正是 vnavmesh 真的在、但什麼都沒在做時的答案,呼叫端的既有判斷原樣適用。
         public bool IsPathing
-            => VNavmesh.Path.IsRunning();
+            => VNavmesh.Path.IsRunningSafe();
 
         public bool IsPathGenerating
-            => VNavmesh.Nav.PathfindInProgress();
+            => VNavmesh.Nav.PathfindInProgressSafe();
 
         public bool NavReady
-            => VNavmesh.Nav.IsReady();
+            => VNavmesh.Nav.IsReadySafe();
 
         private bool IsBlacklisted(Vector3 g)
         {
@@ -41,7 +45,7 @@ namespace GatherBuddy.AutoGather
         }
 
         public bool IsGathering
-            => Dalamud.Conditions[ConditionFlag.Gathering] || Dalamud.Conditions[ConditionFlag.Gathering42];
+            => Dalamud.Conditions[ConditionFlag.Gathering] || Dalamud.Conditions[ConditionFlag.ExecutingGatheringAction];
 
         public bool IsFishing
             => Dalamud.Conditions[ConditionFlag.Fishing];
@@ -93,20 +97,65 @@ namespace GatherBuddy.AutoGather
             if (Dalamud.Conditions[ConditionFlag.InFlight] || Dalamud.Conditions[ConditionFlag.Diving])
                 return true;
 
-            if (GatherBuddy.Config.AutoGatherConfig.ForceWalking || Dalamud.ClientState.LocalPlayer == null)
+            if (GatherBuddy.Config.AutoGatherConfig.ForceWalking || Dalamud.Objects.LocalPlayer == null)
             {
                 return false;
             }
 
-            return Vector3.Distance(Dalamud.ClientState.LocalPlayer.Position, destination)
+            return Vector3.Distance(Dalamud.Objects.LocalPlayer.Position, destination)
              >= GatherBuddy.Config.AutoGatherConfig.MountUpDistance;
+        }
+
+        /// <summary>
+        /// 給除錯分頁的手動導航按鈕用的 ShouldFly。
+        /// vnavmesh 收到 fly=true 但玩家沒騎坐騎時會直接停用移動並返回,表現是站著不動且
+        /// 完全沒有訊息;vnavmesh 也不會替呼叫端上坐騎。這裡在呼叫前先把飛行降級成地面移動。
+        /// 刻意不代替使用者上坐騎 —— 手動按鈕不引入自動化。
+        /// </summary>
+        public bool ShouldFlyManual(Vector3 destination)
+            => DowngradeFlyIfNotMounted(ShouldFly(destination));
+
+        /// <summary>
+        /// 未騎乘坐騎時把飛行需求降為地面移動,並留下 Information 級記錄。
+        /// 只給手動觸發的按鈕使用(離散事件,不需節流);自動採集主流程另有 EnqueueMountUp。
+        /// </summary>
+        public static bool DowngradeFlyIfNotMounted(bool shouldFly)
+        {
+            if (!shouldFly)
+                return false;
+
+            if (Dalamud.Conditions[ConditionFlag.Mounted]
+             || Dalamud.Conditions[ConditionFlag.InFlight]
+             || Dalamud.Conditions[ConditionFlag.Diving])
+                return true;
+
+            GatherBuddy.Log.Information(
+                "手動導航:目前沒有騎乘坐騎,已改用地面路徑移動。(vnavmesh 收到飛行指令但未騎乘時會直接停住不動,且不會自動上坐騎)");
+            return false;
         }
 
         public unsafe Vector2? TimedNodePosition
         {
             get
             {
-                var map     = FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentMap.Instance();
+                // 🔴 AgentMap.Instance() 內部鏈 AgentModule -> UIModule -> Framework 任一層回 null 整條就回 null
+                //    (登入前、切場景、登出後都是常態),特徵碼失配時則擲 InvalidOperationException —— 兩種失效模式並存。
+                //    裸解參考 null 原生指標是攔不到的 AccessViolationException ⇒ 只能事前判空。
+                //    ⚠️ 下面的 markers == null 擋不到:MiniMapGatheringMarkers 是從 map 位址算出來的 Span,map 為 null 時照樣建得出來。
+                //    這裡跑在自動採集的每輪判斷(高頻),所以 fail-closed 靜默回 null,不寫 log。
+                FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentMap* map;
+                try
+                {
+                    map = FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentMap.Instance();
+                }
+                catch
+                {
+                    return null;
+                }
+
+                if (map == null)
+                    return null;
+
                 var markers = map->MiniMapGatheringMarkers;
                 if (markers == null)
                     return null;
@@ -146,7 +195,7 @@ namespace GatherBuddy.AutoGather
 
         private static unsafe T* GetAddon<T>(string name) where T : unmanaged
         {
-            var addon = (AtkUnitBase*)Dalamud.GameGui.GetAddonByName(name);
+            var addon = (AtkUnitBase*)Dalamud.GameGui.GetAddonByName(name).Address;
             if (addon != null && addon->IsFullyLoaded() && addon->IsReady)
                 return (T*)addon;
             else
@@ -187,7 +236,7 @@ namespace GatherBuddy.AutoGather
         {
             get
             {
-                if (Dalamud.ClientState.LocalPlayer == null)
+                if (Dalamud.Objects.LocalPlayer == null)
                     return false;
                 if (Dalamud.Conditions[ConditionFlag.BetweenAreas]
                  || Dalamud.Conditions[ConditionFlag.BetweenAreas51]
@@ -202,11 +251,11 @@ namespace GatherBuddy.AutoGather
                  || Dalamud.Conditions[ConditionFlag.Occupied]
                  || Dalamud.Conditions[ConditionFlag.Occupied39]
                  || Dalamud.Conditions[ConditionFlag.Unconscious]
-                 || Dalamud.Conditions[ConditionFlag.Gathering42]
-                 || Dalamud.Conditions[ConditionFlag.Unknown57] // Mounting up
+                 || Dalamud.Conditions[ConditionFlag.ExecutingGatheringAction]
+                 || Dalamud.Conditions[ConditionFlag.MountOrOrnamentTransition] // Mounting up
                     //Node is open? Fades off shortly after closing the node, can't use items (but can mount) while it's set
                  || Dalamud.Conditions[85] && !Dalamud.Conditions[ConditionFlag.Gathering]
-                 || Dalamud.ClientState.LocalPlayer.IsDead
+                 || Dalamud.Objects.LocalPlayer.IsDead
                  || Player.IsAnimationLocked)
                     return false;
 
@@ -215,7 +264,7 @@ namespace GatherBuddy.AutoGather
         }
 
         private static unsafe bool HasGivingLandBuff
-            => Dalamud.ClientState.LocalPlayer?.StatusList.Any(s => s.StatusId == 1802) ?? false;
+            => Dalamud.Objects.LocalPlayer?.StatusList.Any(s => s.StatusId == 1802) ?? false;
 
         public static unsafe bool IsGivingLandOffCooldown
             => ActionManager.Instance()->IsActionOffCooldown(ActionType.Action, Actions.GivingLand.ActionId);

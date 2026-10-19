@@ -166,7 +166,7 @@ public partial class FishTimerWindow
             {
                 var begin = new Vector2(pos.X + areaStart, pos.Y);
                 var end   = new Vector2(pos.X + areaEnd,   pos.Y + height);
-                ptr.AddRectFilled(begin, end, 0x40000000, 0);
+                ptr.AddRectFilled(begin, end, 0x40000000, 0f);
             }
 
             // Draw marker lines only if they are useful.
@@ -193,7 +193,7 @@ public partial class FishTimerWindow
             pos.Y += i * ImGui.GetFrameHeightWithSpacing();
             var size = window._windowSize with { Y = ImGui.GetFrameHeight() };
             // Background
-            ImGui.GetWindowDrawList().AddRectFilled(pos, pos + size, _color.Value(), 0);
+            ImGui.GetWindowDrawList().AddRectFilled(pos, pos + size, _color.Value(), 0f);
 
             // Markers and highlights.
             pos.X  += window._iconSize.X;
@@ -216,7 +216,7 @@ public partial class FishTimerWindow
 
             // Icon
             if (_icon.TryGetWrap(out var wrap, out _))
-                ImGui.Image(wrap.ImGuiHandle, window._iconSize);
+                ImGui.Image(wrap.Handle, window._iconSize);
             else
                 ImGui.Dummy(window._iconSize);
 
@@ -267,7 +267,7 @@ public partial class FishTimerWindow
 
                 if (hookIcon?.TryGetWrap(out var wrap2, out _) ?? false)
                 {
-                    ImGui.Image(wrap2.ImGuiHandle, window._iconSize);
+                    ImGui.Image(wrap2.Handle, window._iconSize);
                     if (ImGui.IsItemHovered())
                     {
                         using var tooltip = ImRaii.Tooltip();
@@ -298,13 +298,13 @@ public partial class FishTimerWindow
             // Collectable Icon
             if (collectible)
             {
-                var tint = Dalamud.ClientState.LocalPlayer?.StatusList.Any(s => s.StatusId is 805) is true
+                var tint = Dalamud.Objects.LocalPlayer?.StatusList.Any(s => s.StatusId is 805) is true
                     ? Vector4.One
                     : new Vector4(0.75f, 0.75f, 0.75f, 0.5f);
 
                 ImGui.SameLine(window._windowSize.X - window._iconSize.X - (multiHook ? window._iconSize.X : 0));
                 if (CollectableIcon.TryGetWrap(out var wrap3, out _))
-                    ImGui.Image(wrap3.ImGuiHandle, window._iconSize, Vector2.Zero, Vector2.One, tint);
+                    ImGui.Image(wrap3.Handle, window._iconSize, Vector2.Zero, Vector2.One, tint);
                 else
                     ImGui.Dummy(window._iconSize);
             }

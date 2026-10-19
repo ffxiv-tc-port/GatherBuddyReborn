@@ -120,6 +120,10 @@ public partial class FishRecord
     [NotMapped]
     [IgnoreMember]
     [JsonIgnore]
+    // ⚠️ _worldId 是持久化值（寫進釣魚紀錄檔），世界合併／改版後可能已不存在於本地資料表，
+    // 而這裡用的是裸 GetRow —— Lumina 查無此列時會擲例外。目前全 repo 沒有任何地方讀寫
+    // 這個屬性（一律直接用 _worldId），所以刻意不改行為；但將來要接上讀取端時，
+    // 一定要改成 GetRowOrDefault 並判空，否則舊紀錄會讓呼叫端整個炸掉。
     public World World
     {
         get => Dalamud.GameData.GetExcelSheet<World>().GetRow(_worldId);

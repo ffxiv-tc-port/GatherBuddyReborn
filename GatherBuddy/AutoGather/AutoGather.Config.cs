@@ -49,6 +49,7 @@ namespace GatherBuddy.AutoGather
         [Obsolete] public uint MinimumGPForCollectable { get; set; } = 0;
         public float NavResetCooldown { get; set; } = 3.0f;
         public float NavResetThreshold { get; set; } = 2.0f;
+        public AntiStuckConfig AntiStuck { get; set; } = new();
         public bool ForceWalking { get; set; } = false;
         public float FarNodeFilterDistance { get; set; } = 50.0f;
         public bool DisableFlagPathing { get; set; } = false;
@@ -66,11 +67,30 @@ namespace GatherBuddy.AutoGather
         public bool DoRepair { get; set; } = false;
         public int RepairThreshold { get; set; } = 50;
         public bool HonkMode { get; set; } = true;
+
+        /// <summary>
+        /// 自動採集「不是被你關掉、是自己停了」時要不要跳一則 Dalamud 通知。
+        /// 預設關:既有使用者的設定檔升級後行為完全不變,要開必須自己去勾。
+        /// </summary>
+        public bool NotifyWhenStoppedItself { get; set; } = false;
+
+        /// <summary>
+        /// 自動採集「不是被你關掉、是自己停了」時，透過 IPC 請 TataruPraise（塔塔露誇獎）念一句。
+        /// </summary>
+        /// <remarks>
+        /// 📌 預設 <c>true</c>：TataruPraise 沒安裝時整條路是靜默 no-op（IPC 擲
+        /// <c>IpcNotReadyError</c> 被吃掉），而 TataruPraise 自己的總開關（預設關）與冷卻也還在，
+        /// 所以預設開<b>不會</b>讓任何人多聽到聲音。
+        /// ⚠️ 與 <see cref="NotifyWhenStoppedItself"/>、<see cref="HonkMode"/> 刻意分成三個旗標：
+        /// 桌面通知、喇叭聲、語音是三件事，想只留其中一種的人不必被綁在一起。
+        /// </remarks>
+        public bool TataruPraiseOnStoppedItself { get; set; } = true;
         public SortingType SortingMethod { get; set; } = SortingType.Location;
         public bool GoHomeWhenIdle { get; set; } = true;
         public bool GoHomeWhenDone { get; set; } = true;
         public bool UseSkillsForFallbackItems { get; set; } = false;
         public bool AbandonNodes { get; set; } = false;
+        public bool FinishTimedNodes { get; set; } = true;
         public uint ExecutionDelay { get; set; } = 0;
         public bool ConfigConversionFixed { get; set; } = false;
         public bool RotationSolverConversionDone { get; set; } = false;
@@ -78,9 +98,37 @@ namespace GatherBuddy.AutoGather
         public string LifestreamCommand { get; set; } = "auto";
         public int SoundPlaybackVolume { get; set; } = 100;
         public bool FishDataCollection { get; set; } = false;
+        public bool UseSneakBeforeFishing { get; set; } = false;
         public bool AlwaysGatherMaps { get; set; } = false;
         public int MaxFishingSpotMinutes { get; set; } = 20;
         public bool UseNavigation { get; set; } = true;
+
+        /// <summary>
+        /// Escalation action taken when local recovery has repeatedly failed and the
+        /// character never left the stuck area. Restricted to capabilities auto-gather
+        /// already has: no teleporting, no item use, no chat commands.
+        /// </summary>
+        public enum PositionUnstuckAction
+        {
+            Off            = 0,
+            ForceUnstuck   = 1,
+            StopAutoGather = 2,
+        }
+
+        public sealed class AntiStuckConfig
+        {
+            public bool  Enabled               { get; set; } = true;
+            public bool  LocalRecoveryEnabled  { get; set; } = true;
+            public bool  EscalationEnabled     { get; set; } = false;
+            public int   EscalationAfterFails  { get; set; } = 3;
+            public float AreaRadius            { get; set; } = 50.0f;
+            public int   AreaTimeSeconds       { get; set; } = 600;
+
+            public PositionUnstuckAction DrasticAction { get; set; } = PositionUnstuckAction.StopAutoGather;
+
+            public int DrasticCooldownSeconds { get; set; } = 600;
+            public int MaxDrasticPerSession   { get; set; } = 2;
+        }
 
         public enum SortingType
         {

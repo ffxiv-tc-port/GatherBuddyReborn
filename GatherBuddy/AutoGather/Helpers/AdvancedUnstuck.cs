@@ -90,6 +90,13 @@ namespace GatherBuddy.AutoGather.Movement
             return IsRunning ? AdvancedUnstuckCheckResult.Fail : _lastWasFailure ? AdvancedUnstuckCheckResult.Wait : AdvancedUnstuckCheckResult.Pass;
         }
 
+        /// <summary>讓位給手動移動結束時呼叫：那段時間沒在導航不是卡住，下一次 Check 從目前位置重新起算。</summary>
+        public void ResetTracking()
+        {
+            _lastCheck      = DateTime.MinValue;
+            _lastWasFailure = false;
+        }
+
         public void Force()
         {
             if (!IsRunning)

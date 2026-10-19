@@ -2,6 +2,7 @@ using ECommons;
 using ECommons.Automation;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using FFXIVClientStructs.FFXIV.Component.GUI;
+using GatherBuddy.AutoGather.Helpers;
 using GatherBuddy.Classes;
 
 namespace GatherBuddy.AutoGather.AtkReaders;
@@ -10,7 +11,10 @@ public class ItemSlot(int index, ItemSlotReader reader, uint itemSlotFlags, uint
 {
     public unsafe void Gather()
     {
-        if (GenericHelpers.TryGetAddonByName("Gathering", out AtkUnitBase* addon))
+        // 同一格 index 在同一扇 Gathering 視窗裡每個 integrity 合法重按一次(中間隔著整段採集動畫),
+        // 所以用多次互動窗的 15 幀逃生口;CloseGatheringAddons 對同一扇窗送過關閉(-1)之後任何按法都不准。
+        if (GenericHelpers.TryGetAddonByName("Gathering", out AtkUnitBase* addon)
+         && AddonPressGuard.TryBeginPress("Gathering", addon, AddonPressGuard.BuildPressKey(true, index, 0), AddonPressGuard.RoutineRePressEscapeFrames))
         {
             Callback.Fire(addon, true, index, 0);
         }
@@ -22,7 +26,11 @@ public class ItemSlot(int index, ItemSlotReader reader, uint itemSlotFlags, uint
     public bool IsCollectable => reader.IsCollectable;
     public sbyte Yield => reader.Yield;
     public sbyte BoonChance => reader.BoonChance;
-    public bool        IsEmpty => reader.Item == null;
+    // TC note: a slot can hold an item whose ID isn't in GameData.Gatherables (see ItemSlotReader.Item).
+    // That item is real and occupies the slot - IsEmpty must check the raw slot ID, not whether we could
+    // resolve it to a Gatherable, otherwise nodes containing an unrecognized item look entirely empty and
+    // auto-gather closes the window without gathering anything from them.
+    public bool        IsEmpty => reader.ItemId == 0;
     public Gatherable? Item    => reader.Item;
 
     public int GatherChance

@@ -14,9 +14,11 @@ public sealed class CurrentWeather : SeAddressBase
     // You can use Bismark hard mode to differentiate these, as Bismark's weather
     // effects only affect the true weather.
     public CurrentWeather(ISigScanner sigScanner)
-        : base(sigScanner, "48 8B 05 ?? ?? ?? ?? 0F B6 12", 8)
+        : base(sigScanner, "48 8B 05 ?? ?? ?? ?? 0F B6 12", 8,
+            "讀不到實際天氣：出海垂釣時不再用實際天氣篩選魚的出現時間；其餘功能照常。")
     { }
 
+    /// <summary>0＝不知道（位址沒解到）；要分辨先判 <see cref="SeAddressBase.IsAvailable"/>。</summary>
     public unsafe byte Current
-        => *(byte*)Address;
+        => IsAvailable ? *(byte*)Address : (byte)0;
 }

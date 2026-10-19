@@ -92,6 +92,10 @@ public partial class GatherBuddy : IDalamudPlugin
         {
             Dalamud.Initialize(pluginInterface);
             ECommonsMain.Init(pluginInterface, this, Module.DalamudReflector);
+            // 讓「呼叫了對方沒有的 IPC 方法」不再完全靜默。
+            // 訂閱越早越好：事件只在 IPC **呼叫**當下才被查閱，在這裡訂閱就涵蓋往後所有呼叫。
+            EzIpcFailureLog.Enable();
+            ECommons.LanguageHelpers.Localization.Init("ChineseTraditional");
             Icons.Init(Dalamud.GameData, Dalamud.Textures);
             Log     = new Logger();
             Version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "";
@@ -169,6 +173,9 @@ public partial class GatherBuddy : IDalamudPlugin
 
     private void Update(IFramework framework)
     {
+        // 🔴 放這裡不放 DoAutoGather 裡面：那支有一連串 early return，會讓快照在很多狀態下停更。
+        GatherBuddyIpc.PublishStateSnapshot();
+
         var prev = LastObjectsLength;
         LastObjectsLength = Svc.Objects.Length;
         //Scan objects every 5 secons or when the number of objects change
@@ -177,7 +184,7 @@ public partial class GatherBuddy : IDalamudPlugin
             LastObjectsScan = DateTime.Now;
             var objs = Svc.Objects.Where(o => o.ObjectKind == ObjectKind.GatheringPoint);
             foreach (var obj in objs)
-                WorldData.AddLocation(obj.DataId, obj.Position);
+                WorldData.AddLocation(obj.BaseId, obj.Position);
         }
 
         try
@@ -192,6 +199,17 @@ public partial class GatherBuddy : IDalamudPlugin
 
     void IDisposable.Dispose()
     {
+        // 建構子訂了 9 個 AutoRetainer IPC 事件；不退訂的話 CallGate 握著委派，整個舊版本卸不掉。
+        // 放最前面、自己一個 try：後面的步驟擲例外時也不會被跳過。
+        try
+        {
+            AutoRetainerApi?.Dispose();
+        }
+        catch (Exception e)
+        {
+            Log.Error($"Error while disposing AutoRetainerApi: {e}");
+        }
+
         Dalamud.Framework.Update -= Update;
         FishRecorder?.Dispose();
         ContextMenu?.Dispose();
@@ -208,6 +226,7 @@ public partial class GatherBuddy : IDalamudPlugin
         DisposeCommands();
         Time?.Dispose();
         HttpClient?.Dispose();
+        EzIpcFailureLog.Disable();
         ECommonsMain.Dispose();
     }
 

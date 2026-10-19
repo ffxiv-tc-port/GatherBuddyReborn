@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Dalamud.Interface.Utility;
+using ECommons.LanguageHelpers;
 using GatherBuddy.Config;
 using GatherBuddy.Enums;
 using GatherBuddy.Interfaces;
@@ -57,19 +58,19 @@ public partial class Interface
             }
         }
 
-        private static readonly NameColumn        _nameColumn        = new() { Label = "Item Name..." };
-        private static readonly NextUptimeColumn  _nextUptimeColumn  = new() { Label = "Next Uptime" };
-        private static readonly AetheryteColumn   _aetheryteColumn   = new() { Label = "Aetheryte" };
-        private static readonly LevelColumn       _levelColumn       = new() { Label = "Lvl..." };
-        private static readonly JobColumn         _jobColumn         = new() { Label = "Gathering" };
-        private static readonly TypeColumn        _typeColumn        = new() { Label = "Node Type" };
-        private static readonly ExpansionColumn   _expansionColumn   = new() { Label = "Exp." };
-        private static readonly FolkloreColumn    _folkloreColumn    = new() { Label = "Folklore" };
-        private static readonly UptimesColumn     _uptimesColumn     = new() { Label = "Uptimes" };
-        private static readonly BestNodeColumn    _bestNodeColumn    = new() { Label = "Best Node" };
-        private static readonly BestZoneColumn    _bestZoneColumn    = new() { Label = "Best Zone" };
-        private static readonly ItemIdColumn      _itemIdColumn      = new() { Label = "Item Id" };
-        private static readonly GatheringIdColumn _gatheringIdColumn = new() { Label = "G. Id" };
+        private static readonly NameColumn        _nameColumn        = new() { Label = "Item Name...".Loc() };
+        private static readonly NextUptimeColumn  _nextUptimeColumn  = new() { Label = "Next Uptime".Loc() };
+        private static readonly AetheryteColumn   _aetheryteColumn   = new() { Label = "Aetheryte".Loc() };
+        private static readonly LevelColumn       _levelColumn       = new() { Label = "Lvl...".Loc() };
+        private static readonly JobColumn         _jobColumn         = new() { Label = "Gathering".Loc() };
+        private static readonly TypeColumn        _typeColumn        = new() { Label = "Node Type".Loc() };
+        private static readonly ExpansionColumn   _expansionColumn   = new() { Label = "Exp.".Loc() };
+        private static readonly FolkloreColumn    _folkloreColumn    = new() { Label = "Folklore".Loc() };
+        private static readonly UptimesColumn     _uptimesColumn     = new() { Label = "Uptimes".Loc() };
+        private static readonly BestNodeColumn    _bestNodeColumn    = new() { Label = "Best Node".Loc() };
+        private static readonly BestZoneColumn    _bestZoneColumn    = new() { Label = "Best Zone".Loc() };
+        private static readonly ItemIdColumn      _itemIdColumn      = new() { Label = "Item Id".Loc() };
+        private static readonly GatheringIdColumn _gatheringIdColumn = new() { Label = "G. Id".Loc() };
 
         private class ItemFilterColumn : ColumnFlags<ItemFilter, ExtendedGatherable>
         {
@@ -145,7 +146,7 @@ public partial class Interface
             {
                 Flags |= ImGuiTableColumnFlags.DefaultSort;
                 SetFlags(ItemFilter.Available, ItemFilter.Unavailable);
-                SetNames("Currently Available", "Currently Unavailable");
+                SetNames("Currently Available".Loc(), "Currently Unavailable".Loc());
             }
 
             public override void DrawColumn(ExtendedGatherable item, int _)
@@ -166,7 +167,7 @@ public partial class Interface
         private sealed class AetheryteColumn : ColumnString<ExtendedGatherable>
         {
             public override string ToName(ExtendedGatherable item)
-                => item.Uptime.Item1.ClosestAetheryte?.Name ?? "None";
+                => item.Uptime.Item1.ClosestAetheryte?.Name ?? "None".Loc();
 
             public override float Width
                 => _closestAetheryteColumnWidth * ImGuiHelpers.GlobalScale;
@@ -176,7 +177,7 @@ public partial class Interface
                 var aetheryte = item.Uptime.Item1.ClosestAetheryte;
                 if (aetheryte == null)
                 {
-                    ImGui.Text("None");
+                    ImGui.Text("None".Loc());
                     return;
                 }
 
@@ -279,7 +280,7 @@ public partial class Interface
             {
                 SetFlags(ItemFilter.ARealmReborn, ItemFilter.Heavensward, ItemFilter.Stormblood, ItemFilter.Shadowbringers,
                     ItemFilter.Endwalker, ItemFilter.Dawntrail);
-                SetNames("A Realm Reborn", "Heavensward", "Stormblood", "Shadowbringers", "Endwalker", "Dawntrail");
+                SetNames("A Realm Reborn".Loc(), "Heavensward".Loc(), "Stormblood".Loc(), "Shadowbringers".Loc(), "Endwalker".Loc(), "Dawntrail".Loc());
             }
 
             public override void DrawColumn(ExtendedGatherable item, int _)
@@ -427,15 +428,15 @@ public partial class Interface
     private void DrawItemTab()
     {
         using var id  = ImRaii.PushId("Gatherables");
-        using var tab = ImRaii.TabItem("Gatherables");
-        ImGuiUtil.HoverTooltip("Breaking rocks with a pickaxe or felling trees counts as gathering, why do you ask?\n"
-          + "Find all information about botanist and miner items you could ever need.");
+        using var tab = ImRaii.TabItem("Gatherables".Loc());
+        ImGuiUtil.HoverTooltip(("Breaking rocks with a pickaxe or felling trees counts as gathering, why do you ask?\n"
+          + "Find all information about botanist and miner items you could ever need.").Loc());
         if (!tab)
             return;
 
         _itemTable.ExtraHeight = GatherBuddy.Config.ShowStatusLine ? ImGui.GetTextLineHeight() : 0;
         _itemTable.Draw(ImGui.GetTextLineHeightWithSpacing());
-        DrawStatusLine(_itemTable, "Items");
+        DrawStatusLine(_itemTable, "Items".Loc());
         DrawClippy();
     }
 }

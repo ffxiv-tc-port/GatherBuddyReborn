@@ -107,9 +107,12 @@ public partial class FishRecorder
             var embeddedResource = typeof(FishRecorder).Assembly.GetManifestResourceStream(RemoteFishRecordsFileName);
             if (embeddedResource == null)
                 throw new FileNotFoundException($"Could not find embedded resource {RemoteFishRecordsFileName}");
-            using var reader = new StreamReader(embeddedResource);
-            var       json   = reader.ReadToEnd();
-            var       records = JsonConvert.DeserializeObject<List<SimpleFishRecord>>(json);
+            // 等同 JsonConvert.DeserializeObject（同預設設定、檢查多餘內容），直接讀串流：這份內嵌資料約 5 MB，先讀成字串要多配置約 20 MB。
+            using var reader     = new StreamReader(embeddedResource);
+            using var json       = new JsonTextReader(reader);
+            var       serializer = JsonSerializer.CreateDefault();
+            serializer.CheckAdditionalContent = true;
+            var records = serializer.Deserialize<List<SimpleFishRecord>>(json);
             if (records == null)
                 throw new JsonException("Could not deserialize remote fish records.");
 

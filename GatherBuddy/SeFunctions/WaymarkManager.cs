@@ -14,6 +14,13 @@ public unsafe class WaymarkManager
 
     public WaymarkManager()
     {
+        // 位址解不出時 Instance() 會擲例外、整個插件載入失敗；改成指標留 null（其餘成員都已判 null）＝場地標記功能停用。
+        if (MarkingController.Addresses.Instance.Value == 0)
+        {
+            GatherBuddy.Log.Warning("遊戲改版後 MarkingController 的位址對不上：讀寫場地標記的功能停用；其餘功能照常。");
+            return;
+        }
+
         _markingController = MarkingController.Instance();
         Count              = _markingController->FieldMarkers.Length;
     }
@@ -49,11 +56,11 @@ public unsafe class WaymarkManager
 
     public void SetWaymark(int idx)
     {
-        if (idx is < 0 || idx > WaymarkSet.Count || _markingController == null || Dalamud.ClientState.LocalPlayer == null)
+        if (idx is < 0 || idx > WaymarkSet.Count || _markingController == null || Dalamud.Objects.LocalPlayer == null)
             return;
 
         ref var marker = ref _markingController->FieldMarkers[idx];
-        var     pos    = Dalamud.ClientState.LocalPlayer.Position;
+        var     pos    = Dalamud.Objects.LocalPlayer.Position;
         marker.Position = pos;
         marker.X        = (int)(pos.X * 1000 + 0.9f);
         marker.Y        = (int)(pos.Y * 1000 + 0.9f);

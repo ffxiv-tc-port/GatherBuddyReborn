@@ -5,8 +5,22 @@ namespace GatherBuddy.SeFunctions;
 
 public static unsafe class Teleporter
 {
+    private static bool _unavailableLogged;
+
     public static bool IsAttuned(uint aetheryte)
     {
+        // 載入時就會走到（鬧鐘找最近的乙太之光），位址解不出時 Instance() 會擲例外、整個插件載入失敗。
+        if (Telepo.Addresses.Instance.Value == 0 || Telepo.MemberFunctionPointers.UpdateAetheryteList == null)
+        {
+            if (!_unavailableLogged)
+            {
+                _unavailableLogged = true;
+                GatherBuddy.Log.Warning("遊戲改版後傳送清單（Telepo）的位址對不上：所有乙太之光一律當成沒開通，找最近的乙太之光與自動傳送停用；其餘功能照常。");
+            }
+
+            return false;
+        }
+
         var teleport = Telepo.Instance();
         if (teleport == null)
         {
@@ -14,7 +28,7 @@ public static unsafe class Teleporter
             return false;
         }
 
-        if (Dalamud.ClientState.LocalPlayer == null)
+        if (Dalamud.Objects.LocalPlayer == null)
             return true;
         teleport->UpdateAetheryteList();
 

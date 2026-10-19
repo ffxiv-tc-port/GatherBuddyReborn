@@ -57,19 +57,22 @@ namespace GatherBuddy.AutoGather.Helpers
                 }
             }
 
+            /// <summary>只在 framework 執行緒呼叫（UI 回呼）。</summary>
+            /// <remarks>Artisan 實例先在這裡解析好再交給背景：<c>TryGetDalamudPlugin</c> 會寫 ECommons 的靜態 <c>pluginCache</c>（裸 Dictionary）。</remarks>
             public void StartArtisanImport(KeyValuePair<int, string> listKvp)
             {
-                Task.Run(() => ImportArtisanList(listKvp));
+                var artisan = TouchArtisanAssembly ? ArtisanAssemblyInstance : null;
+                Task.Run(() => ImportArtisanList(artisan, listKvp));
             }
 
-            private bool ImportArtisanList(KeyValuePair<int, string> listKvp)
+            private bool ImportArtisanList(IDalamudPlugin? artisan, KeyValuePair<int, string> listKvp)
             {
                 try
                 {
-                    if (TouchArtisanAssembly)
+                    if (artisan != null)
                     {
-                        System.Collections.IList artisanCraftingLists = (System.Collections.IList)ArtisanAssemblyInstance.GetFoP("Config").GetFoP("NewCraftingLists");
-                        var   artisanRootAssembly  = Assembly.GetAssembly(ArtisanAssemblyInstance!.GetType())!;
+                        System.Collections.IList artisanCraftingLists = (System.Collections.IList)artisan.GetFoP("Config").GetFoP("NewCraftingLists");
+                        var   artisanRootAssembly  = Assembly.GetAssembly(artisan.GetType())!;
                         var   craftingListFunctionsType = artisanRootAssembly.GetType("Artisan.CraftingLists.CraftingListFunctions")!;
                         var listMaterialsMethodInfo = craftingListFunctionsType.GetMethod("ListMaterials", All);
                         var targetList = artisanCraftingLists.Cast<object>().SingleOrDefault(l => (int)l.GetFoP("ID") == listKvp.Key);

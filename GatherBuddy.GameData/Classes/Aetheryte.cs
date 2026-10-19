@@ -31,7 +31,7 @@ public class Aetheryte : IComparable<Aetheryte>
         Data      = data;
         Name      = MultiString.ParseSeStringLumina(data.PlaceName.ValueNullable?.Name);
         Territory = gameData.FindOrAddTerritory(data.Territory.ValueNullable) ?? Territory.Invalid;
-        var mapMarker = gameData.DataManager.GetSubrowExcelSheet<MapMarker>().SelectMany(m => m).Cast<MapMarker?>().FirstOrDefault(m => m!.Value.DataType == 3 && m.Value.DataKey.RowId == data.RowId);
+        var mapMarker = gameData.FindAetheryteMarker(data.RowId);
         if (mapMarker == null)
         {
             gameData.Log.Error($"No Map Marker for Aetheryte {Name} [{data.RowId}].");

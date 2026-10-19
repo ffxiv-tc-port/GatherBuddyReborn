@@ -13,6 +13,13 @@ public partial class PatriciaTrie<T> : IEnumerable<(StringView, T)>
 
     public readonly  Node                         Root                = Node.CreateRoot();
     private readonly Dictionary<StringView, Node> _leafs              = new();
+    /// <summary>模糊比對用的共用 DP 暫存表：每次 <see cref="FuzzyFind"/> 都就地改寫它。</summary>
+    /// <remarks>
+    /// 🔴 <b>契約：<see cref="Add"/> 與 <see cref="FuzzyFind"/> 只能在遊戲主執行緒上呼叫。</b>
+    /// 這裡刻意沒有鎖 —— 兩個入口（聊天指令的 <c>Identificator</c>、IPC <c>GatherBuddy.Identify</c>，
+    /// 後者走 <c>IpcFrameworkGate</c>）都已經在主執行緒上。要從別的執行緒查名字時<b>把呼叫端轉派到
+    /// 主執行緒</b>，不要在這裡加鎖。並行改寫的失敗形式是<b>比對結果靜默變成別的道具</b>。
+    /// </remarks>
     private readonly List<List<ushort>>           _tableCache         = new() { new List<ushort>() };
     private          int                          _longestCheckedWord = 0;
 

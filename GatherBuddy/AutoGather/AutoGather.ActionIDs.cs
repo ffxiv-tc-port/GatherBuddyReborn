@@ -128,6 +128,8 @@ public partial class AutoGather
         //Fishing Actions
         public static readonly FishingAction Cast             = new FishingAction(289);
         public static readonly FishingAction Quit             = new FishingAction(299);
+        // The BaseAction Sneak above only resolves for BTN/MIN (GetJobValue throws for FSH).
+        public static readonly FishingAction FisherSneak      = new FishingAction(305,   8,   0,   [47]);
         public static readonly FishingAction Hook             = new FishingAction(296);
         public static readonly FishingAction Chum             = new FishingAction(4104,  5,  100, [763]);
         public static readonly FishingAction Patience         = new FishingAction(4102,  15, 200, [764, 850]);

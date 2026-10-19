@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+﻿using CsEventFramework = FFXIVClientStructs.FFXIV.Client.Game.Event.EventFramework;
+using CsFishingEventHandler = FFXIVClientStructs.FFXIV.Client.Game.Event.FishingEventHandler;
 
 namespace GatherBuddy.SeFunctions;
 
@@ -18,42 +19,19 @@ public enum FishingState : byte
 
 public sealed unsafe class EventFramework
 {
-    private const int FishingManagerOffset = 0x70;
-
-    [StructLayout(LayoutKind.Explicit)]
-    internal struct FishingManagerStruct
-    {
-        [FieldOffset(0x228)]
-        public FishingState FishingState;
-
-        [FieldOffset(0x23C)]
-        public byte CurrentSelectedSwimBait;
-
-        [FieldOffset(0x240)]
-        public uint SwimBaitId1;
-
-        [FieldOffset(0x244)]
-        public uint SwimBaitId2;
-
-        [FieldOffset(0x248)]
-        public uint SwimBaitId3;
-    }
-
     public nint Address
-        => (nint)FFXIVClientStructs.FFXIV.Client.Game.Event.EventFramework.Instance();
+        => (nint)CsEventFramework.Instance();
 
-    internal FishingManagerStruct* FishingManager
+    // 版面跟著 CS 的 FishingEventHandler 走，不手抄偏移：遊戲改版時隨 CS 一起換。
+    internal CsFishingEventHandler* FishingManager
     {
         get
         {
-            if (Address == nint.Zero)
+            var eventFramework = CsEventFramework.Instance();
+            if (eventFramework == null)
                 return null;
 
-            var managerPtr = Address + FishingManagerOffset;
-            if (managerPtr == nint.Zero)
-                return null;
-
-            return *(FishingManagerStruct**)managerPtr;
+            return (CsFishingEventHandler*)eventFramework->EventHandlerModule.FishingEventHandler;
         }
     }
 
@@ -109,8 +87,9 @@ public sealed unsafe class EventFramework
     {
         get
         {
+            // CS 的 State 是 4 位元組列舉；刻意只讀最低位元組，與原本的單位元組讀法相同。
             var ptr = FishingManager;
-            return ptr != null ? ptr->FishingState : FishingState.None;
+            return ptr != null ? (FishingState)(*(byte*)&ptr->State) : FishingState.None;
         }
     }
 }

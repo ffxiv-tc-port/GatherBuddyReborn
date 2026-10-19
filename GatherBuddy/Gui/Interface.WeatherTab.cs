@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Numerics;
 using Dalamud.Interface.Utility;
+using ECommons.LanguageHelpers;
 using GatherBuddy.Config;
 using GatherBuddy.Time;
 using Dalamud.Bindings.ImGui;
@@ -45,7 +46,7 @@ public partial class Interface
         private sealed class ZoneHeader : ColumnString<CachedWeather>
         {
             public ZoneHeader()
-                => Label = "Filter Zone...";
+                => Label = "Filter Zone...".Loc();
 
             public override float Width
                 => _zoneSize * ImGuiHelpers.GlobalScale;
@@ -144,7 +145,7 @@ public partial class Interface
         {
             var cursor = ImGui.GetCursorPos();
             if (icon.TryGetWrap(out var wrap, out _))
-                ImGui.Image(wrap.ImGuiHandle, WeatherIconSize);
+                ImGui.Image(wrap.Handle, WeatherIconSize);
             else
                 ImGui.Dummy(WeatherIconSize);
             ImGui.SetCursorPos(cursor + new Vector2(WeatherIconSize.X + ItemSpacing.X / 2, _textHeightIconOffset));
@@ -155,7 +156,7 @@ public partial class Interface
         {
             ImGui.SetCursorPosX(ImGui.GetCursorPosX() + offset);
             if (icon.TryGetWrap(out var wrap, out _))
-                ImGui.Image(wrap.ImGuiHandle, WeatherIconSize);
+                ImGui.Image(wrap.Handle, WeatherIconSize);
             else
                 ImGui.Dummy(WeatherIconSize);
             ImGuiUtil.HoverTooltip($"{weather.Name} ({weather.Id})");
@@ -167,9 +168,9 @@ public partial class Interface
     private void DrawWeatherTab()
     {
         using var id  = ImRaii.PushId("Weather");
-        using var tab = ImRaii.TabItem("Weather");
-        ImGuiUtil.HoverTooltip("Yes, 'Gloom' is weather.\n"
-          + "See the weather forecast in all zones for the following days, as well as the last one.");
+        using var tab = ImRaii.TabItem("Weather".Loc());
+        ImGuiUtil.HoverTooltip(("Yes, 'Gloom' is weather.\n"
+          + "See the weather forecast in all zones for the following days, as well as the last one.").Loc());
 
         if (!tab)
             return;

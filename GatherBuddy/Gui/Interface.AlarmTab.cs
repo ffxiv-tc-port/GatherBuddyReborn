@@ -4,6 +4,7 @@ using System.Numerics;
 using Dalamud.Interface;
 using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility;
+using ECommons.LanguageHelpers;
 using GatherBuddy.Alarms;
 using GatherBuddy.Config;
 using GatherBuddy.GatherHelper;
@@ -20,10 +21,10 @@ namespace GatherBuddy.Gui;
 public partial class Interface
 {
     private static string CheckUnnamed(string name)
-        => name.Length > 0 ? name : "<Unnamed>";
+        => name.Length > 0 ? name : "<Unnamed>".Loc();
 
     private static string CheckUndescribed(string desc)
-        => desc.Length > 0 ? desc : "<No Description>";
+        => desc.Length > 0 ? desc : "<No Description>".Loc();
 
 
     private class AlarmWindowDragDropData
@@ -133,7 +134,7 @@ public partial class Interface
         public static readonly Sounds[] SoundIds = Enum.GetValues<Sounds>().Where(s => s != Sounds.Unknown).ToArray();
 
         public static readonly string SoundIdNames =
-            string.Join("\0", SoundIds.Select(s => s == Sounds.None ? "No Sound" : $"Sound {s.ToIdx()}"));
+            string.Join("\0", SoundIds.Select(s => s == Sounds.None ? "No Sound".Loc() : "Sound ??".Loc(s.ToIdx())));
 
         public readonly AlarmSelector  Selector;
         public readonly TimedItemCombo ItemCombo = new(string.Empty);
@@ -171,19 +172,19 @@ public partial class Interface
         var       enabled = alarm.Enabled;
 
         ImGui.TableNextColumn();
-        if (ImGuiUtil.DrawDisabledButton(FontAwesomeIcon.Trash.ToIconString(), IconButtonSize, "Delete this Alarm...", false, true))
+        if (ImGuiUtil.DrawDisabledButton(FontAwesomeIcon.Trash.ToIconString(), IconButtonSize, "Delete this Alarm...".Loc(), false, true))
             _plugin.AlarmManager.DeleteAlarm(group, alarmIdx--);
         ImGui.TableNextColumn();
         ImGui.SetNextItemWidth(SetInputWidth);
         var name = alarm.Name;
         if (ImGui.InputTextWithHint("##name", CheckUnnamed(string.Empty), ref name, 64))
             _plugin.AlarmManager.ChangeAlarmName(group, alarmIdx, name);
-        ImGuiUtil.HoverTooltip("Names are optional and can be used in the alarm message that is printed to chat.");
+        ImGuiUtil.HoverTooltip("Names are optional and can be used in the alarm message that is printed to chat.".Loc());
 
         ImGui.TableNextColumn();
         if (ImGui.Checkbox("##Enabled", ref enabled) && enabled != alarm.Enabled)
             _plugin.AlarmManager.ToggleAlarm(group, alarmIdx);
-        ImGuiUtil.HoverTooltip("Enable this Alarm.");
+        ImGuiUtil.HoverTooltip("Enable this Alarm.".Loc());
 
         ImGui.TableNextColumn();
         if (_alarmCache.ItemCombo.Draw(alarm.Item.InternalLocationId - 1, out var newIdx))
@@ -203,13 +204,13 @@ public partial class Interface
 
         if (ImGui.IsItemDeactivated())
             _plugin.AlarmManager.ChangeAlarmOffset(group, alarmIdx, Math.Clamp(_alarmCache.ChangedSecondOffset, 0, RealTime.SecondsPerDay));
-        ImGuiUtil.HoverTooltip("Trigger this alarm this many seconds before the item in question is next available.");
+        ImGuiUtil.HoverTooltip("Trigger this alarm this many seconds before the item in question is next available.".Loc());
 
         ImGui.TableNextColumn();
         var printMessage = alarm.PrintMessage;
         if (ImGui.Checkbox("##PrintMessage", ref printMessage))
             _plugin.AlarmManager.ChangeAlarmMessage(group, alarmIdx, printMessage);
-        ImGuiUtil.HoverTooltip("Print a chat message when this alarm is triggered.");
+        ImGuiUtil.HoverTooltip("Print a chat message when this alarm is triggered.".Loc());
 
         ImGui.TableNextColumn();
         var idx = alarm.SoundId.ToIdx();
@@ -219,7 +220,7 @@ public partial class Interface
             _plugin.AlarmManager.ChangeAlarmSound(group, alarmIdx, AlarmCache.SoundIds[idx]);
             AlarmManager.PreviewAlarm(AlarmCache.SoundIds[idx]);
         }
-        ImGuiUtil.HoverTooltip("Play this sound effect when this alarm is triggered.");
+        ImGuiUtil.HoverTooltip("Play this sound effect when this alarm is triggered.".Loc());
 
         ImGui.TableNextColumn();
         if (DrawLocationInput(alarm.Item, alarm.PreferLocation, out var newLocation))
@@ -232,7 +233,7 @@ public partial class Interface
         if (time.Start > now)
             ImGuiUtil.DrawTextButton(TimeInterval.DurationString(time.Start, now, false), size, ColorId.WarningBg.Value());
         else
-            ImGuiUtil.DrawTextButton("Currently Triggered", size, ColorId.ChangedLocationBg.Value());
+            ImGuiUtil.DrawTextButton("Currently Triggered".Loc(), size, ColorId.ChangedLocationBg.Value());
     }
 
     private void DrawGroupData(AlarmGroup group, int idx)
@@ -245,10 +246,10 @@ public partial class Interface
                 out var newDesc, ref _alarmCache.EditGroupDesc, IconButtonSize, 2 * SetInputWidth, 128))
             _plugin.AlarmManager.ChangeGroupDescription(idx, newDesc);
         var enabled = group.Enabled;
-        if (ImGui.Checkbox("Enabled", ref enabled) && enabled != group.Enabled)
+        if (ImGui.Checkbox("Enabled".Loc(), ref enabled) && enabled != group.Enabled)
             _plugin.AlarmManager.ToggleGroup(idx);
         ImGuiUtil.HoverTooltip(
-            "Enable this alarm group. Only those alarms in the group that are enabled themselves will be counted as active.");
+            "Enable this alarm group. Only those alarms in the group that are enabled themselves will be counted as active.".Loc());
     }
 
     private void DrawToggleAll(AlarmGroup group)
@@ -258,7 +259,7 @@ public partial class Interface
         ImGui.TableNextColumn();
         var allEnabled = group.Alarms.All(a => a.Enabled);
         var ret        = ImGui.Checkbox("##allEnabled", ref allEnabled);
-        ImGuiUtil.HoverTooltip("Enable all disabled alarms, or disable all alarms.");
+        ImGuiUtil.HoverTooltip("Enable all disabled alarms, or disable all alarms.".Loc());
 
         if (!ret)
             return;
@@ -285,7 +286,7 @@ public partial class Interface
 
         using var id = ImRaii.PushId(-1);
         ImGui.TableNextColumn();
-        if (ImGuiUtil.DrawDisabledButton(FontAwesomeIcon.Plus.ToIconString(), IconButtonSize, "Add new Alarm...", false, true))
+        if (ImGuiUtil.DrawDisabledButton(FontAwesomeIcon.Plus.ToIconString(), IconButtonSize, "Add new Alarm...".Loc(), false, true))
             _plugin.AlarmManager.AddAlarm(group, _alarmCache.CreateAlarm());
         ImGui.TableNextColumn();
         ImGui.SetNextItemWidth(SetInputWidth);
@@ -318,7 +319,7 @@ public partial class Interface
 
     private void DrawAlarmGroupHeaderLine()
     {
-        if (ImGuiUtil.DrawDisabledButton(FontAwesomeIcon.Copy.ToIconString(), IconButtonSize, "Copy current Alarm Group to clipboard.",
+        if (ImGuiUtil.DrawDisabledButton(FontAwesomeIcon.Copy.ToIconString(), IconButtonSize, "Copy current Alarm Group to clipboard.".Loc(),
                 _alarmCache.Selector.Current == null, true))
         {
             var group = _alarmCache.Selector.Current!;
@@ -326,16 +327,16 @@ public partial class Interface
             {
                 var s = new AlarmGroup.Config(group).ToBase64();
                 ImGui.SetClipboardText(s);
-                Communicator.PrintClipboardMessage("Alarm Group ", group.Name);
+                Communicator.PrintClipboardMessage("Alarm Group ".Loc(), group.Name);
             }
             catch (Exception e)
             {
                 GatherBuddy.Log.Error($"Could not write Alarm Group {group.Name} to Clipboard:\n{e}");
-                Communicator.PrintClipboardMessage("Alarm Group ", group.Name, e);
+                Communicator.PrintClipboardMessage("Alarm Group ".Loc(), group.Name, e);
             }
         }
 
-        if (ImGuiUtil.DrawDisabledButton("Create Preset", Vector2.Zero, "Create a new Gather Window Preset from this alarm group.",
+        if (ImGuiUtil.DrawDisabledButton("Create Preset".Loc(), Vector2.Zero, "Create a new Gather Window Preset from this alarm group.".Loc(),
                 _alarmCache.Selector.Current == null))
         {
             var preset = new GatherWindowPreset(_alarmCache.Selector.Current!);
@@ -344,23 +345,23 @@ public partial class Interface
 
         ImGui.SameLine();
 
-        ImGuiComponents.HelpMarker("Use /gather alarm to gather the last item alarm triggered.\n"
-          + "Use /gatherfish alarm to gather the last fish alarm triggered.");
+        ImGuiComponents.HelpMarker(("Use /gather alarm to gather the last item alarm triggered.\n"
+          + "Use /gatherfish alarm to gather the last fish alarm triggered.").Loc());
     }
 
     private void DrawAlarmTab()
     {
         using var id  = ImRaii.PushId("Alarms");
-        using var tab = ImRaii.TabItem("Alarms");
-        ImGuiUtil.HoverTooltip("Do you often find yourself late for a very important date with no time to say hello or goodbye?\n"
-          + "Set up your very own alarm clock. Viera might even be able to wear it around their neck.");
+        using var tab = ImRaii.TabItem("Alarms".Loc());
+        ImGuiUtil.HoverTooltip(("Do you often find yourself late for a very important date with no time to say hello or goodbye?\n"
+          + "Set up your very own alarm clock. Viera might even be able to wear it around their neck.").Loc());
         if (!tab)
             return;
 
         _alarmCache.Selector.Draw(SelectorWidth);
         ImGui.SameLine();
 
-        ItemDetailsWindow.Draw("Alarm Group Details", DrawAlarmGroupHeaderLine, () =>
+        ItemDetailsWindow.Draw("Alarm Group Details".Loc(), DrawAlarmGroupHeaderLine, () =>
         {
             if (_alarmCache.Selector.Current != null)
                 DrawAlarmInfo(_alarmCache.Selector.Current, _alarmCache.Selector.CurrentIdx);

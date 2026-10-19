@@ -34,7 +34,9 @@ public static class OceanUptime
     {
         // Only consider weather when on an ocean fishing boat.
         // The weather is random per zone, so you need to be there to see it.
-        if (Dalamud.ClientState.TerritoryType == OceanFishingTerritoryId && fish.CurrentWeather.Length > 0)
+        // 讀不到實際天氣時不套天氣條件（與不在船上時相同），不把魚判成「現在不出現」。
+        if (Dalamud.ClientState.TerritoryType == OceanFishingTerritoryId && fish.CurrentWeather.Length > 0
+         && GatherBuddy.CurrentWeather.IsAvailable)
         {
             var currentWeather = GatherBuddy.CurrentWeather.Current;
 
