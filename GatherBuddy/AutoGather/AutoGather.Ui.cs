@@ -135,7 +135,8 @@ namespace GatherBuddy.AutoGather
                         if (GatherBuddy.AutoGather.Enabled)
                         {
                             Communicator.PrintError("[GatherBuddyReborn] Auto-Gather is enabled! Unable to navigate.".Loc());
-                            return;
+                            // 不可 return：會跳過下面的 EndTable。
+                            break;
                         }
                         //VNavmesh_IPCSubscriber.Nav_PathfindCancelAll();
                         // 🔴 ImGui 按鈕回呼:例外會冒到 WindowSystem.Draw 變成視窗錯誤面板(沒裝 vnavmesh 的人按下「導航」就會踩到)
@@ -157,7 +158,7 @@ namespace GatherBuddy.AutoGather
                             if (GatherBuddy.AutoGather.Enabled)
                             {
                                 Communicator.PrintError("[GatherBuddyReborn] Auto-Gather is enabled! Unable to navigate.".Loc());
-                                return;
+                                break;
                             }
                             //VNavmesh_IPCSubscriber.Nav_PathfindCancelAll();
                             // 🔴 ImGui 按鈕回呼:同樣走安全版。
