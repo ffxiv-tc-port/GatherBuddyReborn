@@ -94,8 +94,22 @@ namespace GatherBuddy.AutoGather.Helpers
                                 continue;
                             list.Add(gatherable.Value, (uint)quantity);
                         }
-                        _listsManager.AddList(list);
-                        Communicator.Print($"List '{listKvp.Value}' imported successfully!");
+                        // 清單集合由 UI 每幀列舉，只能在 framework 執行緒上加；卸載窗內轉派會就地執行，直接放棄。
+                        if (FrameworkUnloadGuard.ShouldSkip("匯入 Artisan 清單"))
+                            return false;
+
+                        _ = Dalamud.Framework.Run(() =>
+                        {
+                            try
+                            {
+                                _listsManager.AddList(list);
+                                Communicator.Print($"List '{listKvp.Value}' imported successfully!");
+                            }
+                            catch (Exception e)
+                            {
+                                Svc.Log.Error(e, "Error while adding imported Artisan List: ");
+                            }
+                        });
                         return true;
                     }
                     return false;
