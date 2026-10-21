@@ -31,8 +31,12 @@ public sealed class GatherBuddyIpc : IDisposable
     public const int MapAlreadyHeld    = 5;
     public const int MapLevelTooLow    = 6;
     public const int MapNotLoggedIn    = 7;
+    public const int MapListDisabled   = 8;
 
     private readonly GatherBuddy _plugin;
+
+    /// <summary>上一次因清單停用而提示過的地圖；同一張連續被拒只提示一次。只在主執行緒讀寫。</summary>
+    private uint _lastListDisabledNotice;
 
     public GatherBuddyIpc(GatherBuddy plugin)
     {
@@ -136,7 +140,10 @@ public sealed class GatherBuddyIpc : IDisposable
     /// 使用者按下「採一張寶物地圖」：把這張地圖放進「來自其他插件」清單（目標 1）並開啟自動採集，
     /// 之後照自動採集自己的流程走。只能接在使用者按下的按鈕上：不輪詢、不重試。
     /// </summary>
-    /// <returns>見 <c>Map*</c> 常數；只有 <see cref="MapStarted"/>／<see cref="MapAlreadyRunning"/> 有動到清單。</returns>
+    /// <returns>
+    /// 見 <c>Map*</c> 常數；只有 <see cref="MapStarted"/>／<see cref="MapAlreadyRunning"/>／<see cref="MapListDisabled"/> 有動到清單，
+    /// 只有前兩者會開自動採集。<see cref="MapListDisabled"/>＝清單或該項目被使用者停用，刻意不替他勾回。
+    /// </returns>
     [EzIPC]
     public int GatherTreasureMap(uint itemId)
         => IpcFrameworkGate.Get(nameof(GatherTreasureMap), () => GatherTreasureMapOnFramework(itemId), MapUnavailable);
@@ -266,6 +273,21 @@ public sealed class GatherBuddyIpc : IDisposable
         if (!SetQuantityOnFramework(itemId, 1))
             return MapNotGatherable;
 
+        // 清單停用或這一項沒勾時地圖進不了採集目標：開了自動採集也不會去採，不回「已開始」。
+        if (!_plugin.AutoGatherListsManager.ActiveItems.Any(a => a.Item.ItemId == itemId))
+        {
+            if (_lastListDisabledNotice != itemId)
+            {
+                _lastListDisabledNotice = itemId;
+                Communicator.PrintError($"其他插件請 GatherBuddy 採「{map.Name}」，但「{IpcListName}」清單或清單裡的這張地圖已停用，沒有開始自動採集；"
+                  + "要採的話請到自動採集分頁把它勾回。");
+            }
+
+            GatherBuddy.Log.Information($"[GatherBuddy IPC] 別的插件交來寶物地圖 {itemId}（{map.Name}），但「{IpcListName}」清單或該項目已停用：不開自動採集，回 {MapListDisabled}。");
+            return MapListDisabled;
+        }
+
+        _lastListDisabledNotice = 0;
         var wasRunning = GatherBuddy.AutoGather.Enabled;
         GatherBuddy.AutoGather.Enabled = true;
         GatherBuddy.Log.Information($"[GatherBuddy IPC] 別的插件替使用者交來一張寶物地圖 {itemId}（{map.Name}）：已放進「來自其他插件」清單，"
