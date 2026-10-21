@@ -317,6 +317,10 @@ namespace GatherBuddy.AutoGather.Lists
         {
             _teleportationCosts.Clear();
 
+            // 費用表留空時 GetTeleportationCost 退回 int.MaxValue，排序照樣能跑。
+            if (!global::GatherBuddy.SeFunctions.Teleporter.IsTelepoAvailable())
+                return;
+
             var telepo = Telepo.Instance();
             if (telepo == null)
                 return;
