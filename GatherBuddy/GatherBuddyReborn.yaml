@@ -4,7 +4,7 @@ description: |-
   透過物品名稱簡化採集流程，找出節點/魚群位置，並用 UI 追蹤特殊開放時段與天氣條件。
 punchline: 把採集與釣魚簡化到極致。
 repo_url: https://github.com/ffxiv-tc-port/GatherBuddyReborn
-icon_url: https://raw.githubusercontent.com/ffxiv-tc-port/DalamudPluginsTC/main/icons/GatherBuddyReborn.png
+icon_url: https://raw.githubusercontent.com/ffxiv-tc-port/DalamudPluginsTC/main/icons/GatherbuddyReborn.png
 dalamud_api_level: 13
 tags:
   - Gathering
