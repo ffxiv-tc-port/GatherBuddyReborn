@@ -22,6 +22,7 @@ public static class HiddenMaps
         (39591, [846, 844, 824, 823]),                                         // Ophiotauroskin
         (43556, [981, 983, 983, 985, 989, 990, 991, 1001, 1002, 1003]),        // Loboskin
         (43557, [981, 983, 983, 985, 989, 990, 991, 1001, 1002, 1003]),        // Br'aaxskin
+        (46185, [1004]),                                                       // Gargantua; 台服沒有上游另列的 1019（無 GatheringPoint）
     };
     // @formatter:on
 
