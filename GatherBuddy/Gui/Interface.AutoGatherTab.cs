@@ -127,12 +127,21 @@ public partial class Interface
         public  ReadOnlyCollection<IGatherable>     FilteredGatherables { get; private set; }
         public  ClippedSelectableCombo<IGatherable> GatherableSelector  { get; private set; }
         private HashSet<IGatherable>                ExcludedGatherables = [];
+        private readonly HashSet<IGatherable>       _excludeScratch     = [];
 
-        public void SetExcludedGatherbales(IEnumerable<IGatherable> exclude)
+        // 排除清單＝items 裡的 Gatherable（魚不算）；每幀比對用重複使用的暫存集合，有變才另建新集合。
+        public void SetExcludedGatherbales(IReadOnlyList<IGatherable> items)
         {
-            var excludeSet = exclude.ToHashSet();
-            if (!ExcludedGatherables.SetEquals(excludeSet))
+            _excludeScratch.Clear();
+            for (var i = 0; i < items.Count; ++i)
             {
+                if (items[i] is Gatherable gatherable)
+                    _excludeScratch.Add(gatherable);
+            }
+
+            if (!ExcludedGatherables.SetEquals(_excludeScratch))
+            {
+                var excludeSet     = new HashSet<IGatherable>(_excludeScratch);
                 var newGatherables = AllGatherables.Except(excludeSet).ToList().AsReadOnly();
                 UpdateGatherables(newGatherables, excludeSet);
             }
@@ -323,7 +332,7 @@ public partial class Interface
             _plugin.AutoGatherListsManager.ChangeDescription(list, newDesc);
 
         var tmp = list.Enabled;
-        if (ImGui.Checkbox("Enabled".Loc() + "##list", ref tmp) && tmp != list.Enabled)
+        if (ImGui.Checkbox($"{"Enabled".Loc()}##list", ref tmp) && tmp != list.Enabled)
             _plugin.AutoGatherListsManager.ToggleList(list);
 
         ImGui.SameLine();
@@ -339,14 +348,19 @@ public partial class Interface
         if (!box)
             return;
 
-        _autoGatherListsCache.SetExcludedGatherbales(list.Items.OfType<Gatherable>());
+        // 這四個屬性每次讀都新建一層唯讀包裝；包裝是活的檢視（list 的底層集合從不換掉），整幀共用一份。
+        var items              = list.Items;
+        var enabledItems       = list.EnabledItems;
+        var quantities         = list.Quantities;
+        var preferredLocations = list.PreferredLocations;
+        _autoGatherListsCache.SetExcludedGatherbales(items);
         var gatherables = _autoGatherListsCache.FilteredGatherables;
         var selector    = _autoGatherListsCache.GatherableSelector;
         int changeIndex = -1, changeItemIndex = -1, deleteIndex = -1;
 
-        for (var i = 0; i < list.Items.Count; ++i)
+        for (var i = 0; i < items.Count; ++i)
         {
-            var       item  = list.Items[i];
+            var       item  = items[i];
             using var id    = ImRaii.PushId((int)item.ItemId);
             using var group = ImRaii.Group();
             if (ImGuiUtil.DrawDisabledButton(FontAwesomeIcon.Trash.ToIconString(), IconButtonSize, "Delete this item from the list".Loc(), false,
@@ -354,7 +368,7 @@ public partial class Interface
                 deleteIndex = i;
             ImGui.SameLine();
 
-            var enabled = list.EnabledItems[item];
+            var enabled = enabledItems[item];
             if (ImGui.Checkbox($"##{item.ItemId}", ref enabled))
                 _plugin.AutoGatherListsManager.ChangeEnabled(list, item, enabled);
 
@@ -371,21 +385,24 @@ public partial class Interface
             ImGui.SameLine(0f, ImGui.CalcTextSize($"0000 / ").X - ImGui.CalcTextSize($"{invTotal} / ").X);
             ImGui.Text($"{invTotal} / ");
             ImGui.SameLine(0, 3f);
-            var quantity = list.Quantities.TryGetValue(item, out var q) ? (int)q : 1;
+            var quantity = quantities.TryGetValue(item, out var q) ? (int)q : 1;
             ImGui.SetNextItemWidth(100f * Scale);
             if (ImGui.InputInt("##quantity", ref quantity, 1, 10))
                 _plugin.AutoGatherListsManager.ChangeQuantity(list, item, (uint)quantity);
             ImGui.SameLine();
-            if (DrawLocationInput(item, list.PreferredLocations.GetValueOrDefault(item), out var newLoc))
+            if (DrawLocationInput(item, preferredLocations.GetValueOrDefault(item), out var newLoc))
                 _plugin.AutoGatherListsManager.ChangePreferredLocation(list, item, newLoc);
             group.Dispose();
 
             if (DragDropGuard.LastItemHasId())
                 _autoGatherListsCache.Selector.CreateDropSource(new AutoGatherListsDragDropData(list, item, i), item.Name[GatherBuddy.Language]);
 
-            var localIdx = i;
-            _autoGatherListsCache.Selector.CreateDropTarget<AutoGatherListsDragDropData>(d
-                => _plugin.AutoGatherListsManager.MoveItem(d.list, d.ItemIdx, localIdx));
+            if (DragDropGuard.DragDropActive())
+            {
+                var localIdx = i;
+                _autoGatherListsCache.Selector.CreateDropTarget<AutoGatherListsDragDropData>(d
+                    => _plugin.AutoGatherListsManager.MoveItem(d.list, d.ItemIdx, localIdx));
+            }
         }
 
         if (deleteIndex >= 0)
@@ -399,7 +416,15 @@ public partial class Interface
             _plugin.AutoGatherListsManager.AddItem(list, gatherables[_autoGatherListsCache.NewGatherableIdx]);
 
         ImGui.SameLine();
-        var allEnabled = list.Items.All(i => list.EnabledItems[i]);
+        var allEnabled = true;
+        for (var i = 0; i < items.Count; ++i)
+        {
+            if (!enabledItems[items[i]])
+            {
+                allEnabled = false;
+                break;
+            }
+        }
         if (ImGui.Checkbox("##AllEnabled", ref allEnabled))
         {
             list.Items.Each(i => _plugin.AutoGatherListsManager.ChangeEnabled(list, i, allEnabled));

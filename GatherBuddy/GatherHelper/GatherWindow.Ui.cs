@@ -144,8 +144,11 @@ public class GatherWindow : Window
             if (quantity > 0 && inventoryCount >= quantity)
                 colorId = ColorId.DisabledText;
             using var color                         = ImRaii.PushColor(ImGuiCol.Text, colorId.Value());
-            var quantityText = quantity > 0 ? $" ({inventoryCount}/{quantity})" : "";
-            if (ImGui.Selectable($"{item.Name[GatherBuddy.Language]}{quantityText}", false))
+            // 兩支各自直接格式化進 ImGui 的 UTF-8 緩衝，標籤文字與 ID 和合併字串時相同。
+            var selected = quantity > 0
+                ? ImGui.Selectable($"{item.Name[GatherBuddy.Language]} ({inventoryCount}/{quantity})", false)
+                : ImGui.Selectable(item.Name[GatherBuddy.Language], false);
+            if (selected)
             {
                 if (_plugin.Executor.LastItem != item)
                     _plugin.Executor.GatherItem(item);

@@ -182,9 +182,12 @@ public partial class Interface
             if (DragDropGuard.LastItemHasId())
                 _gatherWindowCache.Selector.CreateDropSource(new GatherWindowDragDropData(preset, item, i), item.Name[GatherBuddy.Language]);
 
-            var localIdx = i;
-            _gatherWindowCache.Selector.CreateDropTarget<GatherWindowDragDropData>(d
-                => _plugin.GatherWindowManager.MoveItem(d.Preset, d.ItemIdx, localIdx));
+            if (DragDropGuard.DragDropActive())
+            {
+                var localIdx = i;
+                _gatherWindowCache.Selector.CreateDropTarget<GatherWindowDragDropData>(d
+                    => _plugin.GatherWindowManager.MoveItem(d.Preset, d.ItemIdx, localIdx));
+            }
         }
 
         if (ImGuiUtil.DrawDisabledButton(FontAwesomeIcon.Plus.ToIconString(), IconButtonSize,

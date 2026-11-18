@@ -11,4 +11,8 @@ public static class DragDropGuard
 {
     public static bool LastItemHasId()
         => ImGuiP.GetItemID() != 0;
+
+    /// <summary> BeginDragDropTarget 在沒有進行中的拖曳時第一步就回 false；先判掉就不必每列建放下回呼。 </summary>
+    public static bool DragDropActive()
+        => ImGuiP.IsDragDropActive();
 }

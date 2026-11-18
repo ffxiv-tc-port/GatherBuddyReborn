@@ -35,13 +35,13 @@ namespace GatherBuddy.AutoGather
                 GatherBuddy.AutoGather.Enabled = enabled;
             }
 
-            ImGui.Text("Status: ".Loc() + GatherBuddy.AutoGather.AutoStatus);
+            ImGui.Text($"{"Status: ".Loc()}{GatherBuddy.AutoGather.AutoStatus}");
             var lastNavString = GatherBuddy.AutoGather.LastNavigationResult.HasValue
                 ? GatherBuddy.AutoGather.LastNavigationResult.Value
                     ? "Successful".Loc()
                     : "Failed (If you're seeing this you probably need to restart your game)".Loc()
                 : "None".Loc();
-            ImGui.Text("Navigation: ".Loc() + lastNavString);
+            ImGui.Text($"{"Navigation: ".Loc()}{lastNavString}");
         }
 
 

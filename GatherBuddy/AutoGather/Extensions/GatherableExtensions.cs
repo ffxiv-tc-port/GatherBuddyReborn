@@ -31,6 +31,9 @@ public static class GatherableExtensions
             InventoryType.Crystals
         ];
 
+    // 每次 IPC 共用同一個陣列：對端 AllaganTools.ItemCountOwned 只對它做 Contains、不改也不留存。
+    private static readonly uint[] _inventoryTypeIds = _inventoryTypes.Select(it => (uint)it).ToArray();
+
     /// <summary>
     /// Gets the inventory count for a gatherable item.
     /// </summary>
@@ -47,7 +50,7 @@ public static class GatherableExtensions
             //    只攔 IpcNotReadyError:參數個數/型別寫錯擲的其他 IpcError 必須繼續往上冒。
             try
             {
-                return (int)AllaganTools.ItemCountOwned(gatherable.ItemId, true, _inventoryTypes.Select(it => (uint)it).ToArray());
+                return (int)AllaganTools.ItemCountOwned(gatherable.ItemId, true, _inventoryTypeIds);
             }
             catch (IpcNotReadyError)
             {
