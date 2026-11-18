@@ -132,11 +132,16 @@ public class LocationManager
             }
 
             if (changes)
+            {
+                Functions.BackupBeforeRewriteSaveFile(file, text, ret.CustomLocationData, "載入時有自訂位置被略過或修正",
+                    "這次會用讀進來的結果立即覆寫原檔。");
                 ret.Save();
+            }
         }
         catch (Exception e)
         {
             GatherBuddy.Log.Error($"Error loading custom infos:\n{e}");
+            Functions.BackupUnreadableSaveFile(file, e, "這次不寫回；之後改任何自訂位置都會用目前的資料整份覆寫原檔。");
         }
 
         return ret;

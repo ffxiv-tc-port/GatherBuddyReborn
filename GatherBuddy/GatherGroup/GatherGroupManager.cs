@@ -176,7 +176,7 @@ public class GatherGroupManager
 
         try
         {
-            var text = JsonConvert.SerializeObject(Groups.Values.Select(g => g.ToConfig()), Formatting.Indented);
+            var text = Serialize();
             Functions.WriteSaveFile(file, text, $"Could not write gather groups to file {file.FullName}");
         }
         catch (Exception e)
@@ -207,6 +207,9 @@ public class GatherGroupManager
         return change;
     }
 
+
+    private string Serialize()
+        => JsonConvert.SerializeObject(Groups.Values.Select(g => g.ToConfig()), Formatting.Indented);
 
     public static GatherGroupManager Load()
     {
@@ -250,6 +253,8 @@ public class GatherGroupManager
             changes |= manager.SetDefaults();
             if (changes)
             {
+                Functions.BackupBeforeRewriteSaveFile(file, text, manager.Serialize, "載入時有採集群組被略過或補回預設群組",
+                    "這次不寫回；之後改任何採集群組都會用目前的資料整份覆寫原檔。");
                 Dalamud.Notifications.AddNotification(new Notification()
                 {
                     Title = "GatherBuddy Error",

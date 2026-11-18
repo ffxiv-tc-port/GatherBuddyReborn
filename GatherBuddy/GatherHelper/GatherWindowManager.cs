@@ -84,7 +84,7 @@ public partial class GatherWindowManager : IDisposable
 
         try
         {
-            var text = JsonConvert.SerializeObject(Presets.Select(p => new GatherWindowPreset.Config(p)), Formatting.Indented);
+            var text = Serialize();
             Functions.WriteSaveFile(file, text, "Error serializing gather window data");
         }
         catch (Exception e)
@@ -92,6 +92,9 @@ public partial class GatherWindowManager : IDisposable
             GatherBuddy.Log.Error($"Error serializing gather window data:\n{e}");
         }
     }
+
+    private string Serialize()
+        => JsonConvert.SerializeObject(Presets.Select(p => new GatherWindowPreset.Config(p)), Formatting.Indented);
 
     public static GatherWindowManager Load(AlarmManager alarms)
     {
@@ -117,6 +120,8 @@ public partial class GatherWindowManager : IDisposable
 
             if (change)
             {
+                Functions.BackupBeforeRewriteSaveFile(file, text, ret.Serialize, "載入時有採集視窗預設項目被略過或修正",
+                    "這次不寫回；之後改任何採集視窗設定都會用目前的資料整份覆寫原檔。");
                 Dalamud.Notifications.AddNotification(new Notification()
                 {
                     Title = "GatherBuddy Error",

@@ -53,6 +53,11 @@ public static class Functions
         => ConfigFileSafety.BackupUnreadable(file.FullName, $"讀取失敗（{e.GetType().Name}: {e.Message}）",
             $"{consequence}另有啟動時的整包備份在 {AutomaticBackupDirectory()}。", s => GatherBuddy.Log.Information(s));
 
+    // 部分載入後、寫回（立即或之後改設定時）之前呼叫；寫回內容與原檔相同就什麼都不做。
+    public static void BackupBeforeRewriteSaveFile(FileInfo file, string originalText, Func<string> newText, string reason, string consequence)
+        => ConfigFileSafety.BackupBeforeRewrite(file.FullName, originalText, newText, reason,
+            $"{consequence}另有啟動時的整包備份在 {AutomaticBackupDirectory()}。", s => GatherBuddy.Log.Information(s));
+
     // 與 OtterGui Backup.CreateBackupDirectory 同規則：<pluginConfigs 的上一層>/backups/<設定資料夾名>。
     private static string AutomaticBackupDirectory()
     {

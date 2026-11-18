@@ -258,7 +258,7 @@ public partial class AlarmManager : IDisposable
 
         try
         {
-            var text = JsonConvert.SerializeObject(Alarms.Select(a => new AlarmGroup.Config(a)), Formatting.Indented);
+            var text = Serialize();
             Functions.WriteSaveFile(file, text, $"Could not write gather groups to file {file.FullName}");
         }
         catch (Exception e)
@@ -266,6 +266,9 @@ public partial class AlarmManager : IDisposable
             GatherBuddy.Log.Error($"Could not write gather groups to file {file.FullName}:\n{e}");
         }
     }
+
+    private string Serialize()
+        => JsonConvert.SerializeObject(Alarms.Select(a => new AlarmGroup.Config(a)), Formatting.Indented);
 
     public static AlarmManager Load()
     {
@@ -307,6 +310,8 @@ public partial class AlarmManager : IDisposable
 
             if (changes)
             {
+                Functions.BackupBeforeRewriteSaveFile(file, text, manager.Serialize, "載入時有鬧鐘被略過",
+                    "這次不寫回；之後改任何鬧鐘都會用目前的資料整份覆寫原檔。");
                 Dalamud.Notifications.AddNotification(new Notification()
                 {
                     Title = "GatherBuddy Error",

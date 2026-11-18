@@ -88,7 +88,7 @@ public partial class AutoGatherListsManager : IDisposable
 
         try
         {
-            var text = JsonConvert.SerializeObject(_lists.Select(p => new AutoGatherList.Config(p)), Formatting.Indented);
+            var text = SerializeLists();
             Functions.WriteSaveFile(file, text, "Error serializing auto-gather lists data");
         }
         catch (Exception e)
@@ -96,6 +96,9 @@ public partial class AutoGatherListsManager : IDisposable
             GatherBuddy.Log.Error($"Error serializing auto-gather lists data:\n{e}");
         }
     }
+
+    private string SerializeLists()
+        => JsonConvert.SerializeObject(_lists.Select(p => new AutoGatherList.Config(p)), Formatting.Indented);
 
     public static AutoGatherListsManager Load()
     {
@@ -114,7 +117,7 @@ public partial class AutoGatherListsManager : IDisposable
             change = true;
         }
 
-        // 從舊檔名遷移時讀壞不會覆寫那個舊檔（它屬於採集視窗），所以不必備份。
+        // 從舊檔名遷移時寫回的是新檔名、不會覆寫那個舊檔（它屬於採集視窗），所以讀壞或部分載入都不必備份。
         var fromFallback = change;
         try
         {
@@ -128,7 +131,12 @@ public partial class AutoGatherListsManager : IDisposable
             }
 
             if (change)
+            {
+                if (!fromFallback)
+                    Functions.BackupBeforeRewriteSaveFile(file, text, ret.SerializeLists, "載入時有清單項目被略過或修正",
+                        "這次會用讀進來的結果立即覆寫原檔。");
                 ret.Save();
+            }
         }
         catch (Exception e)
         {

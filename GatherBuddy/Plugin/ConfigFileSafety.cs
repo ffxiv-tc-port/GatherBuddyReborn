@@ -50,6 +50,24 @@ internal static class ConfigFileSafety
         }
     }
 
+    // 部分載入（略過或修正了某些項目）之後、寫回之前呼叫：寫回內容與原檔逐字相同就不備份、不記錄；
+    // 算不出寫回內容時當成會改變，照樣備份。
+    public static string? BackupBeforeRewrite(string path, string originalText, Func<string> newText, string reason, string consequence,
+        Action<string> log, Func<DateTime>? now = null)
+    {
+        try
+        {
+            if (string.Equals(originalText, newText(), StringComparison.Ordinal))
+                return null;
+        }
+        catch (Exception)
+        {
+            // 見上：比不出來就照樣備份。
+        }
+
+        return BackupUnreadable(path, reason, consequence, log, now);
+    }
+
     public static void EnqueueWrite(string path, string text, string failureMessage, Action<string> logError)
     {
         lock (QueueLock)
