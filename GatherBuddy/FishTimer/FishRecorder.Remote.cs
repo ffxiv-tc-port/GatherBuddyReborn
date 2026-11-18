@@ -33,7 +33,7 @@ public partial class FishRecorder
     public void StopRemoteRecordsRequests()
     {
         RemoteRecordsCancellationTokenSource.Cancel();
-        WriteRemoteFile();
+        // 刻意不把 RemoteRecords 寫進設定資料夾：那份檔沒有任何讀取點（LoadRemoteFile 讀的是內嵌資源）。
     }
 
     public void QueueHistoricalRecords()
@@ -126,12 +126,6 @@ public partial class FishRecorder
         {
             GatherBuddy.Log.Error($"Could not read fish record file {FishRecordFileName}:\n{e}");
         }
-    }
-
-    private void WriteRemoteFile()
-    {
-        var file = new FileInfo(Path.Combine(FishRecordDirectory.FullName, RemoteFishRecordsFileName));
-        WriteFileInternal(file, true);
     }
 
     private class FishRecorderClient : HttpClient

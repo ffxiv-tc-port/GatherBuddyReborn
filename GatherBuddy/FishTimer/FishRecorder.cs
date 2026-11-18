@@ -59,7 +59,6 @@ public partial class FishRecorder : IDisposable
         Disable();
         Parser.Dispose();
         StopRemoteRecordsRequests();
-        WriteRemoteFile();
         if (Changes > 0)
             WriteFile();
     }

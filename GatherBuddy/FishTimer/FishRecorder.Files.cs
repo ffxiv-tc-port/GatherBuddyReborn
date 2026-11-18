@@ -28,15 +28,15 @@ public partial class FishRecorder
         var file = new FileInfo(Path.Combine(FishRecordDirectory.FullName, FishRecordFileName));
         Changes  = 0;
         SaveTime = TimeStamp.MaxValue;
-        WriteFileInternal(file, false);
+        WriteFileInternal(file);
     }
 
-    private void WriteFileInternal(FileInfo file, bool remote)
+    private void WriteFileInternal(FileInfo file)
     {
         GatherBuddy.Log.Debug($"Saving fish record file to {file.FullName} with {Changes} changes.");
         try
         {
-            var bytes = GetRecordBytes(remote);
+            var bytes = GetRecordBytes(false);
             File.WriteAllBytes(file.FullName, bytes);
         }
         catch (Exception e)
