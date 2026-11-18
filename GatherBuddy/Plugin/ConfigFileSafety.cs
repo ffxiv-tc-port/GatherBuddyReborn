@@ -9,7 +9,7 @@ namespace GatherBuddy.Plugin;
 
 // 本檔假設與契約（艦隊範本 config-load-safety）：
 // ①讀壞的原檔在任何寫入之前先複製成 <檔名>.bad-<時間>；既有備份永不覆寫（CreateNew），同內容只留一份。
-// ②寫入一律 FilesystemUtil.WriteAllTextSafe（暫存檔＋落盤＋換名）：中斷時原檔維持上一份完整內容。
+// ②寫入一律 FilesystemUtil.WriteAllTextSafe／WriteAllBytesSafe（暫存檔＋落盤＋換名）：中斷時原檔維持上一份完整內容。
 // ③同一路徑的寫入在背景依序執行、尚未寫出的只留最新一份；序列化由呼叫端在自己的執行緒做完才交進來。
 // ④所有公開方法永不擲例外；失敗只記錄，不重試。
 internal static class ConfigFileSafety
@@ -18,7 +18,8 @@ internal static class ConfigFileSafety
     private static readonly Dictionary<string, Write>  Pending   = new(StringComparer.OrdinalIgnoreCase);
     private static readonly Dictionary<string, Task>   Running   = new(StringComparer.OrdinalIgnoreCase);
 
-    private readonly record struct Write(string Text, string FailureMessage, Action<string> LogError);
+    // Text 與 Bytes 恰有一個非 null。
+    private readonly record struct Write(string? Text, byte[]? Bytes, string FailureMessage, Action<string> LogError);
 
     // 回傳這份內容的備份檔完整路徑（含「早已備份過」的那一份）；失敗回 null。
     public static string? BackupUnreadable(string path, string reason, string consequence, Action<string> log, Func<DateTime>? now = null)
@@ -69,10 +70,17 @@ internal static class ConfigFileSafety
     }
 
     public static void EnqueueWrite(string path, string text, string failureMessage, Action<string> logError)
+        => Enqueue(path, new Write(text, null, failureMessage, logError));
+
+    // bytes 交進來之後呼叫端不可再改它。
+    public static void EnqueueWrite(string path, byte[] bytes, string failureMessage, Action<string> logError)
+        => Enqueue(path, new Write(null, bytes, failureMessage, logError));
+
+    private static void Enqueue(string path, Write write)
     {
         lock (QueueLock)
         {
-            Pending[path] = new Write(text, failureMessage, logError);
+            Pending[path] = write;
             if (!Running.ContainsKey(path))
                 Running[path] = Task.Run(() => Drain(path));
         }
@@ -110,7 +118,10 @@ internal static class ConfigFileSafety
 
             try
             {
-                FilesystemUtil.WriteAllTextSafe(path, next.Text);
+                if (next.Bytes != null)
+                    FilesystemUtil.WriteAllBytesSafe(path, next.Bytes);
+                else
+                    FilesystemUtil.WriteAllTextSafe(path, next.Text!);
             }
             catch (Exception e)
             {
