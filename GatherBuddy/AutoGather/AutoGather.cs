@@ -631,6 +631,7 @@ namespace GatherBuddy.AutoGather
                     }
 
                     VNavmesh.SimpleMove.PathfindAndMoveToSafe(point.Value, false);
+                    _ownNavIssued = true;
                     return;
                 }
                 else
@@ -1378,6 +1379,7 @@ namespace GatherBuddy.AutoGather
             // 🔴 最先做:卸載時一定要把壓制租約還回去,否則 AutoRetainer 要等到逾時(5 分鐘)才會恢復。
             AutoRetainerSuppression.ReleaseNow("GatherBuddyReborn 正在卸載");
             AutoHookSuppression.RestoreNow("GatherBuddyReborn 正在卸載");
+            StopOwnNavigationOnUnload();
             YesAlready.Unlock();
             TextAdvance.Unlock();
             _antiStuckManager.Dispose();
@@ -1386,6 +1388,38 @@ namespace GatherBuddy.AutoGather
             Svc.Chat.CheckMessageHandled -= OnMessageHandled;
             AddonPressGuard.ForceTeardown();
             //Svc.AddonLifecycle.UnregisterListener(AddonEvent.PreFinalize, "Gathering", OnGatheringFinalize);
+        }
+
+        // 只停自己發起、還沒停掉的那條路徑（VNAV-OWN）：主迴圈在跑、沒在讓位給 AutoRetainer（Waiting），且路徑是自己送的。
+        // 算路取消是全域的，只在佇列裡沒有別人那一筆時才取消。卸載時對端可能已經不在，失敗吞掉、只記一行。
+        private void StopOwnNavigationOnUnload()
+        {
+            if (!_enabled || Waiting || !_ownNavIssued)
+                return;
+
+            Exception? failure = null;
+            try
+            {
+                if (IsPathGenerating && VNavmesh.Nav.PathfindNumQueued() == 0)
+                    VNavmesh.Nav.PathfindCancelAllSafe();
+            }
+            catch (Exception e)
+            {
+                failure = e;
+            }
+
+            try
+            {
+                StopNavigation();
+            }
+            catch (Exception e)
+            {
+                failure ??= e;
+            }
+
+            if (failure != null)
+                GatherBuddy.Log.Warning(
+                    $"[自動採集] 卸載時停止自己發起的導航失敗，vnavmesh 可能會把剩下的路走完：{failure.GetType().Name}: {failure.Message}");
         }
     }
 }

@@ -182,12 +182,16 @@ namespace GatherBuddy.AutoGather
             }
         }
 
+        // 自動採集主迴圈送出 vnavmesh 路徑時設、StopNavigation 清：卸載時只憑它判斷「在走的是不是自己的」。
+        private bool _ownNavIssued;
+
         private void StopNavigation()
         {
             // Reset navigation logic here
             // For example, reinitiate navigation to the destination
             CurrentDestination = default;
             CurrentRotation    = default;
+            _ownNavIssued      = false;
             // 安全版自帶 Enabled 前置檢查、只攔 IpcNotReadyError、作廢存在性快取。
             VNavmesh.Path.StopSafe();
         }
@@ -213,6 +217,7 @@ namespace GatherBuddy.AutoGather
             GatherBuddy.Log.Debug($"Navigating to {destination} (corrected to {correctedDestination})");
 
             LastNavigationResult = VNavmesh.SimpleMove.PathfindAndMoveToSafe(correctedDestination, shouldFly);
+            _ownNavIssued        = true;
         }
 
         private static Vector3 GetCorrectedDestination(Vector3 destination)
