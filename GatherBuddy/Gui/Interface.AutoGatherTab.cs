@@ -348,9 +348,8 @@ public partial class Interface
         if (!box)
             return;
 
-        // 這四個屬性每次讀都新建一層唯讀包裝；包裝是活的檢視（list 的底層集合從不換掉），整幀共用一份。
+        // 這三個屬性每次讀都新建一層唯讀包裝；包裝是活的檢視（list 的底層集合從不換掉），整幀共用一份。
         var items              = list.Items;
-        var enabledItems       = list.EnabledItems;
         var quantities         = list.Quantities;
         var preferredLocations = list.PreferredLocations;
         _autoGatherListsCache.SetExcludedGatherbales(items);
@@ -368,7 +367,7 @@ public partial class Interface
                 deleteIndex = i;
             ImGui.SameLine();
 
-            var enabled = enabledItems[item];
+            var enabled = list.IsItemEnabled(item);
             if (ImGui.Checkbox($"##{item.ItemId}", ref enabled))
                 _plugin.AutoGatherListsManager.ChangeEnabled(list, item, enabled);
 
@@ -419,7 +418,7 @@ public partial class Interface
         var allEnabled = true;
         for (var i = 0; i < items.Count; ++i)
         {
-            if (!enabledItems[items[i]])
+            if (!list.IsItemEnabled(items[i]))
             {
                 allEnabled = false;
                 break;

@@ -236,7 +236,7 @@ public sealed class GatherBuddyIpc : IDisposable
     {
         var list = FindIpcList(_plugin.AutoGatherListsManager);
         var idx  = list == null ? -1 : IndexOfItem(list, itemId);
-        return idx < 0 ? 0 : (int)list!.Quantities[list.Items[idx]];
+        return idx < 0 ? 0 : (int)list!.QuantityOf(list.Items[idx]);
     }
 
     private static List<uint> ListTreasureMapsOnFramework()

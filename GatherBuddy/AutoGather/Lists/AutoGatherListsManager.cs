@@ -52,7 +52,7 @@ public partial class AutoGatherListsManager : IDisposable
         _fallbackItems.Clear();
         var items = _lists
             .Where(l => l.Enabled)
-            .SelectMany(l => l.Items.Select(i => (Item: i, Quantity: l.Quantities[i], l.Fallback, ItemEnabled: l.EnabledItems[i])))
+            .SelectMany(l => l.Items.Select(i => (Item: i, Quantity: l.QuantityOf(i), l.Fallback, ItemEnabled: l.IsItemEnabled(i))))
             .Where(i => i.ItemEnabled)
             .GroupBy(i => (i.Item, i.Fallback))
             .Select(x => (x.Key.Item, Quantity: (uint)Math.Min(x.Sum(g => g.Quantity), uint.MaxValue), x.Key.Fallback));

@@ -32,10 +32,19 @@ public class AutoGatherList
     public bool   Enabled     { get; set; } = false;
     public bool   Fallback    { get; set; } = false;
 
+    // 不變式：quantities 與 enabledItems 的鍵＝items 的內容，preferredLocations 的鍵是其子集；新增寫入點要三份一起動。
     private List<IGatherable>                  items              = [];
     private Dictionary<IGatherable, uint>      quantities         = [];
     private Dictionary<IGatherable, ILocation> preferredLocations = [];
     private Dictionary<IGatherable, bool>      enabledItems       = [];
+
+    /// <summary>缺鍵時照 <see cref="Add"/> 的預設回「啟用」，不擲例外。</summary>
+    public bool IsItemEnabled(IGatherable item)
+        => enabledItems.GetValueOrDefault(item, true);
+
+    /// <summary>缺鍵時照 <see cref="NormalizeQuantity"/> 的下限回 1，不擲例外。</summary>
+    public uint QuantityOf(IGatherable item)
+        => quantities.GetValueOrDefault(item, 1u);
 
     public AutoGatherList Clone()
         => new()
@@ -43,6 +52,7 @@ public class AutoGatherList
             items              = new(items),
             quantities         = new(quantities),
             preferredLocations = new(preferredLocations),
+            enabledItems       = new(enabledItems),
             Name               = Name,
             Description        = Description,
             Enabled            = false,
@@ -76,9 +86,9 @@ public class AutoGatherList
 
         var old = items[index];
         quantities.Remove(old, out var quantity);
-        enabledItems.Remove(old, out var enabled);
-        if (old is Gatherable gatherable)
-            preferredLocations.Remove(gatherable);
+        if (!enabledItems.Remove(old, out var enabled))
+            enabled = true;
+        preferredLocations.Remove(old);
         items[index]       = item;
         quantities[item]   = NormalizeQuantity(item, quantity);
         enabledItems[item] = enabled;
@@ -109,13 +119,10 @@ public class AutoGatherList
 
     public bool SetEnabled(IGatherable item, bool enabled)
     {
-        if (enabledItems.TryGetValue(item, out var old))
+        if (quantities.ContainsKey(item) && IsItemEnabled(item) != enabled)
         {
-            if (old != enabled)
-            {
-                enabledItems[item] = enabled;
-                return true;
-            }
+            enabledItems[item] = enabled;
+            return true;
         }
 
         return false;
