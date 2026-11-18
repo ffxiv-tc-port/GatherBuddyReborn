@@ -380,7 +380,8 @@ public partial class Interface
                 _plugin.AutoGatherListsManager.ChangePreferredLocation(list, item, newLoc);
             group.Dispose();
 
-            _autoGatherListsCache.Selector.CreateDropSource(new AutoGatherListsDragDropData(list, item, i), item.Name[GatherBuddy.Language]);
+            if (DragDropGuard.LastItemHasId())
+                _autoGatherListsCache.Selector.CreateDropSource(new AutoGatherListsDragDropData(list, item, i), item.Name[GatherBuddy.Language]);
 
             var localIdx = i;
             _autoGatherListsCache.Selector.CreateDropTarget<AutoGatherListsDragDropData>(d

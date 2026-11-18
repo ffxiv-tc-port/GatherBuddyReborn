@@ -179,7 +179,8 @@ public partial class Interface
                 _plugin.GatherWindowManager.ChangeItem(preset, GatherGroupCache.AllGatherables[newIdx], i);
             group.Dispose();
 
-            _gatherWindowCache.Selector.CreateDropSource(new GatherWindowDragDropData(preset, item, i), item.Name[GatherBuddy.Language]);
+            if (DragDropGuard.LastItemHasId())
+                _gatherWindowCache.Selector.CreateDropSource(new GatherWindowDragDropData(preset, item, i), item.Name[GatherBuddy.Language]);
 
             var localIdx = i;
             _gatherWindowCache.Selector.CreateDropTarget<GatherWindowDragDropData>(d
