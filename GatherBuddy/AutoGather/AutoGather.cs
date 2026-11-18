@@ -388,14 +388,7 @@ namespace GatherBuddy.AutoGather
                 return;
             }
 
-            if (_activeItemList.AnyNextIsFish(Array.Empty<uint>())
-             && !GatherBuddy.Config.AutoGatherConfig.FishDataCollection)
-            {
-                Communicator.PrintError(
-                    "You have fish on your auto-gather list but you have not opted in to fishing data collection. Auto-gather cannot continue. Please enable fishing data collection in your configuration options or remove fish from your auto-gather lists.".Loc());
-                AbortAutoGather(reason: "Fish are on the list but fishing data collection is off.");
-                return;
-            }
+            // 刻意不把自動釣魚綁在 FishDataCollection 上：上傳是純自願，唯一的上傳觸發點在 FishRecorder.OnFrameworkUpdate、只看該旗標。
 
             if (IsGathering)
             {
