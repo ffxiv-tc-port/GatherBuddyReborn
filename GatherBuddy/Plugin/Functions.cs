@@ -48,9 +48,12 @@ public static class Functions
     public static void WriteSaveFile(FileInfo file, string text, string failureMessage)
         => ConfigFileSafety.EnqueueWrite(file.FullName, text, failureMessage, s => GatherBuddy.Log.Error(s));
 
-    // 讀壞、即將被覆寫之前呼叫；consequence 寫「之後會怎樣寫回這個檔」。
-    public static void BackupUnreadableSaveFile(FileInfo file, Exception e, string consequence)
-        => ConfigFileSafety.BackupUnreadable(file.FullName, $"讀取失敗（{e.GetType().Name}: {e.Message}）",
+    // 讀壞、即將被覆寫之前呼叫；consequence 寫「之後會怎樣寫回這個檔」。回傳備份檔路徑，備份失敗回 null。
+    public static string? BackupUnreadableSaveFile(FileInfo file, Exception e, string consequence)
+        => BackupUnreadableSaveFile(file, $"讀取失敗（{e.GetType().Name}: {e.Message}）", consequence);
+
+    public static string? BackupUnreadableSaveFile(FileInfo file, string reason, string consequence)
+        => ConfigFileSafety.BackupUnreadable(file.FullName, reason,
             $"{consequence}另有啟動時的整包備份在 {AutomaticBackupDirectory()}。", s => GatherBuddy.Log.Information(s));
 
     // 部分載入後、寫回（立即或之後改設定時）之前呼叫；寫回內容與原檔相同就什麼都不做。

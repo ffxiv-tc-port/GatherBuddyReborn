@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
+using GatherBuddy.Plugin;
 using Newtonsoft.Json;
 
 namespace GatherBuddy.CustomInfo
@@ -25,25 +26,35 @@ namespace GatherBuddy.CustomInfo
             LoadIlvConvertTableFromFile();
         }
 
+        // 載入時讀不懂、而且備份不成：這次載入期間不再寫該檔，原檔保留。
+        private static volatile bool _locationsWriteBlocked;
+        private static volatile bool _offsetsWriteBlocked;
+
         private static void LoadOffsetsFromFile()
         {
             var settings = new JsonSerializerSettings();
             var resourceName = "GatherBuddy.CustomInfo.node_offsets.json";
-            NodeOffsets = LoadFromFile<List<OffsetPair>>(NodeOffsetsPath, resourceName, settings).GroupBy(x => x.Original).ToDictionary(x => x.Key, x => x.First().Offset);
+            NodeOffsets = LoadFromFile<List<OffsetPair>>(NodeOffsetsPath, resourceName, settings, MergeData, out var blocked)
+                .GroupBy(x => x.Original).ToDictionary(x => x.Key, x => x.First().Offset);
+            _offsetsWriteBlocked = blocked;
         }
 
         private static void LoadLocationsFromFile()
         {
             var resourceName = "GatherBuddy.CustomInfo.world_locations.json";
-            WorldLocationsByNodeId = LoadFromFile<Dictionary<uint, List<Vector3>>>(WorldLocationsPath, resourceName, new JsonSerializerSettings());
+            WorldLocationsByNodeId = LoadFromFile<Dictionary<uint, List<Vector3>>>(WorldLocationsPath, resourceName, new JsonSerializerSettings(), MergeData,
+                out var blocked);
+            _locationsWriteBlocked = blocked;
         }
 
-        private static T LoadFromFile<T>(string path, string resourceName, JsonSerializerSettings settings)
+        // 契約：使用者的檔讀不懂（壞 JSON、半截、空白、全 NUL、開不了）不擲例外——這裡在靜態建構子裡，擲了＝插件每次都載入失敗。
+        // 讀不懂就先備份原檔再改用內嵌預設；備份不成就不寫（writeBlocked）。合併結果與原檔逐字相同就不寫。
+        private static T LoadFromFile<T>(string path, string resourceName, JsonSerializerSettings settings, Func<T, T, T> merge, out bool writeBlocked)
+            where T : class, new()
         {
             var assembly = typeof(GatherBuddy).Assembly;
             T   defaultObj;
 
-            // Load the embedded resource
             using (var stream = assembly.GetManifestResourceStream(resourceName))
             {
                 if (stream == null)
@@ -51,57 +62,57 @@ namespace GatherBuddy.CustomInfo
 
                 using (var reader = new StreamReader(stream))
                 {
-                    defaultObj = DeserializeStream<T>(reader, settings);
+                    defaultObj = DeserializeStream<T>(reader, settings) ?? new T();
                 }
             }
 
-            // Check if the file exists
-            if (!File.Exists(path))
+            writeBlocked = false;
+            var     file     = new FileInfo(path);
+            string? original = null;
+            T?      existing = null;
+            if (file.Exists)
             {
-                SerializeToFile(path, defaultObj, settings);
-            }
-            else
-            {
-                T? existingFromFile;
-                using (var reader = File.OpenText(path))
-                    existingFromFile = DeserializeStream<T>(reader, settings);
-                var existingObj = existingFromFile ?? Activator.CreateInstance<T>();
-
-                // Depending on the type of T, you might need to perform different operations here
-                // In this case we assume T is a Dictionary<uint, List<Vector3>>, but for other types T you might need other merge operations 
-                if (defaultObj is Dictionary<uint, List<Vector3>> defaultDict1 && existingObj is Dictionary<uint, List<Vector3>> existingDict1)
+                string? problem = null;
+                try
                 {
-                    SerializeToFile(path, MergeData(defaultDict1, existingDict1), settings);
+                    original = File.ReadAllText(path);
+                    if (original.AsSpan().Trim(" \t\r\n\0").IsEmpty)
+                        problem = "內容是空的";
+                    else if ((existing = DeserializeStream<T>(new StringReader(original), settings)) == null)
+                        problem = "內容無法辨識（解析結果是 null）";
                 }
-                else if (defaultObj is List<OffsetPair> defaultDict2 && existingObj is List<OffsetPair> existingDict2)
+                catch (Exception e)
                 {
-                    SerializeToFile(path, MergeData(defaultDict2, existingDict2), settings);
+                    problem = $"{e.GetType().Name}: {e.Message}";
+                }
+
+                if (problem != null)
+                {
+                    writeBlocked = Functions.BackupUnreadableSaveFile(file, $"讀取失敗（{problem}）",
+                        "這次改用內建的預設資料（自己發現的採集點／偏移要從備份找回）；備份成功才會用預設資料覆寫原檔，備份失敗則這次載入期間不寫它。")
+                     == null;
+                    original = null;
+                    existing = null;
                 }
             }
 
-            // Read the content of the file
-            T? obj;
-            using (var reader = File.OpenText(path))
-                obj = DeserializeStream<T>(reader, settings);
-            return obj ?? Activator.CreateInstance<T>();
+            // 沒有檔時也走合併：內嵌的偏移表有重複項，合併會去重 ⇒ 第一次寫出的就是之後每次載入都不會再改的內容。
+            var merged = merge(defaultObj, existing ?? new T());
+            if (writeBlocked)
+                return merged;
+
+            var text = JsonConvert.SerializeObject(merged, Formatting.Indented, settings);
+            if (!string.Equals(text, original, StringComparison.Ordinal))
+                Functions.WriteSaveFile(file, text, $"Could not write {file.FullName}");
+            return merged;
         }
 
-        // 與 JsonConvert.DeserializeObject／SerializeObject(Indented)＋File.WriteAllText 同設定、同輸出，只是直接讀寫串流，不先組出整份字串。
         private static T? DeserializeStream<T>(TextReader reader, JsonSerializerSettings settings)
         {
             var serializer = JsonSerializer.CreateDefault(settings);
             serializer.CheckAdditionalContent = true;
             using var json = new JsonTextReader(reader);
             return serializer.Deserialize<T>(json);
-        }
-
-        private static void SerializeToFile(string path, object? value, JsonSerializerSettings settings)
-        {
-            var serializer = JsonSerializer.CreateDefault(settings);
-            serializer.Formatting = Formatting.Indented;
-            using var writer = new StreamWriter(path, false);
-            using var json   = new JsonTextWriter(writer) { Formatting = serializer.Formatting };
-            serializer.Serialize(json, value);
         }
 
         private static Dictionary<uint,List<Vector3>> MergeData(Dictionary<uint, List<Vector3>> defaultData, Dictionary<uint, List<Vector3>> existingData)
@@ -146,10 +157,13 @@ namespace GatherBuddy.CustomInfo
 
         public static void SaveOffsetsToFile()
         {
+            if (_offsetsWriteBlocked)
+                return;
+
             var settings = new JsonSerializerSettings();
             var offsetJson = Newtonsoft.Json.JsonConvert.SerializeObject(NodeOffsets.Select(x => new OffsetPair(x.Key, x.Value)).ToList(), Formatting.Indented, settings);
-            
-            File.WriteAllText(NodeOffsetsPath, offsetJson);
+
+            Functions.WriteSaveFile(new FileInfo(NodeOffsetsPath), offsetJson, $"Could not write {NodeOffsetsPath}");
         }
 
         public static void AddLocation(uint nodeId, Vector3 location)
@@ -183,6 +197,9 @@ namespace GatherBuddy.CustomInfo
 
         public static void SaveLocationsToFile()
         {
+            if (_locationsWriteBlocked)
+                return;
+
             // Only the snapshot is taken under the data lock; serializing and writing happen outside it. Previously the
             // caller held the data lock for the entire serialize + WriteAllText, so the framework thread stalled inside
             // AddLocation until the write completed - which it hit repeatedly while discovering new nodes in a fresh zone.
@@ -194,7 +211,8 @@ namespace GatherBuddy.CustomInfo
 
                 var locJson = Newtonsoft.Json.JsonConvert.SerializeObject(snapshot, Newtonsoft.Json.Formatting.Indented);
 
-                File.WriteAllText(WorldLocationsPath, locJson);
+                // 在鎖內排進背景佇列（同路徑只留最新一份）：快照的先後就是落地的先後。
+                Functions.WriteSaveFile(new FileInfo(WorldLocationsPath), locJson, $"Could not write {WorldLocationsPath}");
             }
         }
 
