@@ -44,6 +44,29 @@ public static class Functions
         return new FileInfo(Path.Combine(dir.FullName, fileName));
     }
 
+    // 只換寫入方式（原子、背景依序）；序列化仍在呼叫端執行緒，失敗照舊記 Error。
+    public static void WriteSaveFile(FileInfo file, string text, string failureMessage)
+        => ConfigFileSafety.EnqueueWrite(file.FullName, text, failureMessage, s => GatherBuddy.Log.Error(s));
+
+    // 讀壞、即將被覆寫之前呼叫；consequence 寫「之後會怎樣寫回這個檔」。
+    public static void BackupUnreadableSaveFile(FileInfo file, Exception e, string consequence)
+        => ConfigFileSafety.BackupUnreadable(file.FullName, $"讀取失敗（{e.GetType().Name}: {e.Message}）",
+            $"{consequence}另有啟動時的整包備份在 {AutomaticBackupDirectory()}。", s => GatherBuddy.Log.Information(s));
+
+    // 與 OtterGui Backup.CreateBackupDirectory 同規則：<pluginConfigs 的上一層>/backups/<設定資料夾名>。
+    private static string AutomaticBackupDirectory()
+    {
+        try
+        {
+            var dir = Dalamud.PluginInterface.ConfigDirectory;
+            return Path.Combine(dir.Parent!.Parent!.FullName, "backups", dir.Name);
+        }
+        catch (Exception)
+        {
+            return "?";
+        }
+    }
+
     public static bool CompareCi(string lhs, string rhs)
         => string.Compare(lhs, rhs, StringComparison.InvariantCultureIgnoreCase) == 0;
 

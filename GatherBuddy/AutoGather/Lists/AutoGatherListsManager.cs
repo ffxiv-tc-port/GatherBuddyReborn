@@ -89,7 +89,7 @@ public partial class AutoGatherListsManager : IDisposable
         try
         {
             var text = JsonConvert.SerializeObject(_lists.Select(p => new AutoGatherList.Config(p)), Formatting.Indented);
-            File.WriteAllText(file.FullName, text);
+            Functions.WriteSaveFile(file, text, "Error serializing auto-gather lists data");
         }
         catch (Exception e)
         {
@@ -114,6 +114,8 @@ public partial class AutoGatherListsManager : IDisposable
             change = true;
         }
 
+        // 從舊檔名遷移時讀壞不會覆寫那個舊檔（它屬於採集視窗），所以不必備份。
+        var fromFallback = change;
         try
         {
             var text = File.ReadAllText(file.FullName);
@@ -132,6 +134,8 @@ public partial class AutoGatherListsManager : IDisposable
         {
             GatherBuddy.Log.Error($"Error deserializing auto gather lists:\n{e}");
             Communicator.PrintError($"[GatherBuddy Reborn] Auto gather lists failed to load and have been reset.");
+            if (!fromFallback)
+                Functions.BackupUnreadableSaveFile(file, e, "這次已用讀進來的部分（可能是空的）立即覆寫原檔。");
             ret.Save();
         }
 

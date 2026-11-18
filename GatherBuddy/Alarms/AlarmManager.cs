@@ -259,7 +259,7 @@ public partial class AlarmManager : IDisposable
         try
         {
             var text = JsonConvert.SerializeObject(Alarms.Select(a => new AlarmGroup.Config(a)), Formatting.Indented);
-            File.WriteAllText(file.FullName, text);
+            Functions.WriteSaveFile(file, text, $"Could not write gather groups to file {file.FullName}");
         }
         catch (Exception e)
         {
@@ -320,6 +320,7 @@ public partial class AlarmManager : IDisposable
         catch (Exception e)
         {
             GatherBuddy.Log.Error($"Error loading gather groups:\n{e}");
+            Functions.BackupUnreadableSaveFile(file, e, "這次已用讀進來的部分（可能是空的）立即覆寫原檔。");
             manager.Save();
         }
 

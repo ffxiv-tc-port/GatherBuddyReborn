@@ -77,7 +77,7 @@ public class LocationManager
         try
         {
             var text = CustomLocationData();
-            File.WriteAllText(file.FullName, text);
+            Functions.WriteSaveFile(file, text, $"Could not write custom locations to file {file.FullName}");
         }
         catch (Exception e)
         {

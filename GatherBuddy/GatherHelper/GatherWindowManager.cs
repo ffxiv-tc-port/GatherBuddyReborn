@@ -85,7 +85,7 @@ public partial class GatherWindowManager : IDisposable
         try
         {
             var text = JsonConvert.SerializeObject(Presets.Select(p => new GatherWindowPreset.Config(p)), Formatting.Indented);
-            File.WriteAllText(file.FullName, text);
+            Functions.WriteSaveFile(file, text, "Error serializing gather window data");
         }
         catch (Exception e)
         {
@@ -130,6 +130,7 @@ public partial class GatherWindowManager : IDisposable
         catch (Exception e)
         {
             GatherBuddy.Log.Error($"Error deserializing gather window data:\n{e}");
+            Functions.BackupUnreadableSaveFile(file, e, "這次已用讀進來的部分（可能是空的）立即覆寫原檔。");
             ret.Save();
         }
 

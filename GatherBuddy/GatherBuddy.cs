@@ -226,6 +226,9 @@ public partial class GatherBuddy : IDalamudPlugin
         DisposeCommands();
         Time?.Dispose();
         HttpClient?.Dispose();
+        // 存檔在背景寫；卸載前等它寫完，否則最後一次改動可能沒落地新版本就已經讀檔。
+        if (!ConfigFileSafety.Flush(TimeSpan.FromSeconds(5)))
+            Log.Warning("Saving data files did not finish within 5 seconds while unloading; the last change may not have been written.");
         EzIpcFailureLog.Disable();
         ECommonsMain.Dispose();
     }

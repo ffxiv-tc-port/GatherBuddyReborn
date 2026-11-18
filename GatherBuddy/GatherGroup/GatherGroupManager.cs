@@ -177,7 +177,7 @@ public class GatherGroupManager
         try
         {
             var text = JsonConvert.SerializeObject(Groups.Values.Select(g => g.ToConfig()), Formatting.Indented);
-            File.WriteAllText(file.FullName, text);
+            Functions.WriteSaveFile(file, text, $"Could not write gather groups to file {file.FullName}");
         }
         catch (Exception e)
         {
@@ -263,6 +263,7 @@ public class GatherGroupManager
         catch (Exception e)
         {
             GatherBuddy.Log.Error($"Error loading gather groups:\n{e}");
+            Functions.BackupUnreadableSaveFile(file, e, "這次改用預設採集群組並立即覆寫原檔。");
             manager.Groups.Clear();
             manager.SetDefaults();
             manager.Save();

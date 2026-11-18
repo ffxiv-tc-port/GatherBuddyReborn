@@ -123,7 +123,7 @@ namespace GatherBuddy.Gui
                 try
                 {
                     var text = JsonConvert.SerializeObject(Items, Formatting.Indented);
-                    File.WriteAllText(file.FullName, text);
+                    Plugin.Functions.WriteSaveFile(file, text, "Error serializing config presets data");
                 }
                 catch (Exception e)
                 {
