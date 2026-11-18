@@ -66,7 +66,9 @@ public partial class FishRecorder : IDisposable
     private void AddUnchecked(FishRecord record)
     {
         Records.Add(record);
-        RecordsToUpload.Enqueue(record);
+        // 契約：沒勾「加入釣魚資料收集」時釣到／匯入的紀錄永不進上傳佇列（之後才勾也不補傳）；本機紀錄照常。
+        if (GatherBuddy.Config.AutoGatherConfig.FishDataCollection)
+            RecordsToUpload.Enqueue(record);
         AddRecordToTimes(record);
         AddChanges();
     }
