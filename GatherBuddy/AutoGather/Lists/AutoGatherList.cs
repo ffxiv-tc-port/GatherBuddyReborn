@@ -209,11 +209,14 @@ public class AutoGatherList
         }
     }
 
+    /// <summary>回傳 true＝讀進來的內容有被略過、修正或遷移，呼叫端要寫回；與存檔一致時回 false（字典順序不算差異）。</summary>
     public static bool FromConfig(Config cfg, out AutoGatherList list)
     {
+        var changes = false;
         //Migrate Individual Enabled
         if ((cfg.EnabledItems?.Count ?? 0) == 0)
         {
+            changes = cfg.ItemIds.Length > 0;
             cfg.EnabledItems = new Dictionary<uint, bool>(cfg.ItemIds.Length);
             foreach (var item in cfg.ItemIds)
             {
@@ -232,38 +235,37 @@ public class AutoGatherList
             preferredLocations = new(cfg.PrefferedLocations.Count),
             enabledItems       = new(cfg.EnabledItems.Count),
         };
-        var changes = false;
         foreach (var itemId in cfg.ItemIds)
         {
-            uint quantity;
-            if (GatherBuddy.GameData.Gatherables.TryGetValue(itemId, out var item)
-             && list.Add(item, quantity = cfg.Quantities.GetValueOrDefault(item.ItemId)))
-            {
-                changes |= list.quantities[item] != quantity;
-                if (cfg.PrefferedLocations.TryGetValue(itemId, out var locId))
-                {
-                    if (item.NodeList.FirstOrDefault(n => n.Id == locId) is var loc and not null)
-                        list.SetPreferredLocation(item, loc);
-                    else
-                        changes = true;
-                }
-
-                if (cfg.EnabledItems.TryGetValue(itemId, out var enabled))
-                    list.SetEnabled(item, enabled);
-            }
-
-            if (GatherBuddy.GameData.Fishes.Where(f => !f.Value.IsTreasureMap).ToDictionary().TryGetValue(itemId, out var fish)
-             && list.Add(fish, quantity = cfg.Quantities.GetValueOrDefault(fish.ItemId)))
-            {
-                changes |= list.quantities[fish] != quantity;
-
-                if (cfg.EnabledItems.TryGetValue(itemId, out var enabled))
-                    list.SetEnabled(fish, enabled);
-            }
+            IGatherable item;
+            if (GatherBuddy.GameData.Gatherables.TryGetValue(itemId, out var gatherable))
+                item = gatherable;
+            else if (GatherBuddy.GameData.Fishes.TryGetValue(itemId, out var fish) && !fish.IsTreasureMap)
+                item = fish;
             else
             {
                 changes = true;
+                continue;
             }
+
+            uint quantity;
+            if (!list.Add(item, quantity = cfg.Quantities.GetValueOrDefault(item.ItemId)))
+            {
+                changes = true;
+                continue;
+            }
+
+            changes |= list.quantities[item] != quantity;
+            if (cfg.PrefferedLocations.TryGetValue(itemId, out var locId))
+            {
+                if (item.Locations.FirstOrDefault(n => n.Id == locId) is { } loc)
+                    list.SetPreferredLocation(item, loc);
+                else
+                    changes = true;
+            }
+
+            if (cfg.EnabledItems.TryGetValue(itemId, out var enabled))
+                list.SetEnabled(item, enabled);
         }
 
         return changes;
