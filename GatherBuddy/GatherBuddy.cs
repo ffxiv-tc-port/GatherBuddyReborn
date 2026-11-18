@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Reflection;
-using AutoRetainerAPI;
 using Dalamud;
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game;
@@ -69,7 +68,6 @@ public partial class GatherBuddy : IDalamudPlugin
     public static SeTugType             TugType         { get; private set; } = null!;
     public static WaymarkManager        WaymarkManager  { get; private set; } = null!;
     public static AutoGather.AutoGather AutoGather      { get; private set; } = null!;
-    public static AutoRetainerApi       AutoRetainerApi { get; private set; } = null!;
 
 
     internal readonly GatherGroup.GatherGroupManager GatherGroupManager;
@@ -104,8 +102,6 @@ public partial class GatherBuddy : IDalamudPlugin
             Language = Dalamud.ClientState.ClientLanguage;
             GameData = new GameData(Dalamud.GameData, Log, WorldData.WorldLocationsByNodeId, "fish_overrides.json");
             Time     = new SeTime();
-
-            AutoRetainerApi = new AutoRetainerApi();
 
             WaymarkManager = new WaymarkManager();
 
@@ -199,17 +195,6 @@ public partial class GatherBuddy : IDalamudPlugin
 
     void IDisposable.Dispose()
     {
-        // 建構子訂了 9 個 AutoRetainer IPC 事件；不退訂的話 CallGate 握著委派，整個舊版本卸不掉。
-        // 放最前面、自己一個 try：後面的步驟擲例外時也不會被跳過。
-        try
-        {
-            AutoRetainerApi?.Dispose();
-        }
-        catch (Exception e)
-        {
-            Log.Error($"Error while disposing AutoRetainerApi: {e}");
-        }
-
         Dalamud.Framework.Update -= Update;
         FishRecorder?.Dispose();
         ContextMenu?.Dispose();
