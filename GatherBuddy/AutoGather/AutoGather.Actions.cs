@@ -604,22 +604,46 @@ namespace GatherBuddy.AutoGather
 
         private bool ActivateGatheringBuffs(bool activateTruth)
         {
-            if (!Player.Status.Any(s => s.StatusId == Actions.Prospect.EffectId) && Player.Level >= Actions.Prospect.MinLevel)
+            if (!PlayerHasStatus(Actions.Prospect) && Player.Level >= Actions.Prospect.MinLevel)
             {
                 EnqueueActionWithDelay(() => UseAction(Actions.Prospect));
                 return true;
             }
 
-            if (!Player.Status.Any(s => s.StatusId == Actions.Sneak.EffectId) && Player.Level >= Actions.Sneak.MinLevel)
+            if (!PlayerHasStatus(Actions.Sneak) && Player.Level >= Actions.Sneak.MinLevel)
             {
                 EnqueueActionWithDelay(() => UseAction(Actions.Sneak));
                 return true;
             }
 
-            if (activateTruth && !Player.Status.Any(s => s.StatusId == Actions.Truth.EffectId))
+            if (activateTruth && !PlayerHasStatus(Actions.Truth))
             {
                 EnqueueActionWithDelay(() => UseAction(Actions.Truth));
                 return true;
+            }
+
+            return false;
+        }
+
+        // 等同 Player.Status.Any(s => s.StatusId == action.EffectId)：同樣只看有狀態的格、PlayerState 未載入＝沒有狀態、
+        // EffectId 照樣逐格取（沒有本機角色時一樣擲 ArgumentNullException），只是不建 StatusList／Status 包裝與列舉器。
+        // 指標只在這一次呼叫內使用。
+        private static unsafe bool PlayerHasStatus(Actions.BaseAction action)
+        {
+            var player = Svc.Objects.LocalPlayer;
+            ArgumentNullException.ThrowIfNull(player, "source");
+
+            var manager = ((FFXIVClientStructs.FFXIV.Client.Game.Character.BattleChara*)player.Address)->GetStatusManager();
+            int length  = manager->NumValidStatuses;
+            if (length == 0 || !FFXIVClientStructs.FFXIV.Client.Game.UI.PlayerState.Instance()->IsLoaded)
+                return false;
+
+            var statuses = manager->Status;
+            for (var i = 0; i < length; i++)
+            {
+                var statusId = statuses[i].StatusId;
+                if (statusId != 0 && statusId == action.EffectId)
+                    return true;
             }
 
             return false;

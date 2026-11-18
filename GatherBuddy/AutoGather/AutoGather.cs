@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Game.ClientState.Conditions;
+using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Plugin.Ipc.Exceptions;
 using ECommons.DalamudServices;
 using ECommons.GameHelpers;
@@ -387,7 +388,7 @@ namespace GatherBuddy.AutoGather
                 return;
             }
 
-            if (_activeItemList.GetNextOrDefault(new List<uint>()).Any(g => g.Fish != null)
+            if (_activeItemList.AnyNextIsFish(Array.Empty<uint>())
              && !GatherBuddy.Config.AutoGatherConfig.FishDataCollection)
             {
                 Communicator.PrintError(
@@ -511,9 +512,11 @@ namespace GatherBuddy.AutoGather
                 }
             }
 
-            var nearbyNodes = Svc.Objects.Where(o => o.ObjectKind == ObjectKind.GatheringPoint && o.IsTargetable).Select(o => o.BaseId);
-            var next = _activeItemList.GetNextOrDefault(nearbyNodes)
-                .OrderByDescending(nodes => nodes.Item.ItemId);
+            // 這一幀內 next 會被讀十幾次：排好一次放進重用的清單，之後的判斷都讀同一份。
+            CollectNearbyNodeIds(_nearbyNodeIds);
+            _activeItemList.CopyNextOrDefault(_nearbyNodeIds, _next);
+            SortByItemIdDescending(_next);
+            var next = _next;
             if (!next.Any())
             {
                 if (!_activeItemList.HasItemsToGather)
@@ -544,8 +547,7 @@ namespace GatherBuddy.AutoGather
 
             Waiting = false;
 
-            if (next.Any(n => n.Item.ItemData.IsCollectable
-                 && !CheckCollectablesUnlocked(n.Fish != null ? GatheringType.Fisher : n.Gatherable!.GatheringType.ToGroup())))
+            if (HasLockedCollectable(next))
             {
                 AbortAutoGather(reason: "Collectables are not unlocked for this job.");
                 return;
@@ -812,8 +814,60 @@ namespace GatherBuddy.AutoGather
         }
 
         // 捕捉 next 的 lambda 不可寫在 DoAutoGather 裡：next 宣告在方法最外層，閉包會在每幀進入方法時就配置（自動採集關著也一樣）。
-        private static (uint ZoneId, uint AetheryteId) FindForcedAetheryte(IEnumerable<GatherTarget> next)
-            => ForcedAetherytes.ZonesWithoutAetherytes.FirstOrDefault(z => z.ZoneId == next.First().Location.Territory.Id);
+        private static (uint ZoneId, uint AetheryteId) FindForcedAetheryte(List<GatherTarget> next)
+        {
+            var territoryId = next.First().Location.Territory.Id;
+            foreach (var zone in ForcedAetherytes.ZonesWithoutAetherytes)
+            {
+                if (zone.ZoneId == territoryId)
+                    return zone;
+            }
+
+            return default;
+        }
+
+        private readonly List<uint>         _nearbyNodeIds = [];
+        private readonly List<GatherTarget> _next          = [];
+
+        private static void CollectNearbyNodeIds(List<uint> nodeIds)
+        {
+            nodeIds.Clear();
+            foreach (var o in Svc.Objects)
+            {
+                if (o.ObjectKind == ObjectKind.GatheringPoint && o.IsTargetable)
+                    nodeIds.Add(o.BaseId);
+            }
+        }
+
+        // 等同 OrderByDescending(n => n.Item.ItemId)：同 ItemId 保持原本先後（穩定排序），所以不用 List.Sort。
+        private static void SortByItemIdDescending(List<GatherTarget> targets)
+        {
+            for (var i = 1; i < targets.Count; i++)
+            {
+                var current = targets[i];
+                var key     = current.Item.ItemId;
+                var j       = i - 1;
+                while (j >= 0 && targets[j].Item.ItemId < key)
+                {
+                    targets[j + 1] = targets[j];
+                    j--;
+                }
+
+                targets[j + 1] = current;
+            }
+        }
+
+        private bool HasLockedCollectable(List<GatherTarget> next)
+        {
+            foreach (var n in next)
+            {
+                if (n.Item.ItemData.IsCollectable
+                 && !CheckCollectablesUnlocked(n.Fish != null ? GatheringType.Fisher : n.Gatherable!.GatheringType.ToGroup()))
+                    return true;
+            }
+
+            return false;
+        }
 
         public readonly Dictionary<GatherTarget, (Vector3 Position, Angle Rotation, DateTime Expiration)> FishingSpotData = new();
 
@@ -912,7 +966,23 @@ namespace GatherBuddy.AutoGather
             return true;
         }
 
-        private void DoNodeMovement(IEnumerable<GatherTarget> next, ConfigPreset config)
+        // 每幀重用的集合；物件包裝只在這一幀內讀，DoNodeMovement 結束一律清掉，不留到下一幀。
+        private readonly HashSet<Vector3>   _allPositions = [];
+        private readonly List<IGameObject> _visibleNodes = [];
+
+        private void DoNodeMovement(List<GatherTarget> next, ConfigPreset config)
+        {
+            try
+            {
+                DoNodeMovementCore(next, config);
+            }
+            finally
+            {
+                _visibleNodes.Clear();
+            }
+        }
+
+        private void DoNodeMovementCore(List<GatherTarget> next, ConfigPreset config)
         {
             // 採集技能的 ID 依職業決定，園藝師／採掘師以外取不到（GetJobValue 會擲）。
             // 套裝剛切換、職業還沒換過來時這一輪整個略過：不移動、不排技能，套裝切換的等待結束後下一輪再判。
@@ -923,21 +993,9 @@ namespace GatherBuddy.AutoGather
                 return;
             }
 
-            var allPositions = next.Where(n => n.Location.Territory.Id == Player.Territory)
-                .SelectMany(ne => ne.Node?.WorldPositions
-                        .ExceptBy(VisitedNodes, n => n.Key)
-                        .SelectMany(w => w.Value)
-                        .Where(v => !IsBlacklisted(v))
-                 ?? []).Select(s => s)
-                .ToHashSet();
-
-            var visibleNodes = Svc.Objects
-                .Where(o => allPositions.Contains(o.Position))
-                .ToList();
-
-            var closestTargetableNode = visibleNodes
-                .Where(o => o.IsTargetable)
-                .MinBy(o => Vector3.Distance(Player.Position, o.Position));
+            var allPositions = CollectAllPositions(next);
+            var visibleNodes = CollectVisibleNodes();
+            var closestTargetableNode = FindClosestTargetable();
 
             if (ActivateGatheringBuffs(next.First().Gatherable.NodeType is NodeType.Unspoiled or NodeType.Legendary))
                 return;
@@ -945,8 +1003,7 @@ namespace GatherBuddy.AutoGather
             if (closestTargetableNode != null)
             {
                 AutoStatus = "Moving to node...".Loc();
-                var targetItem = next.First(ti => ti.Node != null && ti.Node.WorldPositions.ContainsKey(closestTargetableNode.BaseId))
-                    .Gatherable;
+                var targetItem = FindTargetForNode(next, closestTargetableNode.BaseId).Gatherable;
                 MoveToCloseNode(closestTargetableNode, targetItem, config);
                 return;
             }
@@ -955,15 +1012,27 @@ namespace GatherBuddy.AutoGather
 
             if (CurrentDestination != default)
             {
-                var currentNode = visibleNodes.FirstOrDefault(o => o.Position == CurrentDestination);
+                IGameObject? currentNode = null;
+                foreach (var o in visibleNodes)
+                {
+                    if (o.Position == CurrentDestination)
+                    {
+                        currentNode = o;
+                        break;
+                    }
+                }
+
                 if (currentNode != null && !currentNode.IsTargetable)
                     GatherBuddy.Log.Verbose($"Far node is not targetable, distance {currentNode.Position.DistanceToPlayer()}.");
 
                 //It takes some time (roundtrip to the server) before a node becomes targetable after it becomes visible,
                 //so we need to delay excluding it. But instead of measuring time, we use distance, since character is traveling at a constant speed.
                 //Value 50 was determined empirically.
-                foreach (var node in allPositions.Where(o => o.DistanceToPlayer() < 50))
-                    FarNodesSeenSoFar.Add(node);
+                foreach (var node in allPositions)
+                {
+                    if (node.DistanceToPlayer() < 50)
+                        FarNodesSeenSoFar.Add(node);
+                }
 
                 if (CurrentDestination.DistanceToPlayer() < 50)
                 {
@@ -1011,7 +1080,8 @@ namespace GatherBuddy.AutoGather
             {
                 //Select the closest node
                 selectedFarNode = allPositions
-                    .Where(fn => !visibleNodes.Select(vn => vn.Position).Contains(fn))
+                    // 讀欄位而不是區域變數：捕捉方法層的區域變數會讓閉包在每幀進入方法時就配置。
+                    .Where(fn => !_visibleNodes.Select(vn => vn.Position).Contains(fn))
                     .OrderBy(v => Vector3.Distance(Player.Position, v))
                     .FirstOrDefault(n => !FarNodesSeenSoFar.Contains(n));
 
@@ -1024,6 +1094,78 @@ namespace GatherBuddy.AutoGather
             }
 
             MoveToFarNode(selectedFarNode);
+        }
+
+        // 等同 next.Where(同區域).SelectMany(Node.WorldPositions.ExceptBy(VisitedNodes).SelectMany.Where(!IsBlacklisted)).ToHashSet()：
+        // 加入順序相同；HashSet 只加不刪時依加入順序列舉，後面「選最近的遠處點」平手時才會選到同一個。
+        private HashSet<Vector3> CollectAllPositions(List<GatherTarget> next)
+        {
+            _allPositions.Clear();
+            foreach (var n in next)
+            {
+                if (n.Location.Territory.Id != Player.Territory || n.Node is not { } node)
+                    continue;
+
+                foreach (var (nodeId, positions) in node.WorldPositions)
+                {
+                    if (VisitedNodes.Contains(nodeId))
+                        continue;
+
+                    foreach (var v in positions)
+                    {
+                        if (!IsBlacklisted(v))
+                            _allPositions.Add(v);
+                    }
+                }
+            }
+
+            return _allPositions;
+        }
+
+        // 等同 Svc.Objects.Where(o => allPositions.Contains(o.Position)).ToList()。
+        private List<IGameObject> CollectVisibleNodes()
+        {
+            _visibleNodes.Clear();
+            foreach (var o in Svc.Objects)
+            {
+                if (_allPositions.Contains(o.Position))
+                    _visibleNodes.Add(o);
+            }
+
+            return _visibleNodes;
+        }
+
+        // 等同 visibleNodes.Where(o => o.IsTargetable).MinBy(o => Vector3.Distance(Player.Position, o.Position))：同距離取先出現的。
+        private IGameObject? FindClosestTargetable()
+        {
+            IGameObject? closest         = null;
+            var          closestDistance = 0f;
+            foreach (var o in _visibleNodes)
+            {
+                if (!o.IsTargetable)
+                    continue;
+
+                var distance = Vector3.Distance(Player.Position, o.Position);
+                if (closest == null || Comparer<float>.Default.Compare(distance, closestDistance) < 0)
+                {
+                    closest         = o;
+                    closestDistance = distance;
+                }
+            }
+
+            return closest;
+        }
+
+        // 等同 next.First(ti => ti.Node != null && ti.Node.WorldPositions.ContainsKey(nodeId))，找不到時擲同一種例外。
+        private static GatherTarget FindTargetForNode(List<GatherTarget> next, uint nodeId)
+        {
+            foreach (var ti in next)
+            {
+                if (ti.Node != null && ti.Node.WorldPositions.ContainsKey(nodeId))
+                    return ti;
+            }
+
+            throw new InvalidOperationException("Sequence contains no matching element");
         }
 
         private unsafe void LeaveTheDiadem()

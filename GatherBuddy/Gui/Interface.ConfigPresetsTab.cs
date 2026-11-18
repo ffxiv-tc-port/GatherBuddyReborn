@@ -201,18 +201,35 @@ namespace GatherBuddy.Gui
                 }
             }
 
+            // 自動採集每幀都會叫：等同 Items.SkipLast(1).Where(i => i.Match(item)).FirstOrDefault(最後一個)，寫成迴圈不配置。
             public ConfigPreset Match(Gatherable? item)
             {
-                return item == null
-                    ? Items[Items.Count - 1]
-                    : Items.SkipLast(1).Where(i => i.Match(item)).FirstOrDefault(Items[Items.Count - 1]);
+                var fallback = Items[Items.Count - 1];
+                if (item == null)
+                    return fallback;
+
+                for (var i = 0; i < Items.Count - 1; i++)
+                {
+                    if (Items[i].Match(item))
+                        return Items[i];
+                }
+
+                return fallback;
             }
 
             public ConfigPreset Match(Fish? item)
             {
-                return item == null
-                    ? Items[Items.Count - 1]
-                    : Items.SkipLast(1).Where(i => i.Match(item)).FirstOrDefault(Items[Items.Count - 1]);
+                var fallback = Items[Items.Count - 1];
+                if (item == null)
+                    return fallback;
+
+                for (var i = 0; i < Items.Count - 1; i++)
+                {
+                    if (Items[i].Match(item))
+                        return Items[i];
+                }
+
+                return fallback;
             }
         }
 

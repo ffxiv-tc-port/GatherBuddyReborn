@@ -29,8 +29,16 @@ namespace GatherBuddy.AutoGather.Lists
         private          uint                                    _lastTerritoryId;
         private          bool                                    _activeItemsChanged;
         private          bool                                    _gatheredSomething;
-        private          string                                  _lastLoggedNearbyNodes = string.Empty;
-        private          string                                  _lastLoggedNearbyItems = string.Empty;
+
+        // 自動採集每幀都走：挑選結果與「上次記過的」都放在重用的集合裡，比對不配置。
+        // Verbose 診斷照舊「集合變了才記一行」；字串只在根層開到 Verbose 時才組，log 內容與原本逐字相同。
+        private readonly List<uint>         _nearbyNodeIds   = [];
+        private readonly List<GatherTarget> _nearbyItems     = [];
+        private readonly List<uint>         _lastNearbyNodes = [];
+        private readonly List<IGatherable>  _lastNearbyItems = [];
+        private          bool               _nearbyItemsLogged;
+        // null＝最後一次變化時 Verbose 沒開，要比對時再從 _lastNearbyItems 組回來。
+        private          string?            _lastNearbyItemsText = string.Empty;
 
         internal ReadOnlyDictionary<GatheringNode, TimeInterval> DebugVisitedTimedLocations
             => _visitedTimedNodes.AsReadOnly();
@@ -49,7 +57,19 @@ namespace GatherBuddy.AutoGather.Lists
         /// True if there are items that need to be gathered; otherwise, false.
         /// </value>
         public bool HasItemsToGather
-            => _listsManager.ActiveItems.Where(NeedsGathering).Any();
+        {
+            get
+            {
+                var items = _listsManager.ActiveItems;
+                for (var i = 0; i < items.Count; i++)
+                {
+                    if (NeedsGathering(items[i]))
+                        return true;
+                }
+
+                return false;
+            }
+        }
 
         public bool IsInitialized
             => _lastUpdateTime != TimeStamp.MinValue;
@@ -80,31 +100,154 @@ namespace GatherBuddy.AutoGather.Lists
             if (IsUpdateNeeded())
                 DoUpdate();
 
+            _nearbyNodeIds.Clear();
+            _nearbyNodeIds.AddRange(nearbyNodes);
+            return SelectNearby(_nearbyNodeIds) ? new List<GatherTarget>(_nearbyItems) : _gatherableItems.Where(NeedsGathering);
+        }
+
+        /// <summary>
+        /// 與 <see cref="GetNextOrDefault"/> 同一套挑選，結果寫進 <paramref name="destination"/>（先清空）。
+        /// 給每幀路徑用：不配置；附近有目標時是那份清單，否則是「還要採」的項目，順序都不變。
+        /// </summary>
+        internal void CopyNextOrDefault(IReadOnlyList<uint> nearbyNodes, List<GatherTarget> destination)
+        {
+            if (IsUpdateNeeded())
+                DoUpdate();
+
+            destination.Clear();
+            if (SelectNearby(nearbyNodes))
+            {
+                destination.AddRange(_nearbyItems);
+                return;
+            }
+
+            foreach (var target in _gatherableItems)
+            {
+                if (NeedsGathering(target))
+                    destination.Add(target);
+            }
+        }
+
+        /// <summary>等同 <c>GetNextOrDefault(nearbyNodes).Any(g => g.Fish != null)</c>，含逐項判斷的先後與短路。</summary>
+        internal bool AnyNextIsFish(IReadOnlyList<uint> nearbyNodes)
+        {
+            if (IsUpdateNeeded())
+                DoUpdate();
+
+            if (SelectNearby(nearbyNodes))
+            {
+                foreach (var target in _nearbyItems)
+                {
+                    if (target.Fish != null)
+                        return true;
+                }
+
+                return false;
+            }
+
+            foreach (var target in _gatherableItems)
+            {
+                if (NeedsGathering(target) && target.Fish != null)
+                    return true;
+            }
+
+            return false;
+        }
+
+        // 把附近的目標寫進 _nearbyItems，回傳有沒有。
+        private bool SelectNearby(IReadOnlyList<uint> nearbyNodes)
+        {
             // Only log when the nearby set actually changes - this is polled every tick,
             // and logging unconditionally at Verbose spammed identical lines dozens of
             // times per second while idle.
-            var nearbyNodesText = string.Join(", ", nearbyNodes.Select(x => x.ToString("X8")));
-            if (nearbyNodesText != _lastLoggedNearbyNodes)
+            LogNearbyNodesIfChanged(nearbyNodes);
+
+            _nearbyItems.Clear();
+            if (_gatherableItems.Any(n => !n.Node?.Times.AlwaysUp() ?? false))
             {
-                _lastLoggedNearbyNodes = nearbyNodesText;
-                Svc.Log.Verbose($"Nearby nodes: {nearbyNodesText}.");
+                _nearbyItems.Add(_gatherableItems.First(n => n.Time.InRange(AutoGather.AdjustedServerTime)));
+            }
+            else
+            {
+                foreach (var target in _gatherableItems)
+                {
+                    if (target.Node is { } node && HasAnyNode(node.WorldPositions, nearbyNodes))
+                        _nearbyItems.Add(target);
+                }
             }
 
-            IEnumerable<GatherTarget> nearbyItems = [];
-            nearbyItems = this.Any(n => !n.Node?.Times.AlwaysUp() ?? false)
-                ? [this.First(n => n.Time.InRange(AutoGather.AdjustedServerTime))]
-                : this.Where(i => i.Node?.WorldPositions.Keys.Any(nearbyNodes.Contains) ?? false);
-
-            var nearbyItemsList = nearbyItems.ToList();
-            var nearbyItemsText = $"({nearbyItemsList.Count}): {string.Join(", ", nearbyItemsList.Select(x => x.Item.Name))}.";
-            if (nearbyItemsText != _lastLoggedNearbyItems)
-            {
-                _lastLoggedNearbyItems = nearbyItemsText;
-                Svc.Log.Verbose($"Nearby items: {nearbyItemsText}");
-            }
-            nearbyItems = nearbyItemsList;
-            return nearbyItems.Any() ? nearbyItems : _gatherableItems.Where(NeedsGathering);
+            LogNearbyItemsIfChanged();
+            return _nearbyItems.Count > 0;
         }
+
+        // 與 WorldPositions.Keys.Any(nearbyNodes.Contains) 同序同短路。
+        private static bool HasAnyNode(Dictionary<uint, List<Vector3>> worldPositions, IReadOnlyList<uint> nearbyNodes)
+        {
+            foreach (var nodeId in worldPositions.Keys)
+            {
+                for (var i = 0; i < nearbyNodes.Count; i++)
+                {
+                    if (nearbyNodes[i] == nodeId)
+                        return true;
+                }
+            }
+
+            return false;
+        }
+
+        // 原本比的是 X8 字串；那個字串與 id 序列一一對應，所以比序列結果相同。
+        private void LogNearbyNodesIfChanged(IReadOnlyList<uint> nearbyNodes)
+        {
+            if (nearbyNodes.Count == _lastNearbyNodes.Count)
+            {
+                var same = true;
+                for (var i = 0; i < nearbyNodes.Count && same; i++)
+                    same = nearbyNodes[i] == _lastNearbyNodes[i];
+                if (same)
+                    return;
+            }
+
+            _lastNearbyNodes.Clear();
+            for (var i = 0; i < nearbyNodes.Count; i++)
+                _lastNearbyNodes.Add(nearbyNodes[i]);
+
+            if (LogGate.VerboseEnabled)
+                Svc.Log.Verbose($"Nearby nodes: {string.Join(", ", _lastNearbyNodes.Select(x => x.ToString("X8")))}.");
+        }
+
+        // 品項序列沒變＝字串沒變（名字跟著品項物件固定）；序列變了才組字串、照原本比對字串決定記不記。
+        private void LogNearbyItemsIfChanged()
+        {
+            if (_nearbyItemsLogged && _nearbyItems.Count == _lastNearbyItems.Count)
+            {
+                var same = true;
+                for (var i = 0; i < _nearbyItems.Count && same; i++)
+                    same = ReferenceEquals(_nearbyItems[i].Item, _lastNearbyItems[i]);
+                if (same)
+                    return;
+            }
+
+            if (LogGate.VerboseEnabled)
+            {
+                var previous = _lastNearbyItemsText ?? NearbyItemsText(_lastNearbyItems);
+                var text     = NearbyItemsText(_nearbyItems.Select(x => x.Item).ToList());
+                if (text != previous)
+                    Svc.Log.Verbose($"Nearby items: {text}");
+                _lastNearbyItemsText = text;
+            }
+            else
+            {
+                _lastNearbyItemsText = null;
+            }
+
+            _lastNearbyItems.Clear();
+            foreach (var target in _nearbyItems)
+                _lastNearbyItems.Add(target.Item);
+            _nearbyItemsLogged = true;
+        }
+
+        private static string NearbyItemsText(List<IGatherable> items)
+            => $"({items.Count}): {string.Join(", ", items.Select(x => x.Name))}.";
 
         /// <summary>
         /// Marks a node as visited.
