@@ -12,6 +12,7 @@ using Dalamud.Game.ClientState.Conditions;
 using GatherBuddy.AutoGather.AtkReaders;
 using GatherBuddy.AutoGather.Extensions;
 using GatherBuddy.AutoGather.Lists;
+using GatherBuddy.Interfaces;
 using ObjectKind = Dalamud.Game.ClientState.Objects.Enums.ObjectKind;
 
 namespace GatherBuddy.AutoGather
@@ -133,63 +134,75 @@ namespace GatherBuddy.AutoGather
         /// </summary>
         /// <returns>UseSkills: True if the selected item is in the gathering list; false if we gather a collectable or some unneeded junk
         /// Slot: ItemSlot of item to gather</returns>
-        private (bool UseSkills, ItemSlot Slot) GetItemSlotToGather(IEnumerable<GatherTarget> gatherTarget)
+        private (bool UseSkills, ItemSlot Slot) GetItemSlotToGather(IReadOnlyList<GatherTarget> gatherTarget)
         {
             if (GatheringWindowReader == null)
                 throw new InvalidOperationException("GatheringWindowReader is null");
-            var available = GatheringWindowReader.ItemSlots
-                .Where(i => !i.IsEmpty)
-                .Where(CheckItemOvercap)
-                .ToList();
-
-            if (GatherBuddy.Config.AutoGatherConfig.AlwaysGatherMaps && available.Any(i => i.Item.IsTreasureMap) && DiscipleOfLand.NextTreasureMapAllowance < GatherBuddy.Time.ServerTime.DateTime)
+            // 重用的清單只在這次呼叫內有內容：格子物件讀的是原生視窗，不留到下一幀。
+            var available = _availableSlots;
+            available.Clear();
+            try
             {
-                return (false, available.First(i => i.Item.IsTreasureMap));
+                foreach (var i in GatheringWindowReader.ItemSlots)
+                {
+                    if (!i.IsEmpty && CheckItemOvercap(i))
+                        available.Add(i);
+                }
+
+                return PickItemSlotToGather(gatherTarget, available);
+            }
+            finally
+            {
+                available.Clear();
+            }
+        }
+
+        private readonly List<ItemSlot> _availableSlots = [];
+
+        // 原本是 LINQ（Where／Join／First…）：先後、短路、Join 的配對順序（外層清單順序、同一項再依格子順序）都照舊。
+        private (bool UseSkills, ItemSlot Slot) PickItemSlotToGather(IReadOnlyList<GatherTarget> gatherTarget, List<ItemSlot> available)
+        {
+            if (GatherBuddy.Config.AutoGatherConfig.AlwaysGatherMaps && FirstTreasureMap(available) != null && DiscipleOfLand.NextTreasureMapAllowance < GatherBuddy.Time.ServerTime.DateTime)
+            {
+                return (false, FirstTreasureMap(available)!);
             }
 
-            var target = available.FirstOrDefault(a => gatherTarget.Any(i => i.Gatherable?.ItemId == a.Item.ItemId));
+            ItemSlot? target = null;
+            foreach (var a in available)
+            {
+                if (IndexOfTarget(gatherTarget, a.Item!.ItemId) >= 0)
+                {
+                    target = a;
+                    break;
+                }
+            }
 
             //Gather crystals when using The Giving Land
-            if (HasGivingLandBuff && (target == null || !target.Item.IsCrystal))
+            if (HasGivingLandBuff && (target == null || !target.Item!.IsCrystal))
             {
                 var crystal = GetAnyCrystalInNode();
                 if (crystal != null)
                     return (true, crystal);
             }
 
-            if (target != null && target.Item.GetInventoryCount() < gatherTarget.First(t => t.Gatherable?.ItemId == target.Item.ItemId).Quantity)
+            if (target != null && target.Item!.GetInventoryCount() < QuantityOfTarget(gatherTarget, target.Item.ItemId))
             {
                 //The target item is found in the node, would not overcap and we need to gather more of it
                 return (!target.IsCollectable, target);
             }
 
-            //Items in the gathering list
-            var gatherList = ItemsToGather
-                //Join node slots, retaining list order
-                .Join(available, i => i.Item, s => s.Item, (i, s) => (Slot: s, i.Quantity))
-                //And we need more of them
-                .Where(x => x.Slot.Item.GetInventoryCount() < x.Quantity)
-                .Select(x => x.Slot);
-
-            //Items in the fallback list
-            var fallbackList = _plugin.AutoGatherListsManager.FallbackItems
-                //Join node slots, retaining list order
-                .Join(available, i => i.Item, s => s.Item, (i, s) => (Slot: s, i.Quantity))
-                //And we need more of them
-                .Where(x => x.Slot.Item.GetInventoryCount() < x.Quantity)
-                .Select(x => x.Slot);
-
             var fallbackSkills = GatherBuddy.Config.AutoGatherConfig.UseSkillsForFallbackItems;
 
             //If there is any other item that we want in the node, gather it
-            var slot = gatherList.FirstOrDefault();
+            //(items in the gathering list, in list order, that we need more of)
+            var slot = FirstWantedSlot(_activeItemList.Targets, available);
             if (slot != null)
             {
                 return (!slot.IsCollectable, slot);
             }
 
             //If there is any fallback item, gather it
-            slot = fallbackList.FirstOrDefault();
+            slot = FirstWantedFallbackSlot(_plugin.AutoGatherListsManager.FallbackItems, available);
             if (slot != null)
             {
                 return (fallbackSkills && !slot.IsCollectable, slot);
@@ -200,8 +213,16 @@ namespace GatherBuddy.AutoGather
             // look like "nothing to gather here" and the AbandonNodes check right below would abandon the node.
             // Try it before honoring AbandonNodes. Enabled and a non-zero GatherChance are required: a slot the
             // game refuses every time (0% chance) was retried forever, spamming "Firing callback: Gathering".
-            var unresolvedSlot = GatheringWindowReader!.ItemSlots
-                .FirstOrDefault(s => !s.IsEmpty && s.Item == null && !s.IsCollectable && s.Enabled && s.GatherChance > 0);
+            ItemSlot? unresolvedSlot = null;
+            foreach (var s in GatheringWindowReader!.ItemSlots)
+            {
+                if (!s.IsEmpty && s.Item == null && !s.IsCollectable && s.Enabled && s.GatherChance > 0)
+                {
+                    unresolvedSlot = s;
+                    break;
+                }
+            }
+
             if (unresolvedSlot != null)
             {
                 return (false, unresolvedSlot);
@@ -227,7 +248,16 @@ namespace GatherBuddy.AutoGather
                 return (false, slot);
             }
             //If there are no crystals, gather anything which is not treasure map nor collectable
-            slot = available.FirstOrDefault(s => (!s.Item?.IsTreasureMap ?? false) && !s.IsCollectable);
+            slot = null;
+            foreach (var s in available)
+            {
+                if ((!s.Item?.IsTreasureMap ?? false) && !s.IsCollectable)
+                {
+                    slot = s;
+                    break;
+                }
+            }
+
             if (slot != null)
             {
                 return (false, slot);
@@ -240,15 +270,88 @@ namespace GatherBuddy.AutoGather
             // leftover attempt never burns the daily allowance. Enabled: a greyed-out slot would retry forever.
             if (ShouldUseUpCurrentNode)
             {
-                slot = available.FirstOrDefault(s => (!s.Item?.IsTreasureMap ?? false) && s.Enabled);
-                if (slot != null)
+                foreach (var s in available)
                 {
-                    return (false, slot);
+                    if ((!s.Item?.IsTreasureMap ?? false) && s.Enabled)
+                        return (false, s);
                 }
             }
 
             //Abort if there are no items we can gather
             throw new NoGatherableItemsInNodeException();
+        }
+
+        private static ItemSlot? FirstTreasureMap(List<ItemSlot> available)
+        {
+            foreach (var s in available)
+            {
+                if (s.Item!.IsTreasureMap)
+                    return s;
+            }
+
+            return null;
+        }
+
+        // 等同 gatherTarget 裡第一個 Gatherable?.ItemId == itemId 的位置；沒有回 -1。
+        private static int IndexOfTarget(IReadOnlyList<GatherTarget> gatherTarget, uint itemId)
+        {
+            for (var i = 0; i < gatherTarget.Count; ++i)
+            {
+                if (gatherTarget[i].Gatherable?.ItemId == itemId)
+                    return i;
+            }
+
+            return -1;
+        }
+
+        // 等同 gatherTarget.First(t => t.Gatherable?.ItemId == itemId).Quantity，找不到照樣擲。
+        private static uint QuantityOfTarget(IReadOnlyList<GatherTarget> gatherTarget, uint itemId)
+        {
+            var idx = IndexOfTarget(gatherTarget, itemId);
+            if (idx < 0)
+                throw new InvalidOperationException("Sequence contains no matching element");
+            return gatherTarget[idx].Quantity;
+        }
+
+        // 等同 targets.Join(available, i => i.Item, s => s.Item, …).Where(數量不夠).Select(Slot).FirstOrDefault()；
+        // Join 的鍵型別是 IGatherable、預設比較子，null 鍵不配對。
+        private static ItemSlot? FirstWantedSlot(IReadOnlyList<GatherTarget> targets, List<ItemSlot> available)
+        {
+            var comparer = EqualityComparer<IGatherable>.Default;
+            for (var i = 0; i < targets.Count; ++i)
+            {
+                var target = targets[i];
+                if (target.Item == null)
+                    continue;
+
+                foreach (var s in available)
+                {
+                    if (comparer.Equals(target.Item, s.Item) && s.Item!.GetInventoryCount() < target.Quantity)
+                        return s;
+                }
+            }
+
+            return null;
+        }
+
+        // 同上，對象是備用清單；鍵型別是 Gatherable。
+        private static ItemSlot? FirstWantedFallbackSlot(IReadOnlyList<(Gatherable Item, uint Quantity)> fallback, List<ItemSlot> available)
+        {
+            var comparer = EqualityComparer<Gatherable>.Default;
+            for (var i = 0; i < fallback.Count; ++i)
+            {
+                var (item, quantity) = fallback[i];
+                if (item == null)
+                    continue;
+
+                foreach (var s in available)
+                {
+                    if (comparer.Equals(item, s.Item) && s.Item!.GetInventoryCount() < quantity)
+                        return s;
+                }
+            }
+
+            return null;
         }
 
         private bool CheckItemOvercap(ItemSlot s)
@@ -263,22 +366,66 @@ namespace GatherBuddy.AutoGather
                 return false;
             return true;
         }
-        
+
+        // 等同原本的 GroupJoin(清單裡的水晶)→OrderBy(在不在清單)→ThenBy(持有數)→FirstOrDefault：
+        // 取兩個鍵字典序最小、同分取最先出現的那格；持有數只在第一鍵打平或成為新最小時才查（與 OrderBy 的 First 同）。
         private ItemSlot? GetAnyCrystalInNode()
         {
             if (GatheringWindowReader == null)
                 throw new InvalidOperationException("GatheringWindowReader is null");
-            return GatheringWindowReader.ItemSlots
-                .Where(s => s.Item != null)
-                .Where(s => s.Item!.IsCrystal)
-                .Where(CheckItemOvercap)
+
+            ItemSlot? best      = null;
+            var       bestOrder = 0;
+            var       bestCount = 0;
+            foreach (var s in GatheringWindowReader.ItemSlots)
+            {
+                if (s.Item == null || !s.Item!.IsCrystal || !CheckItemOvercap(s))
+                    continue;
+
                 //Prioritize crystals in the gathering list
-                .GroupJoin(_activeItemList.Where(i => i.Gatherable?.IsCrystal ?? false), s => s.Item, i => i.Item, (s, x) => (Slot: s, Order: x.Any()?1:0))
-                .OrderBy(x => x.Order)
+                var order = IsListedCrystal(s.Item) ? 1 : 0;
+                if (best == null)
+                {
+                    best      = s;
+                    bestOrder = order;
+                    bestCount = s.Item!.GetInventoryCount();
+                    continue;
+                }
+
                 //Prioritize crystals with a lower amount in the inventory
-                .ThenBy(x => x.Slot.Item!.GetInventoryCount())
-                .Select(x => x.Slot)
-                .FirstOrDefault();
+                if (order < bestOrder)
+                {
+                    best      = s;
+                    bestOrder = order;
+                    bestCount = s.Item!.GetInventoryCount();
+                }
+                else if (order == bestOrder)
+                {
+                    var count = s.Item!.GetInventoryCount();
+                    if (count < bestCount)
+                    {
+                        best      = s;
+                        bestCount = count;
+                    }
+                }
+            }
+
+            return best;
+        }
+
+        // GroupJoin 的內層：清單裡 Gatherable 是水晶、且 Item 與這格相同（IGatherable 預設比較子）的有沒有。
+        private bool IsListedCrystal(Gatherable item)
+        {
+            var comparer = EqualityComparer<IGatherable>.Default;
+            var targets  = _activeItemList.Targets;
+            for (var i = 0; i < targets.Count; ++i)
+            {
+                var t = targets[i];
+                if ((t.Gatherable?.IsCrystal ?? false) && t.Item != null && comparer.Equals(t.Item, item))
+                    return true;
+            }
+
+            return false;
         }
     }
 }

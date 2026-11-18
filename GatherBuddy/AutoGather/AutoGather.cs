@@ -402,7 +402,7 @@ namespace GatherBuddy.AutoGather
                         _currentGatherTarget = _activeItemList.CurrentOrDefault;
                 }
 
-                IEnumerable<GatherTarget> gatherTarget = _currentGatherTarget != null ? new[] { (GatherTarget)_currentGatherTarget } : Array.Empty<GatherTarget>();
+                IReadOnlyList<GatherTarget> gatherTarget = _currentGatherTarget is { } current ? SingleTargetArray(current) : Array.Empty<GatherTarget>();
 
                 if (!GatherBuddy.Config.AutoGatherConfig.DoGathering)
                     return;
@@ -410,8 +410,10 @@ namespace GatherBuddy.AutoGather
                 AutoStatus = "Gathering...".Loc();
                 StopNavigation();
 
-                var fish = _activeItemList.GetNextOrDefault(new List<uint>()).Where(g => g.Fish != null);
-                if (fish.Any() && Player.Job == Job.FSH)
+                // 停用（清空清單）只經 TaskManager 排隊，這一幀內不會發生 ⇒ 算一次就等於原本惰性序列的每次列舉。
+                _activeItemList.CopyNextFish(Array.Empty<uint>(), _fishTargets);
+                var fish = _fishTargets;
+                if (fish.Count > 0 && Player.Job == Job.FSH)
                 {
                     if (GatherBuddy.Config.AutoGatherConfig.UseNavigation)
                         DoFishMovement(fish);
@@ -419,7 +421,7 @@ namespace GatherBuddy.AutoGather
                     return;
                 }
 
-                if (!fish.Any() && Player.Job == Job.FSH)
+                if (fish.Count == 0 && Player.Job == Job.FSH)
                 {
                     QueueQuitFishingTasks();
                 }
@@ -821,6 +823,16 @@ namespace GatherBuddy.AutoGather
 
         private readonly List<uint>         _nearbyNodeIds = [];
         private readonly List<GatherTarget> _next          = [];
+        private readonly List<GatherTarget> _fishTargets   = [];
+        private          GatherTarget[]     _singleTarget  = [];
+
+        // 同一個目標沿用同一個陣列；換目標就換新陣列、不改舊的（排進佇列的工作可能還拿著舊的）。
+        private GatherTarget[] SingleTargetArray(GatherTarget target)
+        {
+            if (_singleTarget.Length == 0 || !_singleTarget[0].Equals(target))
+                _singleTarget = [target];
+            return _singleTarget;
+        }
 
         private static void CollectNearbyNodeIds(List<uint> nodeIds)
         {

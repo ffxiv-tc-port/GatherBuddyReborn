@@ -154,6 +154,38 @@ namespace GatherBuddy.AutoGather.Lists
             return false;
         }
 
+        /// <summary>
+        /// 等同列舉一次 <c>GetNextOrDefault(nearbyNodes).Where(g => g.Fish != null)</c>，結果寫進 <paramref name="destination"/>（先清空）。
+        /// 原本的惰性序列每列舉一次就重算「還要採」；同一幀內清單與背包數量不變，算一次結果相同。
+        /// </summary>
+        internal void CopyNextFish(IReadOnlyList<uint> nearbyNodes, List<GatherTarget> destination)
+        {
+            if (IsUpdateNeeded())
+                DoUpdate();
+
+            destination.Clear();
+            if (SelectNearby(nearbyNodes))
+            {
+                foreach (var target in _nearbyItems)
+                {
+                    if (target.Fish != null)
+                        destination.Add(target);
+                }
+
+                return;
+            }
+
+            foreach (var target in _gatherableItems)
+            {
+                if (NeedsGathering(target) && target.Fish != null)
+                    destination.Add(target);
+            }
+        }
+
+        /// <summary>目前的目標清單（列舉本物件得到的同一份、同順序），給每幀路徑用索引讀、不配置列舉器。</summary>
+        internal IReadOnlyList<GatherTarget> Targets
+            => _gatherableItems;
+
         // 把附近的目標寫進 _nearbyItems，回傳有沒有。
         private bool SelectNearby(IReadOnlyList<uint> nearbyNodes)
         {

@@ -111,7 +111,7 @@ namespace GatherBuddy.AutoGather
         }
 
 
-        private unsafe void DoActionTasks(IEnumerable<GatherTarget> target)
+        private unsafe void DoActionTasks(IReadOnlyList<GatherTarget> target)
         {
             if (MasterpieceReader?.IsValid == true)
             {
@@ -329,13 +329,14 @@ namespace GatherBuddy.AutoGather
             }
         }
 
-        private unsafe void DoGatherWindowActions(IEnumerable<GatherTarget> target)
+        private unsafe void DoGatherWindowActions(IReadOnlyList<GatherTarget> target)
         {
             if (GatheringWindowReader == null)
                 return;
 
-            foreach (var t in target)
+            for (var i = 0; i < target.Count; ++i)
             {
+                var t = target[i];
                 //Use The Giving Land out of order to gather random crystals.
                 if (ShouldUseGivingLandOutOfOrder(t.Gatherable))
                 {
@@ -344,8 +345,9 @@ namespace GatherBuddy.AutoGather
                 }
             }
 
-            foreach (var t in target)
+            for (var i = 0; i < target.Count; ++i)
             {
+                var t = target[i];
                 if (!HasGivingLandBuff && ShouldUseLuck(t.Gatherable))
                 {
                     LuckUsed = true;
