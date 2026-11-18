@@ -97,7 +97,7 @@ public class GatherWindow : Window
             return;
         }
 
-        var extendedFish = Interface.ExtendedFishList.FirstOrDefault(f => f.Data == fish);
+        var extendedFish = FindExtendedFish(fish);
         if (extendedFish == null)
         {
             ImGui.SetTooltip(TooltipText(loc, time));
@@ -113,6 +113,19 @@ public class GatherWindow : Window
             false);
     }
 
+    // 與 ExtendedFishList.FirstOrDefault(f => f.Data == fish) 相同；寫在 CreateTooltip 裡的話閉包在方法入口就配置（每列每幀兩次）。
+    private static Interface.ExtendedFish? FindExtendedFish(Fish fish)
+    {
+        var list = Interface.ExtendedFishList;
+        for (var i = 0; i < list.Count; ++i)
+        {
+            if (list[i].Data == fish)
+                return list[i];
+        }
+
+        return null;
+    }
+
     private readonly List<(IGatherable Item, ILocation Location, TimeInterval Uptime, uint Quantity)> _data = new();
 
     // CheckAvailable 每幀重用：品項在 _data 裡的位置、自動採集清單裡已經見過的（品項, 數量）、排序用的比較委派。
@@ -125,7 +138,7 @@ public class GatherWindow : Window
         if (GatherBuddy.Config.ShowGatherWindowOnlyAvailable && time.Start > GatherBuddy.Time.ServerTime)
             return;
 
-        var inventoryCount = item.GetInventoryCount();
+        var inventoryCount = InventoryCountCache.Get(item);
 
         if (quantity > 0 && inventoryCount >= quantity && GatherBuddy.Config.HideGatherWindowCompletedItems)
             return;
