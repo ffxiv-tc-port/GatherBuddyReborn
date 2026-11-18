@@ -158,14 +158,16 @@ namespace GatherBuddy.AutoGather
                     AutoHookSuppression.RestoreNow("自動採集已停用");
 
                     _activeItemList.Reset();
+                    // 必須在 Waiting 歸零之前：讓位給 AutoRetainer 時在走的可能是 AR／Lifestream 的路，不能停。
+                    StopOwnNavigation("停用自動採集時");
                     Waiting                    = false;
                     ActionSequence             = null;
                     CurrentCollectableRotation = null;
 
-                    // 🔴 這裡是 Enabled 的 setter,例外會一路冒到「按下勾選框」的 ImGui 回呼上 ⇒ 兩個呼叫都走 vnavmesh 的安全版。
-                    if (IsPathGenerating)
-                        VNavmesh.Nav.PathfindCancelAllSafe();
-                    StopNavigation();
+                    // 不是自己的路徑時只清本地狀態：留著舊目的地，下次啟用時 Navigate 會把別人的路徑當成自己的而不送。
+                    CurrentDestination       = default;
+                    CurrentRotation          = default;
+                    _ownNavIssued            = false;
                     CurrentFarNodeLocation   = null;
                     _homeWorldWarning        = false;
                     _diademQueuingInProgress = false;
@@ -1379,7 +1381,7 @@ namespace GatherBuddy.AutoGather
             // 🔴 最先做:卸載時一定要把壓制租約還回去,否則 AutoRetainer 要等到逾時(5 分鐘)才會恢復。
             AutoRetainerSuppression.ReleaseNow("GatherBuddyReborn 正在卸載");
             AutoHookSuppression.RestoreNow("GatherBuddyReborn 正在卸載");
-            StopOwnNavigationOnUnload();
+            StopOwnNavigation("卸載時");
             YesAlready.Unlock();
             TextAdvance.Unlock();
             _antiStuckManager.Dispose();
@@ -1391,8 +1393,8 @@ namespace GatherBuddy.AutoGather
         }
 
         // 只停自己發起、還沒停掉的那條路徑（VNAV-OWN）：主迴圈在跑、沒在讓位給 AutoRetainer（Waiting），且路徑是自己送的。
-        // 算路取消是全域的，只在佇列裡沒有別人那一筆時才取消。卸載時對端可能已經不在，失敗吞掉、只記一行。
-        private void StopOwnNavigationOnUnload()
+        // 算路取消是全域的，只在佇列裡沒有別人那一筆時才取消。對端可能已經不在，失敗吞掉、只記一行（停用時呼叫端是 ImGui 回呼，不能擲）。
+        private void StopOwnNavigation(string when)
         {
             if (!_enabled || Waiting || !_ownNavIssued)
                 return;
@@ -1419,7 +1421,7 @@ namespace GatherBuddy.AutoGather
 
             if (failure != null)
                 GatherBuddy.Log.Warning(
-                    $"[自動採集] 卸載時停止自己發起的導航失敗，vnavmesh 可能會把剩下的路走完：{failure.GetType().Name}: {failure.Message}");
+                    $"[自動採集] {when}停止自己發起的導航失敗，vnavmesh 可能會把剩下的路走完：{failure.GetType().Name}: {failure.Message}");
         }
     }
 }
