@@ -128,6 +128,11 @@ public class FishingSpot : IComparable<FishingSpot>, ILocation
             > 10_030 and < 10_040 => data.DataManager.GetExcelSheet<TerritoryType>().GetRow(1237),
             > 10_042 and < 10_094 => data.DataManager.GetExcelSheet<TerritoryType>().GetRow(1237),
             10_096 => data.DataManager.GetExcelSheet<TerritoryType>().GetRow(1237),
+
+            // Phaenna mission spots; 10136, 10145 and 10146 are empty rows.
+            > 10_107 and < 10_136 => data.DataManager.GetExcelSheet<TerritoryType>().GetRow(1291),
+            > 10_136 and < 10_145 => data.DataManager.GetExcelSheet<TerritoryType>().GetRow(1291),
+            > 10_146 and < 10_156 => data.DataManager.GetExcelSheet<TerritoryType>().GetRow(1291),
             _ => spot.TerritoryType.ValueNullable,
         };
 
@@ -148,6 +153,10 @@ public class FishingSpot : IComparable<FishingSpot>, ILocation
 
                 return name + $" ({missionRow:D5})";
             case 10_096: return name + " (00544)";
+            case > 10_107 and < 10_136: return $"{name} ({spot.RowId - 10_108 + 965:D5})";
+            case > 10_136 and < 10_145: return $"{name} ({spot.RowId - 10_137 + 993:D5})";
+            case > 10_146 and < 10_153: return $"{name} ({spot.RowId - 10_147 + 1001:D5})";
+            case > 10_152 and < 10_156: return $"{name} ({spot.RowId - 10_153 + 1037:D5})";
         }
 
         return name;
