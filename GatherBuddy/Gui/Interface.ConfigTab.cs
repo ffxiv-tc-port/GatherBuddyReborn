@@ -449,14 +449,22 @@ public partial class Interface
                     _base.UpdateFlags();
                 });
 
+        // 上游為了不吃掉 Esc 拔掉了讀取端，主視窗沿用 Dalamud 預設（有焦點時 Esc 關閉）；刻意不接回。
+        // 欄位與使用者的值保留不動，只把勾選停用並標示無作用。
         public static void DrawRespectEscapeBox()
-            => DrawCheckbox("Escape Closes Main Window".Loc(),
-                "Toggle whether pressing escape while having the main window focused shall close it.".Loc(),
-                GatherBuddy.Config.CloseOnEscape, b =>
-                {
-                    GatherBuddy.Config.CloseOnEscape = b;
-                    _base.UpdateFlags();
-                });
+        {
+            var note  = "This option currently has no effect: pressing Escape while the main window is focused always closes it.".Loc();
+            var value = GatherBuddy.Config.CloseOnEscape;
+            ImGui.BeginDisabled();
+            ImGui.Checkbox("Escape Closes Main Window".Loc(), ref value);
+            ImGui.EndDisabled();
+            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                ImGui.SetTooltip(note);
+
+            ImGui.SameLine();
+            ImGui.TextColored(global::Dalamud.Interface.Colors.ImGuiColors.DalamudGrey, "(No effect)".Loc());
+            global::Dalamud.Interface.Components.ImGuiComponents.HelpMarker(note);
+        }
 
         public static void DrawGearChangeBox()
             => DrawCheckbox("Enable Gear Change".Loc(),
