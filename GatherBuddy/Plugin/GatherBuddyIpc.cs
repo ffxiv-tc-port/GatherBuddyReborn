@@ -2,9 +2,11 @@
 using ECommons.LanguageHelpers;
 using GatherBuddy.AutoGather;
 using GatherBuddy.AutoGather.Extensions;
+using GatherBuddy.AutoGather.Helpers;
 using GatherBuddy.AutoGather.Lists;
 using GatherBuddy.Classes;
 using GatherBuddy.Enums;
+using GatherBuddy.Gui;
 using GatherBuddy.Interfaces;
 using System;
 using System.Collections.Generic;
@@ -18,9 +20,18 @@ public sealed class GatherBuddyIpc : IDisposable
     /// <summary>
     /// 消費端用這個數字判對方支不支援某個端點：3 起有 AddToAutoGatherList／
     /// GetActiveAutoGatherItemCount，4 起有 SetAutoGatherListQuantity／GetAutoGatherListQuantity，
-    /// 5 起有 GetGatherableTreasureMaps／GatherTreasureMap。端點名一旦公開就不改，只往上加。
+    /// 5 起有 GetGatherableTreasureMaps／GatherTreasureMap，6 起有 GetTimedGatherEstimate。
+    /// 端點名一旦公開就不改，只往上加。
     /// </summary>
-    public const int IpcVersion = 5;
+    public const int IpcVersion = 6;
+
+    // GetTimedGatherEstimate 的 Status。0 必須是「問不到」：消費端拿到 default 不可讀成有估計。
+    public const int EstimateUnavailable  = 0; // 不是採集品（魚不估）、沒有採集點資料、等不到主執行緒
+    public const int EstimateNotTimed     = 1; // 有一般採集點，不必等窗
+    public const int EstimateNotPossible  = 2; // 限時採集點但算不出來，Reason 說明
+    public const int EstimateThisItem     = 3; // 每窗產量＝這次載入求解器對這個道具的預估
+    public const int EstimateOtherItems   = 4; // 每窗產量＝其他限時採集點平均（估）
+    public const int EstimateDefaultGuess = 5; // 每窗產量＝預設值（估）
 
     // GatherTreasureMap 的回傳碼。0 必須是「不可用」：消費端把 default(int) 讀成「已開始」會是災難。
     public const int MapUnavailable    = 0;
@@ -147,6 +158,22 @@ public sealed class GatherBuddyIpc : IDisposable
     [EzIPC]
     public int GatherTreasureMap(uint itemId)
         => IpcFrameworkGate.Get(nameof(GatherTreasureMap), () => GatherTreasureMapOnFramework(itemId), MapUnavailable);
+
+    /// <summary>
+    /// 限時採集點（未知／傳說／限時）的道具還要採 <paramref name="quantity"/> 個，大約要幾輪、多久。
+    /// 與自動採集清單列尾的估計同一套算法；只讀，不動清單、不開始採集。不含飛行與等第一窗。
+    /// </summary>
+    /// <param name="quantity">還要採的數量；本端不扣持有數。</param>
+    /// <returns>
+    /// Status 見 <c>Estimate*</c> 常數；NodeType＝<c>GatherBuddy.Enums.NodeType</c> 的值（0xFF＝不知道）；
+    /// Seconds 是現實秒數；Reason 只在 Status 為 0／2 時有內容，已在地化，不會是 null。
+    /// 走主執行緒閘門：別的執行緒呼叫最久阻塞 5 秒，不要每幀輪詢。
+    /// </returns>
+    [EzIPC]
+    public (int Status, int NodeType, int Rounds, double Seconds, double YieldPerWindow, int WindowsPerEorzeaDay, string Reason)
+        GetTimedGatherEstimate(uint itemId, int quantity)
+        => IpcFrameworkGate.Get(nameof(GetTimedGatherEstimate), () => EstimateOnFramework(itemId, quantity),
+            (EstimateUnavailable, (int)NodeType.Unknown, 0, 0d, 0d, 0, string.Empty));
 
     [EzIPCEvent]
     public readonly Action AutoGatherWaiting;
@@ -293,6 +320,41 @@ public sealed class GatherBuddyIpc : IDisposable
         GatherBuddy.Log.Information($"[GatherBuddy IPC] 別的插件替使用者交來一張寶物地圖 {itemId}（{map.Name}）：已放進「來自其他插件」清單，"
           + (wasRunning ? "自動採集本來就開著。" : "已開啟自動採集。"));
         return wasRunning ? MapAlreadyRunning : MapStarted;
+    }
+
+    private static (int Status, int NodeType, int Rounds, double Seconds, double YieldPerWindow, int WindowsPerEorzeaDay, string Reason)
+        EstimateOnFramework(uint itemId, int quantity)
+    {
+        // Unknown＝沒有任何採集點掛這個道具：本端採不到，不冒充「限時」。
+        if (!GatherBuddy.GameData.Gatherables.TryGetValue(itemId, out var gatherable) || gatherable.NodeType == NodeType.Unknown)
+            return (EstimateUnavailable, (int)NodeType.Unknown, 0, 0, 0, 0, "GatherBuddy has no gathering node for this item (fish are not estimated).".Loc());
+
+        var nodeType = (int)gatherable.NodeType;
+        if (gatherable.NodeType == NodeType.Regular)
+            return (EstimateNotTimed, nodeType, 0, 0, 0, 0, string.Empty);
+
+        if (quantity <= 0)
+            return (EstimateNotPossible, nodeType, 0, 0, 0, 0, "Quantity is 0 or less, nothing to estimate.".Loc());
+
+        var (windows, reason) = TimedGatherEstimateCache.GetWindows(gatherable);
+        if (windows <= 0)
+            return (EstimateNotPossible, nodeType, 0, 0, 0, 0, reason ?? string.Empty);
+
+        var source = TimedYieldTracker.TryGet(itemId, out var yieldPerWindow);
+        if (source == TimedYieldTracker.Source.None)
+            yieldPerWindow = TimedGatherEstimateCache.DefaultYield;
+
+        var result = TimedGatherMath.Estimate(quantity, yieldPerWindow, windows);
+        if (!result.Valid)
+            return (EstimateNotPossible, nodeType, 0, 0, yieldPerWindow, windows, "Could not estimate the gathering time for this item.".Loc());
+
+        var status = source switch
+        {
+            TimedYieldTracker.Source.SameItem   => EstimateThisItem,
+            TimedYieldTracker.Source.OtherItems => EstimateOtherItems,
+            _                                   => EstimateDefaultGuess,
+        };
+        return (status, nodeType, result.Rounds, result.Seconds, yieldPerWindow, windows, string.Empty);
     }
 
     /// <summary>與自動採集挑採集點時的等級篩選相同（等級捨入到 5 的倍數）。</summary>

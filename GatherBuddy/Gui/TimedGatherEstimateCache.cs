@@ -14,7 +14,7 @@ namespace GatherBuddy.Gui;
 internal static class TimedGatherEstimateCache
 {
     // 本次載入還沒有任何求解器結果時的每窗產量，列上會標「估」。
-    private const double DefaultYield = 20;
+    internal const double DefaultYield = 20;
 
     private sealed class Entry
     {
@@ -93,7 +93,8 @@ internal static class TimedGatherEstimateCache
           + "\n" + "Flying and waiting for the first window are not included. Display only.".Loc();
     }
 
-    private static (int Windows, string? Reason) GetWindows(Gatherable gatherable)
+    // IPC 也用這份快取：只能在主執行緒呼叫（字典沒有鎖、Loc 可能寫字典）。
+    internal static (int Windows, string? Reason) GetWindows(Gatherable gatherable)
     {
         if (Windows.TryGetValue(gatherable, out var cached))
             return cached;
