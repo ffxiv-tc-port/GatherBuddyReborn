@@ -391,6 +391,7 @@ public partial class Interface
             ImGui.SameLine();
             if (DrawLocationInput(item, preferredLocations.GetValueOrDefault(item), out var newLoc))
                 _plugin.AutoGatherListsManager.ChangePreferredLocation(list, item, newLoc);
+            TimedGatherEstimateCache.Draw(item, quantity - invTotal);
             group.Dispose();
 
             if (DragDropGuard.LastItemHasId())

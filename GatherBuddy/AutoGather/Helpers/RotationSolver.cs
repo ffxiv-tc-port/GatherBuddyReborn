@@ -295,9 +295,14 @@ namespace GatherBuddy.AutoGather.Helpers
                     | (Player.Status.Any(s => s.StatusId == Actions.BountifulII.EffectId) ? EffectType.Bountiful : EffectType.None)
             };
 
+            // 只記整窗開頭那次：用過 Wise 之後重算的只剩部分耐久，會低估每窗產量。
+            var trackedItemId = slot.Item.ItemId;
+            var trackYield    = gatheringWindow.IntegrityRemaining >= gatheringWindow.IntegrityMax;
             if (slot.Item.NodeType is Enums.NodeType.Unspoiled or Enums.NodeType.Legendary)
             {
                 await Task.Run(() => SolveInternal(state));
+                if (trackYield)
+                    TimedYieldTracker.Record(trackedItemId, global.BestYield / 1000.0);
             }
             else if (slot.Item.NodeType is Enums.NodeType.Regular)
             {
