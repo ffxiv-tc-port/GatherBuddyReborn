@@ -85,6 +85,9 @@ namespace GatherBuddy.AutoGather
         /// 桌面通知、喇叭聲、語音是三件事，想只留其中一種的人不必被綁在一起。
         /// </remarks>
         public bool TataruPraiseOnStoppedItself { get; set; } = true;
+
+        /// <summary>插件重新載入前自動採集在跑時，重新載入後直接繼續；關＝只提示、點了才開始（現行行為）。遊戲結束後重開不算。</summary>
+        public bool AutoResumeAfterReload { get; set; } = false;
         public SortingType SortingMethod { get; set; } = SortingType.Location;
         public bool GoHomeWhenIdle { get; set; } = true;
         public bool GoHomeWhenDone { get; set; } = true;

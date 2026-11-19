@@ -57,6 +57,7 @@ namespace GatherBuddy.AutoGather
             _antiStuckManager            =  new(_advancedUnstuck);
             _activeItemList              =  new ActiveItemList(plugin.AutoGatherListsManager);
             ArtisanExporter              =  new Reflection.ArtisanExporter(plugin.AutoGatherListsManager);
+            ResumeOffer                  =  new ReloadResumeOffer(this, Dalamud.PluginInterface.ConfigDirectory.FullName);
             Svc.Chat.CheckMessageHandled += OnMessageHandled;
             //Svc.AddonLifecycle.RegisterListener(AddonEvent.PreFinalize, "Gathering", OnGatheringFinalize);
             _plugin.FishRecorder.Parser.CaughtFish += OnFishCaught;
@@ -113,6 +114,7 @@ namespace GatherBuddy.AutoGather
         private readonly ActiveItemList   _activeItemList;
 
         public Reflection.ArtisanExporter ArtisanExporter;
+        internal ReloadResumeOffer        ResumeOffer { get; }
         public TaskManager                TaskManager { get; }
 
         private           bool             _enabled { get; set; } = false;
@@ -1537,6 +1539,8 @@ namespace GatherBuddy.AutoGather
             Svc.Chat.CheckMessageHandled -= OnMessageHandled;
             AddonPressGuard.ForceTeardown();
             //Svc.AddonLifecycle.UnregisterListener(AddonEvent.PreFinalize, "Gathering", OnGatheringFinalize);
+            // Dispose 本身不改 _enabled，這裡讀到的就是卸載前的狀態。
+            ResumeOffer.Dispose(_enabled, _plugin.AutoGatherListsManager);
         }
 
         // 只停自己發起、還沒停掉的那條路徑（VNAV-OWN）：主迴圈在跑、沒在讓位給 AutoRetainer（Waiting），且路徑是自己送的。

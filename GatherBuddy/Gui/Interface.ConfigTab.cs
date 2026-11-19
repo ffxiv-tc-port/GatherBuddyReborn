@@ -133,6 +133,12 @@ public partial class Interface
                 GatherBuddy.Config.AutoGatherConfig.TataruPraiseOnStoppedItself,
                 b => GatherBuddy.Config.AutoGatherConfig.TataruPraiseOnStoppedItself = b);
 
+        public static void DrawAutoResumeAfterReloadBox()
+            => DrawCheckbox("Resume auto-gather automatically after the plugin is reloaded".Loc(),
+                "If auto-gather was running when the plugin was reloaded (disabled and re-enabled, or updated), start it again within 2 minutes instead of only showing a \"Resume\" prompt. Closing the game and starting it again never resumes or prompts.".Loc(),
+                GatherBuddy.Config.AutoGatherConfig.AutoResumeAfterReload,
+                b => GatherBuddy.Config.AutoGatherConfig.AutoResumeAfterReload = b);
+
         public static void DrawRepairBox()
             => DrawCheckbox("Repair gear when needed".Loc(),        "Repair gear when it is almost broken".Loc(),
                 GatherBuddy.Config.AutoGatherConfig.DoRepair, b => GatherBuddy.Config.AutoGatherConfig.DoRepair = b);
@@ -977,6 +983,7 @@ public partial class Interface
                 ConfigFunctions.DrawHonkVolumeSlider();
                 ConfigFunctions.DrawStopNotifyBox();
                 ConfigFunctions.DrawTataruPraiseBox();
+                ConfigFunctions.DrawAutoResumeAfterReloadBox();
                 AutoGatherUI.DrawMountSelector();
                 ConfigFunctions.DrawMountUpDistance();
                 ConfigFunctions.DrawMoveWhileMounting();

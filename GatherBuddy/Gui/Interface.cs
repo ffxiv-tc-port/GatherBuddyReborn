@@ -54,6 +54,7 @@ public partial class Interface : Window, IDisposable
     public override void Draw()
     {
         DrawHeader();
+        GatherBuddy.AutoGather.ResumeOffer.DrawBanner();
         using var tab = ImRaii.TabBar("ConfigTabs###GatherBuddyConfigTabs", ImGuiTabBarFlags.Reorderable);
         if (!tab)
             return;

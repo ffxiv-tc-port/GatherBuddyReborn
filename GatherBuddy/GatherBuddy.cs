@@ -183,6 +183,8 @@ public partial class GatherBuddy : IDalamudPlugin
                 WorldData.AddLocation(obj.BaseId, obj.Position);
         }
 
+        AutoGather.ResumeOffer.Tick();
+
         try
         {
             AutoGather.DoAutoGather();
