@@ -159,6 +159,7 @@ namespace GatherBuddy.AutoGather
                     AutoRetainerSuppression.ReleaseNow("自動採集已停用");
                     // 借走 AutoHook 的啟用開關就要還(與啟用分支的 SuppressNow 成對)。
                     AutoHookSuppression.RestoreNow("自動採集已停用");
+                    ResetTeleportBusyGate();
 
                     _activeItemList.Reset();
                     // 必須在 Waiting 歸零之前：讓位給 AutoRetainer 時在走的可能是 AR／Lifestream 的路，不能停。
@@ -283,6 +284,9 @@ namespace GatherBuddy.AutoGather
             {
                 return;
             }
+
+            // 放在所有提早 return 之前：被 CanAct 擋住的那幾幀也要記到「最後一次忙」，安靜期才從忙完那一刻起算。
+            ObserveTeleportBusy();
 
             // If we are not gathering and _currentGatherTarget is set, we just finished gathering or left the node
             if (!IsGathering && _currentGatherTarget != null)
@@ -523,8 +527,13 @@ namespace GatherBuddy.AutoGather
                 }
 
                 if (GatherBuddy.Config.AutoGatherConfig.GoHomeWhenIdle)
+                {
+                    // 只在 GoHome 真的會送的時候等（WentHome 時它直接回 false）。
+                    if (!WentHome && HoldTeleportForBusyPlayer("回家", null))
+                        return;
                     if (GoHome())
                         return;
+                }
 
                 if (HasReducibleItems())
                 {
@@ -585,6 +594,9 @@ namespace GatherBuddy.AutoGather
                         AutoStatus = "Manual teleporting required".Loc();
                     else if (!lifestreamBusy)
                     {
+                        if (HoldTeleportForBusyPlayer("用乙太網傳送到", next.First().Node?.Territory.Name))
+                            return;
+
                         AutoStatus = "Teleporting...".Loc();
                         StopNavigation();
                         string name = string.Empty;
@@ -770,6 +782,9 @@ namespace GatherBuddy.AutoGather
                     LeaveTheDiadem();
                     return;
                 }
+
+                if (HoldTeleportForBusyPlayer("傳送到", next.First().Location.Territory.Name))
+                    return;
 
                 AutoStatus = "Teleporting...".Loc();
                 StopNavigation();
@@ -1301,7 +1316,11 @@ namespace GatherBuddy.AutoGather
                 Task.Run(() => _soundHelper.StartHonkSoundTask(3));
             CloseGatheringAddons();
             if (GatherBuddy.Config.AutoGatherConfig.GoHomeWhenDone)
+            {
+                // 停止流程是一串排好的任務、不會再回到主迴圈 ⇒ 在佇列裡等；上限給到 int.MaxValue，結束只靠忙完放行或停用時 Abort。
+                TaskManager.Enqueue(() => WentHome || !HoldTeleportForBusyPlayer("回家", null), int.MaxValue, "等使用者忙完再回家");
                 EnqueueActionWithDelay(() => { GoHome(); });
+            }
             TaskManager.Enqueue(() =>
             {
                 // 必須在 Enabled = false 之前:setter 的停用分支第一件事就是把 AutoStatus
