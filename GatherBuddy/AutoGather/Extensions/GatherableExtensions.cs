@@ -42,7 +42,8 @@ public static class GatherableExtensions
     /// <returns>The count of the item in the inventory.</returns>
     public unsafe static int GetInventoryCount(this IGatherable gatherable)
     {
-        if (GatherBuddy.Config.AutoGatherConfig.CheckRetainers && AllaganTools.Enabled)
+        // 寶藏圖每個容器只能放一張（玩家背包、陸行鳥鞍囊、每名僱員各一張），擋採集的只有玩家背包那張 ⇒ 不算僱員。
+        if (!gatherable.IsTreasureMap && GatherBuddy.Config.AutoGatherConfig.CheckRetainers && AllaganTools.Enabled)
         {
             // 🔴 AllaganTools.Enabled 是節流過的答案(最多 5 秒舊),而這一段從「繪製執行緒」也走得到(逐項畫背包數量)。
             //    AllaganTools 剛好在那個窗裡被卸載的話,ItemCountOwned 會擲 IpcNotReadyError —— 在繪製路徑上那會變成
