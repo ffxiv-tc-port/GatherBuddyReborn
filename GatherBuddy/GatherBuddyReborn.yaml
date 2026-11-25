@@ -1,8 +1,13 @@
 name: GatherBuddy Reborn
 author: The Combat Reborn Team
 description: |-
-  透過物品名稱簡化採集流程，找出節點/魚群位置，並用 UI 追蹤特殊開放時段與天氣條件。
-punchline: 把採集與釣魚簡化到極致。
+  採集與釣魚的助手：用物品名稱找出採集點與釣場，追蹤限時採集點的出現時間與天氣，並可自動採集。
+  - 自動採集（啟用後才開始）：依清單自動導航、採集並收滿指定數量，途中可自動精選、精製魔晶石與修理；需搭配 vnavmesh，跨區移動可搭配 Lifestream，釣魚可搭配 AutoHook
+  - 自動採集清單：可從 TeamCraft 匯入，其他插件也能把缺的素材加進來（例如 Artisan）；限時採集點的道具會顯示預估還要多久才採得完
+  - 提醒與採集視窗：依採集點出現時間與天氣提醒，可自訂多組採集清單快速切換
+  - 釣魚計時器、刺魚輔助工具、釣魚紀錄與統計
+  - 指令 /gbr 開啟主視窗，/gather <物品名稱> 標出最近的採集點並傳送過去
+punchline: 查詢採集點與釣場，並可自動導航採集。
 repo_url: https://github.com/ffxiv-tc-port/GatherBuddyReborn
 icon_url: https://raw.githubusercontent.com/ffxiv-tc-port/DalamudPluginsTC/main/icons/GatherbuddyReborn.png
 dalamud_api_level: 13
