@@ -41,13 +41,13 @@ public static partial class Fish
             .Bait(data, 43850)
             .Bite(data, HookSet.Powerful, BiteType.Strong);
         data.Apply(43675, Patch.Dawntrail) // Sea Alpaca
-            .Bait(data, 29717)
+            .Bait(data, 43851)
             .Bite(data, HookSet.Precise, BiteType.Weak);
         data.Apply(43676, Patch.Dawntrail) // Marbled Hatchetfish
-            .Bait(data, 29717)
+            .Bait(data, 43851)
             .Bite(data, HookSet.Precise, BiteType.Weak);
         data.Apply(43677, Patch.Dawntrail) // Starsnipper
-            .Bait(data, 29717)
+            .Bait(data, 43851)
             .Bite(data, HookSet.Precise, BiteType.Weak);
         data.Apply(43678, Patch.Dawntrail) // Urqotrout
             .Bait(data, 43851)
@@ -82,7 +82,7 @@ public static partial class Fish
             .Bait(data, 43852)
             .Bite(data, HookSet.Powerful, BiteType.Strong);
         data.Apply(43688, Patch.Dawntrail) // Deepwarden
-            .Bait(data, 29717)
+            .Bait(data, 43858)
             .Bite(data, HookSet.Powerful, BiteType.Strong);
         data.Apply(43689, Patch.Dawntrail) // Kozama'uka Skipper
             .Bait(data, 43852)
@@ -109,7 +109,7 @@ public static partial class Fish
             .Bait(data, 43849)
             .Bite(data, HookSet.Powerful, BiteType.Strong);
         data.Apply(43697, Patch.Dawntrail) // Driftwood Catfish
-            .Bait(data, 43849)
+            .Bait(data, 43855)
             .Bite(data, HookSet.Powerful, BiteType.Strong);
         data.Apply(43698, Patch.Dawntrail) // Oho Hunu
             .Bait(data, 43849)
@@ -121,7 +121,7 @@ public static partial class Fish
             .Bait(data, 43849)
             .Bite(data, HookSet.Powerful, BiteType.Strong);
         data.Apply(43701, Patch.Dawntrail) // Hunu Peacock Bass
-            .Bait(data, 43852)
+            .Bait(data, 43849)
             .Bite(data, HookSet.Powerful, BiteType.Strong);
         data.Apply(43702, Patch.Dawntrail) // Pelubane
             .Bait(data, 43852)
@@ -240,7 +240,7 @@ public static partial class Fish
             .Bait(data, 43855)
             .Bite(data, HookSet.Powerful, BiteType.Strong);
         data.Apply(43740, Patch.Dawntrail) // Flawless Saucer
-            .Bait(data, 43852)
+            .Bait(data, 43858)
             .Bite(data, HookSet.Powerful, BiteType.Strong);
         data.Apply(43741, Patch.Dawntrail) // Glittergill
             .Bait(data, 29717)
@@ -249,7 +249,7 @@ public static partial class Fish
             .Bait(data, 29717)
             .Bite(data, HookSet.Powerful, BiteType.Strong);
         data.Apply(43743, Patch.Dawntrail) // Blind Brotula
-            .Bait(data, 29717)
+            .Bait(data, 43858)
             .Bite(data, HookSet.Precise, BiteType.Weak);
         data.Apply(43744, Patch.Dawntrail) // Yak T'el Caiman
             .Bait(data, 29717)
@@ -330,7 +330,7 @@ public static partial class Fish
             .Bait(data, 29717)
             .Bite(data, HookSet.Powerful, BiteType.Strong);
         data.Apply(43769, Patch.Dawntrail) // Moon Croppie
-            .Bait(data, 29717)
+            .Bait(data, 43855)
             .Bite(data, HookSet.Powerful, BiteType.Strong);
         data.Apply(43770, Patch.Dawntrail) // Driftdowns Trout
             .Bait(data, 29717)
@@ -348,20 +348,20 @@ public static partial class Fish
             .Bait(data, 43855)
             .Bite(data, HookSet.Powerful, BiteType.Strong);
         data.Apply(43775, Patch.Dawntrail) // Goldgrouper
-            .Bait(data, 43855)
+            .Bait(data, 43858)
             .Bite(data, HookSet.Powerful, BiteType.Strong)
             .Lure(Enums.Lure.Ambitious);
         data.Apply(43776, Patch.Dawntrail) // Everkeep Yabby
-            .Bait(data, 29717)
+            .Bait(data, 43858)
             .Bite(data, HookSet.Precise, BiteType.Weak);
         data.Apply(43777, Patch.Dawntrail) // Stickleback
-            .Bait(data, 29717)
+            .Bait(data, 43858)
             .Bite(data, HookSet.Precise, BiteType.Weak);
         data.Apply(43778, Patch.Dawntrail) // Custodian Carp
-            .Bait(data, 29717)
+            .Bait(data, 43858)
             .Bite(data, HookSet.Powerful, BiteType.Strong);
         data.Apply(43779, Patch.Dawntrail) // Mosaic Loach
-            .Bait(data, 29717)
+            .Bait(data, 43858)
             .Bite(data, HookSet.Powerful, BiteType.Strong);
         data.Apply(43780, Patch.Dawntrail) // Rosebud Frog
             .Bait(data, 29717)
@@ -405,7 +405,8 @@ public static partial class Fish
             .Bite(data, HookSet.Powerful, BiteType.Strong);
         data.Apply(43793, Patch.Dawntrail) // Devotion Clam
             .Bait(data, 43856)
-            .Bite(data, HookSet.Precise, BiteType.Weak);
+            .Bite(data, HookSet.Precise, BiteType.Weak)
+            .Snag(data, Snagging.Required);
         data.Apply(43794, Patch.Dawntrail) // Forgotten One
             .Bait(data, 43859)
             .Bite(data, HookSet.Powerful, BiteType.Strong);
@@ -464,10 +465,10 @@ public static partial class Fish
             .Spear(data, SpearfishSize.Large, SpearfishSpeed.Fast);
         data.Apply(43821, Patch.Dawntrail) // Piraputanga
             .Spear(data, SpearfishSize.Average, SpearfishSpeed.Fast)
-            .Predators(data, 300, (43810, 16));
+            .Predators(data, 0, (43810, 16));
         data.Apply(43822, Patch.Dawntrail) // Purussaurus
             .Spear(data, SpearfishSize.Large, SpearfishSpeed.ExtremelyFast)
-            .Predators(data, 300, (43810, 16));
+            .Predators(data, 0, (43810, 16));
         data.Apply(43823, Patch.Dawntrail) // Turali Land Crab
             .Spear(data, SpearfishSize.Small, SpearfishSpeed.SuperSlow);
         data.Apply(43824, Patch.Dawntrail) // Crested Goby
@@ -506,10 +507,10 @@ public static partial class Fish
             .Spear(data, SpearfishSize.Large, SpearfishSpeed.VeryFast);
         data.Apply(43841, Patch.Dawntrail) // Iq Rrax Crab
             .Spear(data, SpearfishSize.Small, SpearfishSpeed.VeryFast)
-            .Predators(data, 300, (43836, 16), (43842, 2), (43833, 3));
+            .Predators(data, 20, (43836, 16), (43842, 2), (43833, 3));
         data.Apply(43842, Patch.Dawntrail) // Wivre Cod
             .Spear(data, SpearfishSize.Large, SpearfishSpeed.SuperFast)
-            .Predators(data, 300, (43836, 16));
+            .Predators(data, 0, (43836, 16));
         data.Apply(43843, Patch.Dawntrail) // Warmouth
             .Spear(data, SpearfishSize.Small, SpearfishSpeed.VerySlow);
         data.Apply(43844, Patch.Dawntrail) // Shaaloani Goby

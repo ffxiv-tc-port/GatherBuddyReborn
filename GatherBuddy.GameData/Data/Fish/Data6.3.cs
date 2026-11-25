@@ -48,7 +48,7 @@ public static partial class Fish
             .Weather(data, 49)
             .Bite(data, HookSet.Powerful, BiteType.Legendary);
         data.Apply(38835, Patch.GodsRevelLandsTremble) // Cosmic Haze
-            .Mooch(data, 36594, 36489)
+            .Mooch(data, 36595, 36489)
             .Time(1200, 240)
             .Weather(data, 149)
             .Bite(data, HookSet.Powerful, BiteType.Legendary);
@@ -68,7 +68,7 @@ public static partial class Fish
             .Spear(data, SpearfishSize.Large, SpearfishSpeed.Slow);
         data.Apply(38841, Patch.GodsRevelLandsTremble) // Nosceasaur
             .Spear(data, SpearfishSize.Large, SpearfishSpeed.Fast)
-            .Predators(data, 60, (38939, 4))
+            .Predators(data, 20, (38939, 4))
             .Comment("Catch 4 Guppies in one node.");
         data.Apply(38935, Patch.GodsRevelLandsTremble) // Jhinga
             .Bait(data, 36593)
